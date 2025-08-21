@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "70143873029",
+    "project_id": "e-commerce-kotlin-7185f",
+    "storage_bucket": "e-commerce-kotlin-7185f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:70143873029:android:b404fbbc4f27bb4a33cc6c",
+        "android_client_info": {
+          "package_name": "com.project.e_commerce.android"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9z8zsTAd04kqryMyKvpDGE77l3dTt1ek"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
