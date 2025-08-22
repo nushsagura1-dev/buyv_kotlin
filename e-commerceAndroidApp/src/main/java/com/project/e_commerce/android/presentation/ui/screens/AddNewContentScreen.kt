@@ -40,8 +40,16 @@ import coil.compose.AsyncImage
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
+// import com.google.firebase.storage.FirebaseStorage // Commented out - using Cloudinary instead
 import com.project.e_commerce.android.R
+import com.project.e_commerce.android.data.remote.CloudinaryConfig
+import com.cloudinary.android.MediaManager
+import com.cloudinary.android.callback.ErrorInfo
+import com.cloudinary.android.callback.UploadCallback
+import com.cloudinary.utils.ObjectUtils
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import java.io.IOException
 
 data class SizeEntry(
     var size: String = "",
@@ -58,6 +66,136 @@ data class CategoryBehavior(
     val enableSize: Boolean,
     val enableColor: Boolean
 )
+
+// Helper function to upload images to Cloudinary and save product
+private fun uploadImagesToCloudinary(
+    videoUrl: String, 
+    firestore: FirebaseFirestore,
+    context: android.content.Context,
+    productImageUris: List<Uri>,
+    selectedCategory: String,
+    description: String,
+    productName: String,
+    productPrice: String,
+    productQuantity: String,
+    reelTitle: String,
+    productTags: String,
+    sizes: List<String>,
+    colorQuantities: Map<String, MutableMap<String, String>>,
+    navController: NavHostController
+) {
+    if (productImageUris.isEmpty()) {
+        // No images to upload, save product directly
+        saveProductToFirestore(
+            videoUrl, emptyList(), firestore, context,
+            selectedCategory, description, productName, productPrice,
+            productQuantity, reelTitle, productTags, sizes, colorQuantities, navController
+        )
+        return
+    }
+    
+    var uploadedImages = 0
+    val imageUrls = mutableListOf<String>()
+    
+    productImageUris.forEach { uri ->
+        val imageOptions = ObjectUtils.asMap(
+            "public_id", "products/${System.currentTimeMillis()}_${uri.lastPathSegment}",
+            "upload_preset", CloudinaryConfig.UPLOAD_PRESET,
+            "folder", CloudinaryConfig.Folders.PRODUCTS
+        )
+        
+        MediaManager.get().upload(uri)
+            .options(imageOptions)
+            .callback(object : UploadCallback {
+                override fun onStart(requestId: String) {
+                    // Upload started
+                }
+                
+                override fun onSuccess(requestId: String, resultData: Map<Any?, Any?>) {
+                    val imageUrl = resultData["secure_url"] as String
+                    imageUrls.add(imageUrl)
+                    uploadedImages++
+                    
+                    if (uploadedImages == productImageUris.size) {
+                        // All images uploaded, save product
+                        saveProductToFirestore(
+                            videoUrl, imageUrls, firestore, context,
+                            selectedCategory, description, productName, productPrice,
+                            productQuantity, reelTitle, productTags, sizes, colorQuantities, navController
+                        )
+                    }
+                }
+                
+                override fun onError(requestId: String, error: ErrorInfo) {
+                    Toast.makeText(context, "فشل في رفع الصورة: ${error.description}", Toast.LENGTH_SHORT).show()
+                }
+                
+                override fun onReschedule(requestId: String, error: ErrorInfo) {
+                    Toast.makeText(context, "إعادة جدولة رفع الصورة", Toast.LENGTH_SHORT).show()
+                }
+                
+                override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {
+                    // يمكن إضافة شريط تقدم هنا
+                }
+            }).dispatch()
+    }
+}
+
+// Helper function to save product to Firestore
+private fun saveProductToFirestore(
+    videoUrl: String, 
+    imageUrls: List<String>, 
+    firestore: FirebaseFirestore,
+    context: android.content.Context,
+    selectedCategory: String,
+    description: String,
+    productName: String,
+    productPrice: String,
+    productQuantity: String,
+    reelTitle: String,
+    productTags: String,
+    sizes: List<String>,
+    colorQuantities: Map<String, MutableMap<String, String>>,
+    navController: NavHostController
+) {
+    // تكوين sizeColorData
+    val sizeColorData = sizes.map { size ->
+        val colorsMap = colorQuantities[size] ?: emptyMap()
+        mapOf(
+            "size" to size,
+            "colors" to colorsMap.ifEmpty { mapOf("" to productQuantity.ifBlank { "0" }) }
+        )
+    }
+    
+    // حفظ المنتج
+    val product = hashMapOf(
+        "category" to selectedCategory,
+        "categoryName" to selectedCategory,
+        "createdAt" to FieldValue.serverTimestamp(),
+        "description" to description,
+        "name" to productName,
+        "price" to productPrice,
+        "productImages" to imageUrls,
+        "quantity" to productQuantity,
+        "rating" to 0,
+        "reelTitle" to reelTitle,
+        "reelVideoUrl" to videoUrl,
+        "search_query" to "",
+        "soldCount" to "0",
+        "tags" to productTags,
+        "sizeColorData" to sizeColorData
+    )
+    
+    firestore.collection("products")
+        .add(product)
+        .addOnSuccessListener {
+            Toast.makeText(context, "تم إضافة المنتج بنجاح", Toast.LENGTH_SHORT).show()
+            navController.popBackStack()
+        }
+        .addOnFailureListener { e ->
+            Toast.makeText(context, "فشل في الحفظ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        }
+}
 
 @Composable
 fun AddNewContentScreen(navController: NavHostController) {
@@ -485,7 +623,7 @@ fun AddNewContentScreen(navController: NavHostController) {
 
         Spacer(modifier = Modifier.height(30.dp))
 
-        // ========= Submit (رفع على Firebase Storage + حفظ في Firestore) =========
+        // ========= Submit (رفع على Cloudinary + حفظ في Firestore) =========
         Button(
             onClick = {
                 val reelUri = reelVideoUri.value
@@ -498,73 +636,141 @@ fun AddNewContentScreen(navController: NavHostController) {
                     return@Button
                 }
 
-                val storage = FirebaseStorage.getInstance().reference
+                // ========= FIREBASE STORAGE CODE (COMMENTED OUT - USING CLOUDINARY INSTEAD) =========
+                // val storage = FirebaseStorage.getInstance().reference
+                // val firestore = FirebaseFirestore.getInstance()
+                //
+                // // 1) رفع الفيديو
+                // val videoRef = storage.child("reels/${System.currentTimeMillis()}.mp4")
+                // val uploadVideoTask = videoRef.putFile(reelUri)
+                // uploadVideoTask
+                //     .continueWithTask { task ->
+                //         if (!task.isSuccessful) throw task.exception ?: Exception("Video upload failed")
+                //         videoRef.downloadUrl
+                //     }
+                //     .addOnSuccessListener { videoDownloadUrl ->
+                //         // 2) رفع الصور
+                //         val imageUploadTasks = productImageUris.map { uri ->
+                //             val imageRef = storage.child("product_images/${System.currentTimeMillis()}_${uri.lastPathSegment}")
+                //             imageRef.putFile(uri).continueWithTask { t ->
+                //                 if (!t.isSuccessful) throw t.exception ?: Exception("Image upload failed")
+                //                 imageRef.downloadUrl
+                //             }
+                //         }
+                //
+                //         Tasks.whenAllSuccess<Uri>(imageUploadTasks).addOnSuccessListener { imageDownloadUrls ->
+                //             // 3) تكوين sizeColorData
+                //             val sizeColorData = sizes.map { size ->
+                //                 val colorsMap = colorQuantities[size] ?: emptyMap()
+                //                 mapOf(
+                //                     "size" to size,
+                //                     "colors" to colorsMap.ifEmpty { mapOf("" to productQuantity.ifBlank { "0" }) }
+                //                 )
+                //             }
+                //
+                //             // 4) حفظ المنتج
+                //             val product = hashMapOf(
+                //                 "category" to selectedCategory,
+                //                 "categoryName" to selectedCategory,
+                //                 "createdAt" to FieldValue.serverTimestamp(),
+                //                 "description" to description,
+                //                 "name" to productName,
+                //                 "price" to productPrice,
+                //                 "productImages" to imageDownloadUrls.map { it.toString() },
+                //                 "quantity" to productQuantity,
+                //                 "rating" to 0,
+                //                 "reelTitle" to reelTitle,
+                //                                 "reelVideoUrl" to videoDownloadUrl.toString(),
+                //                                 "search_query" to "",
+                //                                 "soldCount" to "0",
+                //                                 "tags" to productTags,
+                //                                 "sizeColorData" to sizeColorData
+                //                             )
+                //
+                //                             firestore.collection("products")
+                //                                 .add(product)
+                //                                 .addOnSuccessListener {
+                //                                     Toast.makeText(context, "تم إضافة المنتج بنجاح", Toast.LENGTH_SHORT).show()
+                //                                     navController.popBackStack()
+                //                                 }
+                //                                 .addOnFailureListener { e ->
+                //                                     Toast.makeText(context, "فشل في الحفظ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                //                                 }
+                //                         }.addOnFailureListener {
+                //                             Toast.makeText(context, "فشل في رفع الصور", Toast.LENGTH_SHORT).show()
+                //                         }
+                //                     }
+                //                     .addOnFailureListener {
+                //                         Toast.makeText(context, "فشل في رفع الفيديو", Toast.LENGTH_SHORT).show()
+                //                     }
+                // ========= END FIREBASE STORAGE CODE =========
+
                 val firestore = FirebaseFirestore.getInstance()
 
-                // 1) رفع الفيديو
-                val videoRef = storage.child("reels/${System.currentTimeMillis()}.mp4")
-                val uploadVideoTask = videoRef.putFile(reelUri)
-                uploadVideoTask
-                    .continueWithTask { task ->
-                        if (!task.isSuccessful) throw task.exception ?: Exception("Video upload failed")
-                        videoRef.downloadUrl
-                    }
-                    .addOnSuccessListener { videoDownloadUrl ->
-                        // 2) رفع الصور
-                        val imageUploadTasks = productImageUris.map { uri ->
-                            val imageRef = storage.child("product_images/${System.currentTimeMillis()}_${uri.lastPathSegment}")
-                            imageRef.putFile(uri).continueWithTask { t ->
-                                if (!t.isSuccessful) throw t.exception ?: Exception("Image upload failed")
-                                imageRef.downloadUrl
-                            }
-                        }
+                // Show loading state
+                Toast.makeText(context, "Uploading files...", Toast.LENGTH_SHORT).show()
 
-                        Tasks.whenAllSuccess<Uri>(imageUploadTasks).addOnSuccessListener { imageDownloadUrls ->
-                            // 3) تكوين sizeColorData
-                            val sizeColorData = sizes.map { size ->
-                                val colorsMap = colorQuantities[size] ?: emptyMap()
-                                mapOf(
-                                    "size" to size,
-                                    // المفتاح الفاضي "" للـ qty بدون ألوان (متوافق مع العرض)
-                                    "colors" to colorsMap.ifEmpty { mapOf("" to productQuantity.ifBlank { "0" }) }
-                                )
-                            }
+                // 1) رفع الفيديو على Cloudinary
+                // Build the upload URL for unsigned uploads
+                val uploadUrl = "https://api.cloudinary.com/v1_1/${CloudinaryConfig.CLOUD_NAME}/video/upload"
+                
+                // Create multipart request body
+                val videoBytes = context.contentResolver.openInputStream(reelUri)?.readBytes() ?: ByteArray(0)
+                val videoRequestBody = RequestBody.create("video/mp4".toMediaTypeOrNull(), videoBytes)
+                
+                val requestBody = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("upload_preset", CloudinaryConfig.UPLOAD_PRESET)
+                    .addFormDataPart("public_id", "reels/${System.currentTimeMillis()}")
+                    .addFormDataPart("folder", CloudinaryConfig.Folders.REELS)
+                    .addFormDataPart("resource_type", "video")
+                    .addFormDataPart("file", "video.mp4", videoRequestBody)
+                    .build()
 
-                            // 4) حفظ المنتج
-                            val product = hashMapOf(
-                                "category" to selectedCategory,
-                                "categoryName" to selectedCategory,
-                                "createdAt" to FieldValue.serverTimestamp(),
-                                "description" to description,
-                                "name" to productName,
-                                "price" to productPrice,
-                                "productImages" to imageDownloadUrls.map { it.toString() },
-                                "quantity" to productQuantity,
-                                "rating" to 0,
-                                "reelTitle" to reelTitle,
-                                "reelVideoUrl" to videoDownloadUrl.toString(),
-                                "search_query" to "",
-                                "soldCount" to "0",
-                                "tags" to productTags,
-                                "sizeColorData" to sizeColorData
-                            )
+                // Create OkHttp client and request
+                val client = OkHttpClient()
+                val request = Request.Builder()
+                    .url(uploadUrl)
+                    .post(requestBody)
+                    .build()
 
-                            firestore.collection("products")
-                                .add(product)
-                                .addOnSuccessListener {
-                                    Toast.makeText(context, "تم إضافة المنتج بنجاح", Toast.LENGTH_SHORT).show()
-                                    navController.popBackStack()
-                                }
-                                .addOnFailureListener { e ->
-                                    Toast.makeText(context, "فشل في الحفظ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                }
-                        }.addOnFailureListener {
-                            Toast.makeText(context, "فشل في رفع الصور", Toast.LENGTH_SHORT).show()
+                // Execute upload in background
+                client.newCall(request).enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        // Use Handler to post to main thread
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            Toast.makeText(context, "فشل في رفع الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                     }
-                    .addOnFailureListener {
-                        Toast.makeText(context, "فشل في رفع الفيديو", Toast.LENGTH_SHORT).show()
+
+                    override fun onResponse(call: Call, response: Response) {
+                        if (response.isSuccessful) {
+                            val responseBody = response.body?.string()
+                            try {
+                                val jsonObject = org.json.JSONObject(responseBody ?: "{}")
+                                val videoUrl = jsonObject.getString("secure_url")
+                                
+                                // Use Handler to post to main thread
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    // 2) رفع الصور على Cloudinary
+                                    uploadImagesToCloudinary(
+                                        videoUrl, firestore, context, productImageUris,
+                                        selectedCategory, description, productName, productPrice,
+                                        productQuantity, reelTitle, productTags, sizes, colorQuantities, navController
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    Toast.makeText(context, "خطأ في معالجة الاستجابة: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } else {
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                Toast.makeText(context, "فشل في رفع الفيديو: ${response.code}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
+                })
             },
             modifier = Modifier
                 .fillMaxWidth()

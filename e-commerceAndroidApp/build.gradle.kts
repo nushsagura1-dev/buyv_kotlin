@@ -90,7 +90,11 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx:23.2.1")
     implementation("com.google.firebase:firebase-analytics:23.0.0")
     implementation("com.google.firebase:firebase-firestore-ktx:25.1.4")
-    implementation("com.google.firebase:firebase-storage-ktx:21.0.2")
+    // implementation("com.google.firebase:firebase-storage-ktx:21.0.2") // Commented out - using Cloudinary instead
+
+    // Cloudinary
+    implementation("com.cloudinary:cloudinary-android:3.1.1")
+    implementation("com.cloudinary:cloudinary-core:2.3.2")
 
     // UI / Animations / Media
     implementation("com.airbnb.android:lottie-compose:6.6.7")
