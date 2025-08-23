@@ -17,7 +17,7 @@ import com.project.e_commerce.android.presentation.viewModel.loginScreenViewMode
 import com.project.e_commerce.android.presentation.viewModel.profileViewModel.ProfileViewModel
 import com.project.e_commerce.android.presentation.viewModel.reelsScreenViewModel.ReelsScreenViewModel
 import com.project.e_commerce.android.presentation.viewModel.restPasswordViewModel.RestPasswordViewModel
-import com.project_e_commerce.android.presentation.viewModel.AuthViewModel
+import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
 import okhttp3.OkHttpClient
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module

@@ -6,10 +6,6 @@ import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -30,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,9 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -61,31 +54,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
-import com.bumptech.glide.integration.compose.GlideImage
+// ORIGINAL GLIDE IMPORTS (COMMENTED OUT):
+// import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
+// import com.bumptech.glide.integration.compose.GlideImage
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.composable.composableScreen.public.VideoPlayer
-import androidx.compose.ui.unit.IntOffset
 import com.project.e_commerce.android.presentation.ui.utail.noRippleClickable
 import com.project.e_commerce.android.presentation.viewModel.MainUiStateViewModel
 import com.project.e_commerce.android.presentation.viewModel.reelsScreenViewModel.ReelsScreenViewModel
-import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
+import coil.compose.AsyncImage
 import com.project.e_commerce.android.presentation.ui.screens.HeaderStyle
-import kotlinx.coroutines.delay
 import com.google.accompanist.pager.*
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.ui.screens.HeartAnimation
 import com.project.e_commerce.android.presentation.ui.screens.RequireLoginPrompt
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.Comment
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.Ratings
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.Reels
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -536,7 +523,8 @@ fun ReelContent(
 }
 
 
-@OptIn(ExperimentalGlideComposeApi::class)
+// ORIGINAL GLIDE ANNOTATION (COMMENTED OUT):
+// @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun UserInfo(
     reel: Reels,
@@ -705,7 +693,8 @@ fun ReelHashtags(hashtags: List<String>) {
     )
 }
 
-@OptIn(ExperimentalGlideComposeApi::class)
+// ORIGINAL GLIDE ANNOTATION (COMMENTED OUT):
+// @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun InteractionButtons(
     navController: NavHostController,
@@ -724,7 +713,22 @@ fun InteractionButtons(
             modifier = Modifier
                 .size(46.dp) // مساحة أكبر لتضمين التوثيق
         ) {
-            GlideImage(
+            // ORIGINAL GLIDE CODE (COMMENTED OUT):
+            // GlideImage(
+            //     model = reel.userImage,
+            //     contentScale = ContentScale.Crop,
+            //     modifier = Modifier
+            //         .size(40.dp)
+            //         .align(Alignment.TopCenter)
+            //         .clip(CircleShape)
+            //         .clickable {
+            //             navController.navigate(Screens.ReelsScreen.UserProfileScreen.route)
+            //         },
+            //     contentDescription = "User Avatar"
+            // )
+            
+            // NEW COIL CODE:
+            AsyncImage(
                 model = reel.userImage,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -1369,7 +1373,8 @@ fun ModernInputField(
 
 
 // ModernCommentItem
-@OptIn(ExperimentalGlideComposeApi::class)
+// ORIGINAL GLIDE ANNOTATION (COMMENTED OUT):
+// @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun ModernCommentItem(
     comment: Comment,
@@ -1385,7 +1390,18 @@ fun ModernCommentItem(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.Top
     ) {
-        GlideImage(
+        // ORIGINAL GLIDE CODE (COMMENTED OUT):
+        // GlideImage(
+        //     model = R.drawable.profile,
+        //     contentDescription = "User Avatar",
+        //     contentScale = ContentScale.Crop,
+        //     modifier = Modifier
+        //         .size(40.dp)
+        //         .clip(CircleShape)
+        // )
+        
+        // NEW COIL CODE:
+        AsyncImage(
             model = R.drawable.profile,
             contentDescription = "User Avatar",
             contentScale = ContentScale.Crop,
@@ -1490,7 +1506,8 @@ fun ModernCommentItem(
 
 
 // ModernRatingItem
-@OptIn(ExperimentalGlideComposeApi::class)
+// ORIGINAL GLIDE ANNOTATION (COMMENTED OUT):
+// @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun ModernRatingItem(
     rating: Ratings,
@@ -1505,7 +1522,19 @@ fun ModernRatingItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // صورة المستخدم
-        GlideImage(
+        
+        // ORIGINAL GLIDE CODE (COMMENTED OUT):
+        // GlideImage(
+        //     model = R.drawable.profile,
+        //     contentDescription = "User Avatar",
+        //     contentScale = ContentScale.Crop,
+        //     modifier = Modifier
+        //         .size(40.dp)
+        //         .clip(CircleShape)
+        // )
+        
+        // NEW COIL CODE:
+        AsyncImage(
             model = R.drawable.profile,
             contentDescription = "User Avatar",
             contentScale = ContentScale.Crop,

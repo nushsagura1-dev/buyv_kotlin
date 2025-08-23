@@ -37,19 +37,14 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
-import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-// import com.google.firebase.storage.FirebaseStorage // Commented out - using Cloudinary instead
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.data.remote.CloudinaryConfig
 import com.cloudinary.android.MediaManager
 import com.cloudinary.android.callback.ErrorInfo
 import com.cloudinary.android.callback.UploadCallback
 import com.cloudinary.utils.ObjectUtils
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import java.io.IOException
 
 data class SizeEntry(
     var size: String = "",
@@ -636,141 +631,58 @@ fun AddNewContentScreen(navController: NavHostController) {
                     return@Button
                 }
 
-                // ========= FIREBASE STORAGE CODE (COMMENTED OUT - USING CLOUDINARY INSTEAD) =========
-                // val storage = FirebaseStorage.getInstance().reference
-                // val firestore = FirebaseFirestore.getInstance()
-                //
-                // // 1) رفع الفيديو
-                // val videoRef = storage.child("reels/${System.currentTimeMillis()}.mp4")
-                // val uploadVideoTask = videoRef.putFile(reelUri)
-                // uploadVideoTask
-                //     .continueWithTask { task ->
-                //         if (!task.isSuccessful) throw task.exception ?: Exception("Video upload failed")
-                //         videoRef.downloadUrl
-                //     }
-                //     .addOnSuccessListener { videoDownloadUrl ->
-                //         // 2) رفع الصور
-                //         val imageUploadTasks = productImageUris.map { uri ->
-                //             val imageRef = storage.child("product_images/${System.currentTimeMillis()}_${uri.lastPathSegment}")
-                //             imageRef.putFile(uri).continueWithTask { t ->
-                //                 if (!t.isSuccessful) throw t.exception ?: Exception("Image upload failed")
-                //                 imageRef.downloadUrl
-                //             }
-                //         }
-                //
-                //         Tasks.whenAllSuccess<Uri>(imageUploadTasks).addOnSuccessListener { imageDownloadUrls ->
-                //             // 3) تكوين sizeColorData
-                //             val sizeColorData = sizes.map { size ->
-                //                 val colorsMap = colorQuantities[size] ?: emptyMap()
-                //                 mapOf(
-                //                     "size" to size,
-                //                     "colors" to colorsMap.ifEmpty { mapOf("" to productQuantity.ifBlank { "0" }) }
-                //                 )
-                //             }
-                //
-                //             // 4) حفظ المنتج
-                //             val product = hashMapOf(
-                //                 "category" to selectedCategory,
-                //                 "categoryName" to selectedCategory,
-                //                 "createdAt" to FieldValue.serverTimestamp(),
-                //                 "description" to description,
-                //                 "name" to productName,
-                //                 "price" to productPrice,
-                //                 "productImages" to imageDownloadUrls.map { it.toString() },
-                //                 "quantity" to productQuantity,
-                //                 "rating" to 0,
-                //                 "reelTitle" to reelTitle,
-                //                                 "reelVideoUrl" to videoDownloadUrl.toString(),
-                //                                 "search_query" to "",
-                //                                 "soldCount" to "0",
-                //                                 "tags" to productTags,
-                //                                 "sizeColorData" to sizeColorData
-                //                             )
-                //
-                //                             firestore.collection("products")
-                //                                 .add(product)
-                //                                 .addOnSuccessListener {
-                //                                     Toast.makeText(context, "تم إضافة المنتج بنجاح", Toast.LENGTH_SHORT).show()
-                //                                     navController.popBackStack()
-                //                                 }
-                //                                 .addOnFailureListener { e ->
-                //                                     Toast.makeText(context, "فشل في الحفظ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                //                                 }
-                //                         }.addOnFailureListener {
-                //                             Toast.makeText(context, "فشل في رفع الصور", Toast.LENGTH_SHORT).show()
-                //                         }
-                //                     }
-                //                     .addOnFailureListener {
-                //                         Toast.makeText(context, "فشل في رفع الفيديو", Toast.LENGTH_SHORT).show()
-                //                     }
-                // ========= END FIREBASE STORAGE CODE =========
+                // Cloudinary upload implementation
 
                 val firestore = FirebaseFirestore.getInstance()
 
                 // Show loading state
                 Toast.makeText(context, "Uploading files...", Toast.LENGTH_SHORT).show()
 
-                // 1) رفع الفيديو على Cloudinary
-                // Build the upload URL for unsigned uploads
-                val uploadUrl = "https://api.cloudinary.com/v1_1/${CloudinaryConfig.CLOUD_NAME}/video/upload"
+                // 1) رفع الفيديو على Cloudinary using MediaManager SDK
+                val videoOptions = ObjectUtils.asMap(
+                    "public_id", "reels/${System.currentTimeMillis()}",
+                    "upload_preset", CloudinaryConfig.UPLOAD_PRESET,
+                    "folder", CloudinaryConfig.Folders.REELS,
+                    "resource_type", "video"
+                )
                 
-                // Create multipart request body
-                val videoBytes = context.contentResolver.openInputStream(reelUri)?.readBytes() ?: ByteArray(0)
-                val videoRequestBody = RequestBody.create("video/mp4".toMediaTypeOrNull(), videoBytes)
-                
-                val requestBody = MultipartBody.Builder()
-                    .setType(MultipartBody.FORM)
-                    .addFormDataPart("upload_preset", CloudinaryConfig.UPLOAD_PRESET)
-                    .addFormDataPart("public_id", "reels/${System.currentTimeMillis()}")
-                    .addFormDataPart("folder", CloudinaryConfig.Folders.REELS)
-                    .addFormDataPart("resource_type", "video")
-                    .addFormDataPart("file", "video.mp4", videoRequestBody)
-                    .build()
-
-                // Create OkHttp client and request
-                val client = OkHttpClient()
-                val request = Request.Builder()
-                    .url(uploadUrl)
-                    .post(requestBody)
-                    .build()
-
-                // Execute upload in background
-                client.newCall(request).enqueue(object : Callback {
-                    override fun onFailure(call: Call, e: IOException) {
-                        // Use Handler to post to main thread
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            Toast.makeText(context, "فشل في رفع الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
+                MediaManager.get().upload(reelUri)
+                    .options(videoOptions)
+                    .callback(object : UploadCallback {
+                        override fun onStart(requestId: String) {
+                            // Upload started
                         }
-                    }
-
-                    override fun onResponse(call: Call, response: Response) {
-                        if (response.isSuccessful) {
-                            val responseBody = response.body?.string()
-                            try {
-                                val jsonObject = org.json.JSONObject(responseBody ?: "{}")
-                                val videoUrl = jsonObject.getString("secure_url")
-                                
-                                // Use Handler to post to main thread
-                                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    // 2) رفع الصور على Cloudinary
-                                    uploadImagesToCloudinary(
-                                        videoUrl, firestore, context, productImageUris,
-                                        selectedCategory, description, productName, productPrice,
-                                        productQuantity, reelTitle, productTags, sizes, colorQuantities, navController
-                                    )
-                                }
-                            } catch (e: Exception) {
-                                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    Toast.makeText(context, "خطأ في معالجة الاستجابة: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        } else {
+                        
+                        override fun onSuccess(requestId: String, resultData: Map<Any?, Any?>) {
+                            val videoUrl = resultData["secure_url"] as String
+                            
+                            // Use Handler to post to main thread
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                Toast.makeText(context, "فشل في رفع الفيديو: ${response.code}", Toast.LENGTH_SHORT).show()
+                                // 2) رفع الصور على Cloudinary
+                                uploadImagesToCloudinary(
+                                    videoUrl, firestore, context, productImageUris,
+                                    selectedCategory, description, productName, productPrice,
+                                    productQuantity, reelTitle, productTags, sizes, colorQuantities, navController
+                                )
                             }
                         }
-                    }
-                })
+                        
+                        override fun onError(requestId: String, error: ErrorInfo) {
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                Toast.makeText(context, "فشل في رفع الفيديو: ${error.description}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        
+                        override fun onReschedule(requestId: String, error: ErrorInfo) {
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                Toast.makeText(context, "إعادة جدولة رفع الفيديو", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        
+                        override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {
+                            // يمكن إضافة شريط تقدم هنا
+                        }
+                    }).dispatch()
             },
             modifier = Modifier
                 .fillMaxWidth()

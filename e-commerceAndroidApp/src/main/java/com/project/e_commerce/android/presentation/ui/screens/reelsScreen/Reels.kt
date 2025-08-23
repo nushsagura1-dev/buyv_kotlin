@@ -1,4 +1,4 @@
-package com.project_e_commerce.android.presentation.ui.screens.reelsScreen
+package com.project.e_commerce.android.presentation.ui.screens.reelsScreen
 
 import android.net.Uri
 import com.project.e_commerce.android.R

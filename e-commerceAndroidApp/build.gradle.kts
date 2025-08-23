@@ -98,7 +98,8 @@ dependencies {
 
     // UI / Animations / Media
     implementation("com.airbnb.android:lottie-compose:6.6.7")
-    implementation("com.github.bumptech.glide:compose:1.0.0-beta01")
+    // ORIGINAL GLIDE DEPENDENCY (COMMENTED OUT):
+    // implementation("com.github.bumptech.glide:compose:1.0.0-beta01")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.tbuonomo:dotsindicator:5.1.0")
     implementation("com.google.accompanist:accompanist-pager:0.36.0")

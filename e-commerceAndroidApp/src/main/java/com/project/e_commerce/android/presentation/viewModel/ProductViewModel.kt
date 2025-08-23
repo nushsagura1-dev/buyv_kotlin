@@ -9,12 +9,11 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.*
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.Comment
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.LoveItem
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.NewComment
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.Ratings
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.Reels
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Comment
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.LoveItem
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.NewComment
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Ratings
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 

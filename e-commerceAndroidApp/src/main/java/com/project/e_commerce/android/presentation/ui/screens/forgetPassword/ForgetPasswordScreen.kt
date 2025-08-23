@@ -28,8 +28,8 @@ import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import org.koin.androidx.compose.koinViewModel
 import com.project.e_commerce.android.R
 import com.project_e_commerce.android.presentation.ui.screens.createAccountScreen.InputFieldWithLabel
-import com.project_e_commerce.android.presentation.viewModel.AuthEffect
-import com.project_e_commerce.android.presentation.viewModel.AuthViewModel
+import com.project.e_commerce.android.presentation.viewModel.AuthEffect
+import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable

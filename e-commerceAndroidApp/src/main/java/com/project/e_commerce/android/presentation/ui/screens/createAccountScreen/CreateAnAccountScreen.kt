@@ -25,8 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import com.project_e_commerce.android.presentation.viewModel.AuthEffect
-import com.project_e_commerce.android.presentation.viewModel.AuthViewModel
+import com.project.e_commerce.android.presentation.viewModel.AuthEffect
+import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
 

@@ -1,6 +1,6 @@
 package com.project.e_commerce.domain.repository
 
-import com.project.e_commerce.domain.model.User
+import com.project.e_commerce.android.domain.model.User
 import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {

@@ -1,7 +1,7 @@
 package com.project.e_commerce.android.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
-import com.project.e_commerce.domain.model.User
+import com.project.e_commerce.android.domain.model.User
 import com.project.e_commerce.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

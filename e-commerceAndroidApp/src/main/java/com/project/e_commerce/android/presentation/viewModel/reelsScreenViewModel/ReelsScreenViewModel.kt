@@ -10,11 +10,11 @@ import androidx.navigation.NavController
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.viewModel.baseViewModel.BaseViewModel
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.Comment
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.LoveItem
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.NewComment
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.Ratings
-import com.project_e_commerce.android.presentation.ui.screens.reelsScreen.Reels
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Comment
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.LoveItem
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.NewComment
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Ratings
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

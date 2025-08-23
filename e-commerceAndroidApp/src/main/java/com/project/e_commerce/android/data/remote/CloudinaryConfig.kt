@@ -5,6 +5,8 @@ import com.cloudinary.android.MediaManager
 
 object CloudinaryConfig {
     const val CLOUD_NAME = "dwtbxzkst"
+    const val CLOUDINARY_API_KEY = "137652538693452"
+    const val CLOUDINARY_API_SECRET = "UyOMGSySXjNLDrYsB2HwzK9Sa0w"
     const val UPLOAD_PRESET = "Ecommerce_BuyV"
     
     // Folder structure for organized uploads
@@ -31,7 +33,8 @@ object CloudinaryConfig {
     fun init(context: android.content.Context) {
         val config = HashMap<String, String>()
         config["cloud_name"] = CLOUD_NAME
-        // No API key or secret needed for unsigned uploads
+        config["api_key"] = CLOUDINARY_API_KEY
+        config["api_secret"] = CLOUDINARY_API_SECRET
         
         MediaManager.init(context, config)
     }
