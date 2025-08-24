@@ -59,6 +59,7 @@ import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.CartItem
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
+
 class MainActivity : ComponentActivity() {
     private val cartViewModel: CartViewModel by viewModel()
     private val mainUiStateViewModel by viewModels<MainUiStateViewModel>()

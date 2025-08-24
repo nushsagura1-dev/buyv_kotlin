@@ -2,22 +2,21 @@ package com.project.e_commerce.android.presentation.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Button
@@ -25,23 +24,24 @@ import androidx.compose.material.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavHostController
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.ui.screens.profileScreen.ProfileStat
-import com.project.e_commerce.android.presentation.ui.screens.profileScreen.SimpleProductGrid
-import com.project.e_commerce.android.presentation.ui.screens.profileScreen.SimpleReelGrid
 
 
 @Composable
@@ -231,10 +231,115 @@ fun UserProfileScreen(navController: NavHostController) {
     }
 }
 
-
-@Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun PreviewUserProfileScreen() {
-    val navController = rememberNavController()
-    UserProfileScreen(navController = navController)
+fun SimpleReelGrid(navController: NavHostController) {
+    val reels = listOf(
+        R.drawable.perfume1, R.drawable.img2, R.drawable.img3, R.drawable.img4,
+        R.drawable.perfume1, R.drawable.img2, R.drawable.img3, R.drawable.img4,
+        R.drawable.perfume1, R.drawable.img2, R.drawable.img3
+    )
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.height(650.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        items(reels) { imageRes ->
+            Box(
+                modifier = Modifier
+                    .background(Color(0xFFF8F8F8))
+                    .height(130.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = imageRes),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(4.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_play),
+                        contentDescription = null,
+                        tint = Color.White,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("105", color = Color.White, fontSize = 12.sp)
+                }
+            }
+        }
+    }
 }
+
+@Composable
+fun SimpleProductGrid(navController: NavHostController) {
+    val products = listOf(
+        Triple("White Laptop", "In Stock", "$100"),
+        Triple("Elegant Perfume", "Out of Stock", "$50"),
+        Triple("Smart Watch", "5 left", "$75"),
+        Triple("Designer Bag", "10 left", "$150"),
+        Triple("Smart Watch", "Out of Stock", "$75"),
+        Triple("Smart Watch", "In Stock", "$100"),
+        Triple("Smart Watch", "In Stock", "$75"),
+    )
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.height(650.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        items(products) { (title, stock, price) ->
+            Column(
+                modifier = Modifier
+                    .background(Color(0xFFF8F8F8))
+                    .padding(bottom = 4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.img2),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                Text(
+                    title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 6.dp, start = 8.dp, end = 8.dp)
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        stock,
+                        color = if (stock == "Out of Stock") Color(0xFFEB1919)
+                        else if (stock == "In Stock") Color(0xFF22C55E)
+                        else Color.Gray,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        price,
+                        color = Color(0xFFFF6F00),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+    }
+}
+

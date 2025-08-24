@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.viewModel.CartItem
 import com.project.e_commerce.android.presentation.viewModel.CartState

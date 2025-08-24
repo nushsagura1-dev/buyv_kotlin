@@ -30,7 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import coil.compose.rememberAsyncImagePainter
+import coil3.compose.rememberAsyncImagePainter
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.viewModel.CartItem

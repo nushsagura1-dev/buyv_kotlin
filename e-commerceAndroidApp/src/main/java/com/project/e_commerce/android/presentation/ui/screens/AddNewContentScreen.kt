@@ -3,6 +3,7 @@ package com.project.e_commerce.android.presentation.ui.screens
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.widget.Toast
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
@@ -36,7 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.project.e_commerce.android.R
@@ -79,6 +81,20 @@ private fun uploadImagesToCloudinary(
     colorQuantities: Map<String, MutableMap<String, String>>,
     navController: NavHostController
 ) {
+    Log.d("UPLOAD_DEBUG", "🚀 Starting upload process:")
+    Log.d("UPLOAD_DEBUG", "   Video URL: $videoUrl")
+    Log.d("UPLOAD_DEBUG", "   Product Name: $productName")
+    Log.d("UPLOAD_DEBUG", "   Reel Title: $reelTitle")
+    Log.d("UPLOAD_DEBUG", "   Category: $selectedCategory")
+    Log.d("UPLOAD_DEBUG", "   Images count: ${productImageUris.size}")
+    val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+    Log.d("UPLOAD_DEBUG", "   Current user: ${currentUser?.uid}")
+    
+    if (currentUser == null) {
+        Toast.makeText(context, "User not authenticated", Toast.LENGTH_SHORT).show()
+        return
+    }
+    
     if (productImageUris.isEmpty()) {
         // No images to upload, save product directly
         saveProductToFirestore(
@@ -153,6 +169,11 @@ private fun saveProductToFirestore(
     colorQuantities: Map<String, MutableMap<String, String>>,
     navController: NavHostController
 ) {
+    val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+    if (currentUser == null) {
+        Toast.makeText(context, "User not authenticated", Toast.LENGTH_SHORT).show()
+        return
+    }
     // تكوين sizeColorData
     val sizeColorData = sizes.map { size ->
         val colorsMap = colorQuantities[size] ?: emptyMap()
@@ -163,7 +184,8 @@ private fun saveProductToFirestore(
     }
     
     // حفظ المنتج
-    val product = hashMapOf(
+    val product = mutableMapOf<String, Any>(
+        "userId" to currentUser.uid,
         "category" to selectedCategory,
         "categoryName" to selectedCategory,
         "createdAt" to FieldValue.serverTimestamp(),
@@ -171,6 +193,7 @@ private fun saveProductToFirestore(
         "name" to productName,
         "price" to productPrice,
         "productImages" to imageUrls,
+        "thumbnailUrl" to (imageUrls.firstOrNull() ?: ""),
         "quantity" to productQuantity,
         "rating" to 0,
         "reelTitle" to reelTitle,
@@ -181,13 +204,55 @@ private fun saveProductToFirestore(
         "sizeColorData" to sizeColorData
     )
     
+    // Save product to products collection
     firestore.collection("products")
         .add(product)
-        .addOnSuccessListener {
-            Toast.makeText(context, "تم إضافة المنتج بنجاح", Toast.LENGTH_SHORT).show()
-            navController.popBackStack()
+        .addOnSuccessListener { documentReference ->
+            val productId = documentReference.id
+            Log.d("UPLOAD_DEBUG", "✅ Product saved with ID: $productId")
+            
+            // Also save as a post/reel so it appears in the profile
+            val post = mutableMapOf<String, Any>(
+                "id" to productId,
+                "userId" to currentUser.uid,
+                "type" to "REEL", // Changed from PostType.REEL.name to "REEL" string
+                "title" to reelTitle,
+                "description" to description,
+                "mediaUrl" to videoUrl,
+                "thumbnailUrl" to (imageUrls.firstOrNull() ?: ""),
+                "images" to imageUrls, // Add images field for smart thumbnails
+                "likesCount" to 0,
+                "commentsCount" to 0,
+                "viewsCount" to 0,
+                "isPublished" to true,
+                "createdAt" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp(),
+                "productId" to productId // Link to the product
+            )
+            
+            Log.d("UPLOAD_DEBUG", "📝 Post data with images: $post")
+            Log.d("UPLOAD_DEBUG", "📝 Images field: ${post["images"]}")
+            Log.d("UPLOAD_DEBUG", "📝 Image URLs count: ${imageUrls.size}")
+            
+            Log.d("UPLOAD_DEBUG", "📝 Saving post/reel to posts collection: $post")
+            
+            // Save post to posts collection
+            firestore.collection("posts")
+                .document(productId)
+                .set(post)
+                .addOnSuccessListener {
+                    Log.d("UPLOAD_DEBUG", "✅ Post/reel saved successfully to posts collection")
+                    Toast.makeText(context, "تم إضافة المنتج والريل بنجاح", Toast.LENGTH_SHORT).show()
+                    navController.popBackStack()
+                }
+                .addOnFailureListener { e ->
+                    Log.d("UPLOAD_DEBUG", "❌ Failed to save post/reel: ${e.message}")
+                    Toast.makeText(context, "تم حفظ المنتج لكن فشل في حفظ الريل: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    navController.popBackStack()
+                }
         }
         .addOnFailureListener { e ->
+            Log.d("UPLOAD_DEBUG", "❌ Failed to save product: ${e.message}")
             Toast.makeText(context, "فشل في الحفظ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
         }
 }

@@ -27,9 +27,9 @@ import com.project.e_commerce.android.presentation.ui.screens.TrackOrderScreen
 import com.project.e_commerce.android.presentation.ui.screens.loginScreen.LoginScreen
 import com.project.e_commerce.android.presentation.ui.screens.profileScreen.ProfileScreen
 import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.ReelsView
+
 import com.project.e_commerce.android.presentation.ui.screens.changePasswordScreen.ChangePasswordScreen
 import com.project.e_commerce.android.presentation.ui.screens.changePasswordScreen.PasswordChangedSuccessScreen
-import com.project.e_commerce.android.presentation.ui.screens.exploreItems
 
 import com.project.e_commerce.android.presentation.ui.screens.forgetPassword.ResetPasswordScreen
 import com.project.e_commerce.android.presentation.ui.screens.onboarding.OnboardingScreen1
@@ -76,7 +76,17 @@ fun MyNavHost(
             SearchReelsAndUsersScreen(navController)
         }
         composable(Screens.ReelsScreen.ExploreScreen.route) {
-            ExploreScreenWithHeader(items = exploreItems, navController  )
+            ExploreScreenWithHeader(navController = navController)
+        }
+        
+        // New route for opening individual reels from explore page
+        composable(
+            route = Screens.ReelsScreen.route + "/{reelId}",
+            arguments = listOf(navArgument("reelId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val reelId = backStackEntry.arguments?.getString("reelId") ?: ""
+            // Navigate to reels screen with specific reel ID
+            ReelsView(navController, productViewModel, cartViewModel, reelId = reelId)
         }
         composable(Screens.ReelsScreen.SoundPageScreen.route) {
             SoundPageScreen( navController)
@@ -143,6 +153,8 @@ fun MyNavHost(
         composable(Screens.ProfileScreen.AddNewContentScreen.route) {
             AddNewContentScreen(navController = navController)
         }
+
+        // Reel viewer route
 
 
         composable(Screens.ProfileScreen.NotificationScreen.route) { NotificationScreen(

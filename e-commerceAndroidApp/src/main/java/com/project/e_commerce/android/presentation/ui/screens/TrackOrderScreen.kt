@@ -98,7 +98,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.zIndex
-import coil.compose.rememberAsyncImagePainter
+import coil3.compose.rememberAsyncImagePainter
 import android.util.Size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState

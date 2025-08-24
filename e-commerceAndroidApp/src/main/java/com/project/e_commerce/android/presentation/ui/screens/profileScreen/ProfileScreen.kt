@@ -3,18 +3,38 @@ package com.project.e_commerce.android.presentation.ui.screens.profileScreen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
+import androidx.compose.material.Button
+import androidx.compose.material.ButtonDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,24 +42,47 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
+import android.util.Log
+import coil3.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.ui.screens.RequireLoginPrompt
+import com.project.e_commerce.android.presentation.utils.VideoThumbnailUtils
+import com.project.e_commerce.android.presentation.viewModel.profileViewModel.ProfileViewModel
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun ProfileScreen(navController: NavHostController) {
+    val profileViewModel: ProfileViewModel = koinViewModel()
+    val uiState by profileViewModel.uiState.collectAsState()
+    val userReels by profileViewModel.userReels.collectAsState()
+    val userProducts by profileViewModel.userProducts.collectAsState()
+    val userLikedContent by profileViewModel.userLikedContent.collectAsState()
+    val userBookmarkedContent by profileViewModel.userBookmarkedContent.collectAsState()
 
-    // ✅ ربط فعلي بـ FirebaseAuth بدون أي تغيير في الـ UI
+    // Show error dialog if there's an error
+    if (uiState.error != null) {
+        AlertDialog(
+            onDismissRequest = { profileViewModel.clearError() },
+            title = { Text("Error") },
+            text = { Text(uiState.error!!) },
+            confirmButton = {
+                TextButton(onClick = { profileViewModel.clearError() }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
+    // Firebase Auth state
     val auth = remember { FirebaseAuth.getInstance() }
     var isLoggedIn by remember { mutableStateOf(auth.currentUser != null) }
 
-    // اسمع تغيّر حالة المستخدم (يسجّل دخول/يخرج) بشكل آمن مع Compose
+    // Listen to auth state changes
     DisposableEffect(Unit) {
         val listener = FirebaseAuth.AuthStateListener { fa ->
             isLoggedIn = fa.currentUser != null
@@ -48,12 +91,12 @@ fun ProfileScreen(navController: NavHostController) {
         onDispose { auth.removeAuthStateListener(listener) }
     }
 
-    // نفس فكرة الـ RequireLoginPrompt اللي في التصميم الجديد — بدون تعديل بصري
+    // Show login prompt if not authenticated
     if (!isLoggedIn) {
         RequireLoginPrompt(
             onLogin = { navController.navigate(Screens.LoginScreen.route) },
             onSignUp = { navController.navigate(Screens.LoginScreen.CreateAccountScreen.route) },
-            onDismiss = { /* لا شيء */ },
+            onDismiss = { /* nothing */ },
             showCloseButton = false
         )
         return
@@ -67,14 +110,25 @@ fun ProfileScreen(navController: NavHostController) {
         Pair(R.drawable.ic_love_checked, R.drawable.ic_love_un_checked)
     )
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    if (uiState.isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                color = Color(0xFFFF6F00),
+                modifier = Modifier.size(48.dp)
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         item {
-            // Top Bar (بدون أي تغيير بصري)
+            // Top Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -120,7 +174,7 @@ fun ProfileScreen(navController: NavHostController) {
         item { Spacer(modifier = Modifier.height(8.dp)) }
 
         item {
-            // Stats + صورة البروفايل (كما في تصميمك الجديد تمامًا)
+            // Stats + Profile Image
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -132,26 +186,47 @@ fun ProfileScreen(navController: NavHostController) {
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ProfileStat("122", "Following") {
+                    ProfileStat(
+                        number = uiState.followingCount.toString(),
+                        label = "Following"
+                    ) {
                         navController.navigate(
                             Screens.FollowListScreen.createRoute(
-                                username = "jenny_wilson",
+                                username = uiState.username,
                                 startTab = 1,
                                 showFriendsTab = true
                             )
                         )
                     }
-                    Image(
-                        painter = painterResource(id = R.drawable.profile),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape)
-                    )
-                    ProfileStat("150K", "Followers") {
+                    
+                    // Profile Image - Use real data if available, fallback to default
+                    if (uiState.profileImageUrl != null) {
+                        AsyncImage(
+                            model = uiState.profileImageUrl,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(id = R.drawable.profile)
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.profile),
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(CircleShape)
+                        )
+                    }
+                    
+                    ProfileStat(
+                        number = uiState.followersCount.toString(),
+                        label = "Followers"
+                    ) {
                         navController.navigate(
                             Screens.FollowListScreen.createRoute(
-                                username = "jenny_wilson",
+                                username = uiState.username,
                                 startTab = 0,
                                 showFriendsTab = true
                             )
@@ -167,7 +242,7 @@ fun ProfileScreen(navController: NavHostController) {
             // Name & Username
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Jenny Wilson",
+                    text = uiState.displayName.ifEmpty { "User" },
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF0D3D67)
@@ -179,12 +254,19 @@ fun ProfileScreen(navController: NavHostController) {
                     modifier = Modifier.size(22.dp)
                 )
             }
-            Text("@jenny_wilson", fontSize = 13.sp, color = Color.Gray)
+            Text(
+                text = "@${uiState.username.ifEmpty { "user" }}",
+                fontSize = 13.sp,
+                color = Color.Gray
+            )
             Spacer(modifier = Modifier.height(8.dp))
         }
 
         item {
-            ProfileStat("1.5M", "Likes")
+            ProfileStat(
+                number = uiState.likesCount.toString(),
+                label = "Likes"
+            )
         }
 
         item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -242,6 +324,13 @@ fun ProfileScreen(navController: NavHostController) {
             }
         }
 
+        item { Spacer(modifier = Modifier.height(8.dp)) }
+
+        // Debug buttons removed - no longer needed
+
+
+
+
         item { Spacer(modifier = Modifier.height(20.dp)) }
 
         item {
@@ -270,14 +359,28 @@ fun ProfileScreen(navController: NavHostController) {
 
         item { Spacer(modifier = Modifier.height(16.dp)) }
 
-        // عرض الشبكة حسب التاب المختار (بدون تغيير)
+        // Content Grid based on selected tab
         item {
+            Log.d("PROFILE_DEBUG", "🎯 Selected Tab: $selectedTabIndex")
             when (selectedTabIndex) {
-                0 -> SimpleReelGrid(navController)      // Reels
-                1 -> SimpleProductGrid(navController)   // Products
-                2 -> MixedSavedGrid(navController)      // Saved
-                3 -> LikedReelGrid(navController)       // Likes
+                0 -> {
+                    Log.d("PROFILE_DEBUG", "🎬 Showing Reels Tab with ${userReels.size} reels")
+                    UserReelsGrid(userReels, navController)
+                }
+                1 -> {
+                    Log.d("PROFILE_DEBUG", "📦 Showing Products Tab with ${userProducts.size} products")
+                    UserProductsGrid(userProducts, navController)
+                }
+                2 -> {
+                    Log.d("PROFILE_DEBUG", "🔖 Showing Saved Tab with ${userBookmarkedContent.size} bookmarked posts")
+                    UserBookmarkedGrid(userBookmarkedContent, navController)
+                }
+                3 -> {
+                    Log.d("PROFILE_DEBUG", "❤️ Showing Likes Tab with ${userLikedContent.size} liked posts")
+                    UserLikedGrid(userLikedContent, navController)
+                }
             }
+        }
         }
     }
 }
@@ -294,30 +397,104 @@ fun ProfileStat(number: String, label: String, onClick: () -> Unit = {}) {
 }
 
 @Composable
-fun SimpleReelGrid(navController: NavHostController) {
-    val reels = listOf(
-        R.drawable.perfume1, R.drawable.img2, R.drawable.img3, R.drawable.img4,
-        R.drawable.perfume1, R.drawable.img2, R.drawable.img3, R.drawable.img4,
-        R.drawable.perfume1, R.drawable.img2, R.drawable.img3
-    )
+fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPost>, navController: NavHostController) {
+    Log.d("PROFILE_DEBUG", "🎬 UserReelsGrid called with ${reels.size} reels")
+    
+    if (reels.isEmpty()) {
+        Log.d("PROFILE_DEBUG", "🎬 No reels to display")
+        EmptyStateGrid("No reels yet", "Start creating reels to see them here")
+        return
+    }
+    
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.height(650.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        items(reels) { imageRes ->
+        items(reels) { reel ->
             Box(
                 modifier = Modifier
                     .background(Color(0xFFF8F8F8))
                     .height(130.dp)
+                    .clickable {
+                        // Navigate to reels screen with specific reel ID
+                        navController.navigate("${Screens.ReelsScreen.route}/${reel.id}")
+                    }
             ) {
-                Image(
-                    painter = painterResource(id = imageRes),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                // Use smart thumbnail: priority: 1. First image, 2. Video thumbnail, 3. Default
+                val bestThumbnail = VideoThumbnailUtils.getBestThumbnail(
+                    images = reel.images,
+                    videoUrl = reel.mediaUrl,
+                    fallbackUrl = reel.thumbnailUrl
                 )
+                
+                // Debug logging - make it more visible
+                Log.d("PROFILE_DEBUG", "🎬 ===== REEL THUMBNAIL DEBUG =====")
+                Log.d("PROFILE_DEBUG", "🎬 Reel Title: ${reel.title}")
+                Log.d("PROFILE_DEBUG", "🎬 Reel ID: ${reel.id}")
+                Log.d("PROFILE_DEBUG", "🎬 Images List: ${reel.images}")
+                Log.d("PROFILE_DEBUG", "🎬 Images Count: ${reel.images.size}")
+                Log.d("PROFILE_DEBUG", "🎬 Video URL: ${reel.mediaUrl}")
+                Log.d("PROFILE_DEBUG", "🎬 Thumbnail URL: ${reel.thumbnailUrl}")
+                Log.d("PROFILE_DEBUG", "🎬 Best Thumbnail: $bestThumbnail")
+                Log.d("PROFILE_DEBUG", "🎬 =================================")
+                
+                if (!bestThumbnail.isNullOrBlank()) {
+                    Log.d("PROFILE_DEBUG", "🎬 Loading AsyncImage with: $bestThumbnail")
+
+                    // Use the actual bestThumbnail instead of test image
+                    AsyncImage(
+                        model = bestThumbnail, // Use the calculated best thumbnail
+                        contentDescription = "Reel thumbnail",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        onError = {
+                            Log.e("PROFILE_DEBUG", "❌ AsyncImage failed to load: $bestThumbnail")
+                        },
+                        onSuccess = {
+                            Log.d("PROFILE_DEBUG", "✅ AsyncImage loaded successfully: $bestThumbnail")
+                        },
+                        onLoading = {
+                            Log.d("PROFILE_DEBUG", "⏳ AsyncImage is loading: $bestThumbnail")
+                        }
+                    )
+                } else {
+                    Log.d("PROFILE_DEBUG", "🎬 No thumbnail available - showing clean background")
+                    // Show clean background instead of hardcoded image
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFFE0E0E0))
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_play),
+                            contentDescription = "No thumbnail",
+                            tint = Color.Gray,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(48.dp)
+                        )
+                    }
+                }
+                
+                // Play icon overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f))
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_play),
+                        contentDescription = "Play reel",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(32.dp)
+                    )
+                }
+                
+                // Views count at bottom
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -329,9 +506,15 @@ fun SimpleReelGrid(navController: NavHostController) {
                         painter = painterResource(id = R.drawable.ic_play),
                         contentDescription = null,
                         tint = Color.White,
+                        modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text("105", color = Color.White, fontSize = 12.sp)
+                    Text(
+                        text = reel.viewsCount.toString(), 
+                        color = Color.White, 
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }
@@ -339,82 +522,19 @@ fun SimpleReelGrid(navController: NavHostController) {
 }
 
 @Composable
-fun MixedSavedGrid(navController: NavHostController) {
-    val savedItems = listOf(
-        R.drawable.img1, R.drawable.img2, R.drawable.img3, R.drawable.img4,
-        R.drawable.img1, R.drawable.img2, R.drawable.img3, R.drawable.img4,
-    )
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = Modifier.height(650.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        items(savedItems) { imageRes ->
-            Box(
-                modifier = Modifier
-                    .background(Color(0xFFF8F8F8))
-                    .height(130.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = imageRes),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
+fun UserProductsGrid(products: List<com.project.e_commerce.android.domain.model.UserProduct>, navController: NavHostController) {
+    if (products.isEmpty()) {
+        EmptyStateGrid("No products yet", "Start adding products to see them here")
+        return
     }
-}
-
-@Composable
-fun LikedReelGrid(navController: NavHostController) {
-    val likedReels = listOf(
-        R.drawable.img4, R.drawable.img2, R.drawable.img3, R.drawable.perfume1,
-        R.drawable.img4, R.drawable.img2, R.drawable.img3, R.drawable.perfume1,
-        R.drawable.img4, R.drawable.img2, R.drawable.img3, R.drawable.perfume1,
-    )
+    
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.height(650.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        items(likedReels) { imageRes ->
-            Box(
-                modifier = Modifier
-                    .background(Color(0xFFF8F8F8))
-                    .height(130.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = imageRes),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SimpleProductGrid(navController: NavHostController) {
-    val products = listOf(
-        Triple("White Laptop", "In Stock", "$100"),
-        Triple("Elegant Perfume", "Out of Stock", "$50"),
-        Triple("Smart Watch", "5 left", "$75"),
-        Triple("Designer Bag", "10 left", "$150"),
-        Triple("Smart Watch", "Out of Stock", "$75"),
-        Triple("Smart Watch", "In Stock", "$100"),
-        Triple("Smart Watch", "In Stock", "$75"),
-    )
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = Modifier.height(650.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        items(products) { (title, stock, price) ->
+        items(products) { product ->
             Column(
                 modifier = Modifier
                     .background(Color(0xFFF8F8F8))
@@ -425,15 +545,25 @@ fun SimpleProductGrid(navController: NavHostController) {
                         .fillMaxWidth()
                         .height(120.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.img2),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    if (product.images.isNotEmpty()) {
+                        AsyncImage(
+                            model = product.images.first(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            error = painterResource(id = R.drawable.img2)
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.img2),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
                 Text(
-                    title,
+                    product.name,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 6.dp, start = 8.dp, end = 8.dp)
@@ -446,14 +576,12 @@ fun SimpleProductGrid(navController: NavHostController) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        stock,
-                        color = if (stock == "Out of Stock") Color(0xFFEB1919)
-                        else if (stock == "In Stock") Color(0xFF22C55E)
-                        else Color.Gray,
+                        if (product.stockQuantity > 0) "${product.stockQuantity} left" else "Out of Stock",
+                        color = if (product.stockQuantity > 0) Color(0xFF22C55E) else Color(0xFFEB1919),
                         fontSize = 12.sp
                     )
                     Text(
-                        price,
+                        "$${product.price}",
                         color = Color(0xFFFF6F00),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
@@ -464,9 +592,129 @@ fun SimpleProductGrid(navController: NavHostController) {
     }
 }
 
-@Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun PreviewProfileScreen() {
-    val navController = rememberNavController()
-    ProfileScreen(navController = navController)
+fun UserBookmarkedGrid(bookmarkedContent: List<com.project.e_commerce.android.domain.model.UserPost>, navController: NavHostController) {
+    Log.d("PROFILE_DEBUG", "🔖 UserBookmarkedGrid called with ${bookmarkedContent.size} bookmarked posts")
+    
+    if (bookmarkedContent.isEmpty()) {
+        Log.d("PROFILE_DEBUG", "🔖 No bookmarked content to display")
+        EmptyStateGrid("No saved posts yet", "Save posts and products to see them here")
+        return
+    }
+    
+    Log.d("PROFILE_DEBUG", "🔖 Displaying ${bookmarkedContent.size} bookmarked posts")
+    bookmarkedContent.forEach { post ->
+        Log.d("PROFILE_DEBUG", "🔖 Bookmarked Post: ${post.title} - ${post.mediaUrl}")
+    }
+    
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.height(650.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        items(bookmarkedContent) { post ->
+            Box(
+                modifier = Modifier
+                    .background(Color(0xFFF8F8F8))
+                    .height(130.dp)
+            ) {
+                if (post.thumbnailUrl != null) {
+                    AsyncImage(
+                        model = post.thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        error = painterResource(id = R.drawable.img2)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.img2),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun UserLikedGrid(likedContent: List<com.project.e_commerce.android.domain.model.UserPost>, navController: NavHostController) {
+    Log.d("PROFILE_DEBUG", "❤️ UserLikedGrid called with ${likedContent.size} liked posts")
+    
+    if (likedContent.isEmpty()) {
+        Log.d("PROFILE_DEBUG", "❤️ No liked content to display")
+        EmptyStateGrid("No likes yet", "Like posts and products to see them here")
+        return
+    }
+    
+    Log.d("PROFILE_DEBUG", "❤️ Displaying ${likedContent.size} liked posts")
+    likedContent.forEach { post ->
+        Log.d("PROFILE_DEBUG", "❤️ Liked Post: ${post.title} - ${post.mediaUrl}")
+    }
+    
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.height(650.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        items(likedContent) { post ->
+            Box(
+                modifier = Modifier
+                    .background(Color(0xFFF8F8F8))
+                    .height(130.dp)
+            ) {
+                if (post.thumbnailUrl != null) {
+                    AsyncImage(
+                        model = post.thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        error = painterResource(id = R.drawable.img2)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.img2),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyStateGrid(title: String, subtitle: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(650.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            painter = painterResource(id = R.drawable.ic_image),
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = Color.Gray
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Gray
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = subtitle,
+            fontSize = 14.sp,
+            color = Color.Gray
+        )
+    }
 }

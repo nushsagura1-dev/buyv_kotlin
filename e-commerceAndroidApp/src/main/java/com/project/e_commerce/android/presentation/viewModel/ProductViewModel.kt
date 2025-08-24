@@ -16,6 +16,7 @@ import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Rating
 import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import android.util.Log
 
 class ProductViewModel : ViewModel() {
     var categories by mutableStateOf<List<Category>>(emptyList())
@@ -38,6 +39,7 @@ class ProductViewModel : ViewModel() {
         private set
 
     init {
+        Log.d("PRODUCT_DEBUG", "🔍 PRODUCT VIEWMODEL INITIALIZED - DEBUG IS WORKING!")
         getCategoriesFromFirebase()
         getFeaturedProductsFromFirebase()
         getBestSellerProductsFromFirebase()
@@ -119,11 +121,21 @@ class ProductViewModel : ViewModel() {
             try {
                 val db = FirebaseFirestore.getInstance()
                 val snapshot = db.collection("products").get().await()
+                Log.d("PRODUCT_DEBUG", "DEBUG: Firebase returned ${snapshot.documents.size} products")
+
                 val products = snapshot.documents.mapNotNull { doc ->
+                    Log.d("PRODUCT_DEBUG", "DEBUG: Processing document: ${doc.id}")
+                    Log.d("PRODUCT_DEBUG", "DEBUG: Document data: ${doc.data}")
+
                     val productImages = doc.get("productImages") as? List<*> ?: emptyList<Any>()
                     val images = productImages.filterIsInstance<String>()
                     val mainImage = images.firstOrNull() ?: ""
                     val sizeColorData = (doc.get("sizeColorData") as? List<Map<String, Any>>) ?: emptyList()
+
+                    Log.d("PRODUCT_DEBUG", "DEBUG: Product ${doc.id} - productImages: $productImages")
+                    Log.d("PRODUCT_DEBUG", "DEBUG: Product ${doc.id} - filtered images: $images")
+                    Log.d("PRODUCT_DEBUG", "DEBUG: Product ${doc.id} - mainImage: $mainImage")
+                    Log.d("PRODUCT_DEBUG", "DEBUG: Product ${doc.id} - reelVideoUrl: ${doc.getString("reelVideoUrl")}")
 
                     Product(
                         id = doc.id,
@@ -144,11 +156,11 @@ class ProductViewModel : ViewModel() {
                         createdAt = doc.getTimestamp("createdAt")
                     )
                 }
-
-                allProducts = products
+                Log.d("PRODUCT_DEBUG", "DEBUG: Successfully processed ${products.size} products")
+                bestSellerProducts = products
                 generateReelsFromProducts(products)
-
             } catch (e: Exception) {
+                Log.d("PRODUCT_DEBUG", "DEBUG: Error in getAllProductsFromFirebase: ${e.message}")
                 e.printStackTrace()
             }
         }
@@ -296,7 +308,13 @@ class ProductViewModel : ViewModel() {
 
     private fun generateReelsFromProducts(products: List<Product>) {
         viewModelScope.launch {
+            Log.d("PRODUCT_DEBUG", "DEBUG: generateReelsFromProducts called with ${products.size} products")
             val reels = products.map { product ->
+                Log.d("PRODUCT_DEBUG", "DEBUG: Converting product ${product.id} to reel")
+                Log.d("PRODUCT_DEBUG", "DEBUG: Product ${product.id} - name: ${product.name}")
+                Log.d("PRODUCT_DEBUG", "DEBUG: Product ${product.id} - productImages: ${product.productImages}")
+                Log.d("PRODUCT_DEBUG", "DEBUG: Product ${product.id} - reelVideoUrl: ${product.reelVideoUrl}")
+                
                 val (comments, ratings) = getCommentsAndRatesForProduct(product.id)
 
                 val sizes = product.sizeColorData
@@ -309,7 +327,7 @@ class ProductViewModel : ViewModel() {
                     .filter { it.isNotBlank() }
                     .distinct()
 
-                Reels(
+                val reel = Reels(
                     id = product.id,
                     userName = "Store Official",
 
@@ -331,7 +349,11 @@ class ProductViewModel : ViewModel() {
                     colors = colors,
                     rating = product.rating,
                 )
+                
+                Log.d("PRODUCT_DEBUG", "DEBUG: Created reel ${reel.id} - video: ${reel.video}, images: ${reel.images}, productImage: ${reel.productImage}")
+                reel
             }
+            Log.d("PRODUCT_DEBUG", "DEBUG: Generated ${reels.size} reels")
             productReels = reels
         }
     }

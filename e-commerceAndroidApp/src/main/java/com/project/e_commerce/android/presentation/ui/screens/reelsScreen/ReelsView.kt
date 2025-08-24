@@ -64,8 +64,8 @@ import com.project.e_commerce.android.presentation.viewModel.MainUiStateViewMode
 import com.project.e_commerce.android.presentation.viewModel.reelsScreenViewModel.ReelsScreenViewModel
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.rememberAsyncImagePainter
-import coil.compose.AsyncImage
+import coil3.compose.rememberAsyncImagePainter
+import coil3.compose.AsyncImage
 import com.project.e_commerce.android.presentation.ui.screens.HeaderStyle
 import com.google.accompanist.pager.*
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
@@ -80,6 +80,7 @@ fun ReelsView(
     navController: NavHostController,
     productViewModel: ProductViewModel,
     cartViewModel: CartViewModel,
+    reelId: String? = null,
     mainUiStateViewModel: MainUiStateViewModel = viewModel(LocalContext.current as ComponentActivity)
 ) {
     val viewModel: ReelsScreenViewModel = koinViewModel()
@@ -90,6 +91,13 @@ fun ReelsView(
     val modalBottomSheetState: ModalBottomSheetState = rememberModalBottomSheetState(
         initialValue = ModalBottomSheetValue.Hidden,
     )
+
+    // Find the initial page index if a specific reel is requested
+    val initialPage = if (reelId != null) {
+        state.indexOfFirst { it.id == reelId }.takeIf { it >= 0 } ?: 0
+    } else {
+        0
+    }
 
     rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {}
 
@@ -147,7 +155,8 @@ fun ReelsView(
                 sheetTab.value = SheetTab.Ratings
             },
             isLoggedIn = isLoggedIn.value,
-            setShowLoginPrompt = { showLoginPrompt = it }
+            setShowLoginPrompt = { showLoginPrompt = it },
+            initialPage = initialPage
         )
 
         // Overlay Custom BottomSheet
@@ -326,9 +335,10 @@ fun ReelsList(
     onClickMoreButton: () -> Unit,
     reelsList: List<Reels>,
     isLoggedIn: Boolean,
-    setShowLoginPrompt: (Boolean) -> Unit
+    setShowLoginPrompt: (Boolean) -> Unit,
+    initialPage: Int = 0
 ) {
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { reelsList.size })
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { reelsList.size })
     val currentPage = pagerState.currentPage
 
     var showHeart by remember { mutableStateOf(false) }
