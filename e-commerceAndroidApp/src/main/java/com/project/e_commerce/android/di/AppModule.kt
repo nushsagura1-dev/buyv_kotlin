@@ -8,7 +8,9 @@ import com.project.e_commerce.android.data.repository.AuthRepository
 import com.project.e_commerce.android.data.repository.CountriesRepository
 import com.project.e_commerce.android.data.repository.FirebaseAuthRepository
 import com.project.e_commerce.android.data.repository.FirebaseUserProfileRepository
+import com.project.e_commerce.android.data.repository.FirebaseFollowingRepository
 import com.project.e_commerce.android.domain.repository.UserProfileRepository
+import com.project.e_commerce.android.domain.repository.FollowingRepository
 import com.project.e_commerce.android.domain.usecase.CheckEmailValidation
 import com.project.e_commerce.android.domain.usecase.CheckLoginValidation
 import com.project.e_commerce.android.domain.usecase.CheckMatchedPasswordUseCase
@@ -19,8 +21,10 @@ import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
 import com.project.e_commerce.android.presentation.viewModel.loginScreenViewModel.LoginScreenViewModel
 import com.project.e_commerce.android.presentation.viewModel.profileViewModel.ProfileViewModel
+import com.project.e_commerce.android.presentation.viewModel.editProfileViewModel.EditProfileViewModel
 import com.project.e_commerce.android.presentation.viewModel.reelsScreenViewModel.ReelsScreenViewModel
 import com.project.e_commerce.android.presentation.viewModel.restPasswordViewModel.RestPasswordViewModel
+import com.project.e_commerce.android.presentation.viewModel.followingViewModel.FollowingViewModel
 import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
 import okhttp3.OkHttpClient
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -34,6 +38,7 @@ val viewModelModule = module {
     single { FirebaseFirestore.getInstance() }
     single<AuthRepository> { FirebaseAuthRepository(get()) }
     single<UserProfileRepository> { FirebaseUserProfileRepository(get(), get()) }
+    single<FollowingRepository> { FirebaseFollowingRepository(get(), get()) }
 
     // Use cases
     single { CheckMatchedPasswordUseCase() }
@@ -44,11 +49,20 @@ val viewModelModule = module {
     
     // User Profile Use Cases
     single { GetUserProfileUseCase(get()) }
+    single { UpdateUserProfileUseCase(get()) }
     single { GetUserPostsUseCase(get()) }
     single { GetUserReelsUseCase(get()) }
     single { GetUserProductsUseCase(get()) }
     single { GetUserLikedPostsUseCase(get()) }
     single { GetUserBookmarkedPostsUseCase(get()) }
+    
+    // Following Use Cases
+    single { FollowUserUseCase(get()) }
+    single { UnfollowUserUseCase(get()) }
+    single { GetFollowingStatusUseCase(get()) }
+    single { GetFollowingUsersUseCase(get()) }
+    single { GetUserProfilesByIdsUseCase(get()) }
+    single { GetFollowersUseCase(get()) }
 
     // ViewModels
     viewModel {
@@ -76,14 +90,33 @@ val viewModelModule = module {
             getUserReelsUseCase = get(),
             getUserProductsUseCase = get(),
             getUserLikedPostsUseCase = get(),
-            getUserBookmarkedPostsUseCase = get()
+            getUserBookmarkedPostsUseCase = get(),
+            getFollowingUsersUseCase = get(),
+            getFollowersUseCase = get()
+        ) 
+    }
+    
+    viewModel { 
+        EditProfileViewModel(
+            getUserProfileUseCase = get(),
+            updateUserProfileUseCase = get()
         ) 
     }
     
     viewModel { RestPasswordViewModel(get(), get()) }
-    viewModel { ReelsScreenViewModel() }
     viewModel { ProductViewModel() }
+    viewModel { ReelsScreenViewModel(get(), get()) }
     viewModel { CartViewModel() }
+    viewModel { 
+        FollowingViewModel(
+            followUserUseCase = get(),
+            unfollowUserUseCase = get(),
+            getFollowingStatusUseCase = get(),
+            getFollowingUsersUseCase = get(),
+            getUserProfilesByIdsUseCase = get(),
+            getFollowersUseCase = get()
+        ) 
+    }
 
     // Retrofit
     single {

@@ -7,6 +7,7 @@ import com.project.e_commerce.android.presentation.viewModel.Product
 
 data class Reels(
     val id: String = "",
+    val userId: String = "", // Add userId to identify reel owner
     val userName: String = "",
     val userImage: Int = 0,
     val video: Uri? = null,
@@ -34,9 +35,19 @@ data class Reels(
     companion object {
         fun fromProduct(product: Product): Reels {
             val firstImageUrl = product.productImages.firstOrNull().orEmpty()
+            
+            // For now, use a placeholder that will be replaced with real user data
+            // The real username should come from the user's profile in Firebase
+            val placeholderUsername = if (product.userId.isNotEmpty()) {
+                "User_${product.userId.take(8)}" // Generate a readable placeholder
+            } else {
+                "Unknown User"
+            }
+            
             return Reels(
                 id = product.id,
-                userName = "Store Official",
+                userId = product.userId.ifEmpty { "Jn8DBgNiS7Y4vnUTlmra2vPdf433" }, // Use real user ID instead of non-existent "store_official"
+                userName = placeholderUsername, // Will be replaced with real username from user profile
                 userImage = R.drawable.profile, // كان String في القديم؛ دلوقتي UI متوقع Resource
                 video = product.reelVideoUrl.takeIf { it.isNotEmpty() }?.let { Uri.parse(it) },
                 images = product.productImages.takeIf { it.isNotEmpty() }?.map { Uri.parse(it) },

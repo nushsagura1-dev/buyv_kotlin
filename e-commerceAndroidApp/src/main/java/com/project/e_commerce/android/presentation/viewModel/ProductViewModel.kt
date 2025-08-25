@@ -17,6 +17,7 @@ import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import android.util.Log
+import com.project.e_commerce.android.R
 
 class ProductViewModel : ViewModel() {
     var categories by mutableStateOf<List<Category>>(emptyList())
@@ -40,10 +41,41 @@ class ProductViewModel : ViewModel() {
 
     init {
         Log.d("PRODUCT_DEBUG", "🔍 PRODUCT VIEWMODEL INITIALIZED - DEBUG IS WORKING!")
-        getCategoriesFromFirebase()
-        getFeaturedProductsFromFirebase()
-        getBestSellerProductsFromFirebase()
-        getAllProductsFromFirebase()
+        Log.d("PRODUCT_DEBUG", "🚀 Starting to load products from Firebase...")
+        Log.d("PRODUCT_DEBUG", "📱 ProductViewModel instance: $this")
+        
+        viewModelScope.launch {
+            Log.d("PRODUCT_DEBUG", "🔄 Starting Firebase operations in viewModelScope")
+            checkFirebaseCollections()
+            getCategoriesFromFirebase()
+            getFeaturedProductsFromFirebase()
+            getBestSellerProductsFromFirebase()
+            getAllProductsFromFirebase()
+            Log.d("PRODUCT_DEBUG", "✅ All Firebase operations completed")
+        }
+    }
+
+    private suspend fun checkFirebaseCollections() {
+        try {
+            Log.d("PRODUCT_DEBUG", "🔍 Checking Firebase products collection...")
+            val db = FirebaseFirestore.getInstance()
+            
+            // Try to access the products collection directly
+            val productsSnapshot = db.collection("products").get().await()
+            Log.d("PRODUCT_DEBUG", "✅ 'products' collection exists and is accessible")
+            Log.d("PRODUCT_DEBUG", "📊 'products' collection has ${productsSnapshot.documents.size} documents")
+            
+            if (productsSnapshot.documents.isNotEmpty()) {
+                Log.d("PRODUCT_DEBUG", "📄 First document ID: ${productsSnapshot.documents.first().id}")
+                Log.d("PRODUCT_DEBUG", "🔍 First document data: ${productsSnapshot.documents.first().data}")
+            } else {
+                Log.w("PRODUCT_DEBUG", "⚠️ 'products' collection exists but is empty")
+            }
+        } catch (e: Exception) {
+            Log.e("PRODUCT_DEBUG", "❌ Error accessing 'products' collection: ${e.message}")
+            Log.e("PRODUCT_DEBUG", "❌ Exception type: ${e.javaClass.simpleName}")
+            e.printStackTrace()
+        }
     }
 
     fun getProductById(productId: String) {
@@ -57,6 +89,7 @@ class ProductViewModel : ViewModel() {
 
                 selectedProduct = Product(
                     id = doc.id,
+                    userId = doc.getString("userId") ?: "", // Add userId from Firebase
                     name = doc.getString("name") ?: "",
                     description = doc.getString("description") ?: "",
                     price = doc.getString("price") ?: "0",
@@ -119,9 +152,15 @@ class ProductViewModel : ViewModel() {
     fun getAllProductsFromFirebase() {
         viewModelScope.launch {
             try {
+                Log.d("PRODUCT_DEBUG", "🔄 getAllProductsFromFirebase called")
                 val db = FirebaseFirestore.getInstance()
+                Log.d("PRODUCT_DEBUG", "📁 Querying Firebase collection: products")
                 val snapshot = db.collection("products").get().await()
-                Log.d("PRODUCT_DEBUG", "DEBUG: Firebase returned ${snapshot.documents.size} products")
+                Log.d("PRODUCT_DEBUG", "📊 Firebase query result: ${snapshot.documents.size} documents")
+                Log.d("PRODUCT_DEBUG", "📄 Document IDs: ${snapshot.documents.map { it.id }}")
+                if (snapshot.documents.isNotEmpty()) {
+                    Log.d("PRODUCT_DEBUG", "🔍 First document data: ${snapshot.documents.first().data}")
+                }
 
                 val products = snapshot.documents.mapNotNull { doc ->
                     Log.d("PRODUCT_DEBUG", "DEBUG: Processing document: ${doc.id}")
@@ -139,6 +178,7 @@ class ProductViewModel : ViewModel() {
 
                     Product(
                         id = doc.id,
+                        userId = doc.getString("userId") ?: "", // Add userId from Firebase
                         name = doc.getString("name") ?: "",
                         description = doc.getString("description") ?: "",
                         price = doc.getString("price") ?: "0",
@@ -156,8 +196,10 @@ class ProductViewModel : ViewModel() {
                         createdAt = doc.getTimestamp("createdAt")
                     )
                 }
-                Log.d("PRODUCT_DEBUG", "DEBUG: Successfully processed ${products.size} products")
-                bestSellerProducts = products
+                Log.d("PRODUCT_DEBUG", "✅ Successfully processed ${products.size} products")
+                Log.d("PRODUCT_DEBUG", "📱 Product IDs: ${products.map { it.id }}")
+                Log.d("PRODUCT_DEBUG", "🎬 Calling generateReelsFromProducts with ${products.size} products")
+                allProducts = products
                 generateReelsFromProducts(products)
             } catch (e: Exception) {
                 Log.d("PRODUCT_DEBUG", "DEBUG: Error in getAllProductsFromFirebase: ${e.message}")
@@ -182,6 +224,7 @@ class ProductViewModel : ViewModel() {
 
                     Product(
                         id = doc.id,
+                        userId = doc.getString("userId") ?: "", // Add userId from Firebase
                         name = doc.getString("name") ?: "",
                         description = doc.getString("description") ?: "",
                         price = doc.getString("price") ?: "0",
@@ -224,6 +267,7 @@ class ProductViewModel : ViewModel() {
 
                     Product(
                         id = doc.id,
+                        userId = doc.getString("userId") ?: "", // Add userId from Firebase
                         name = doc.getString("name") ?: "",
                         description = doc.getString("description") ?: "",
                         price = doc.getString("price") ?: "0",
@@ -283,6 +327,7 @@ class ProductViewModel : ViewModel() {
 
                     Product(
                         id = doc.id,
+                        userId = doc.getString("userId") ?: "", // Add userId from Firebase
                         name = doc.getString("name") ?: "",
                         description = doc.getString("description") ?: "",
                         price = doc.getString("price") ?: "0",
@@ -308,7 +353,12 @@ class ProductViewModel : ViewModel() {
 
     private fun generateReelsFromProducts(products: List<Product>) {
         viewModelScope.launch {
-            Log.d("PRODUCT_DEBUG", "DEBUG: generateReelsFromProducts called with ${products.size} products")
+            Log.d("PRODUCT_DEBUG", "🎬 generateReelsFromProducts called with ${products.size} products")
+            if (products.isEmpty()) {
+                Log.w("PRODUCT_DEBUG", "⚠️ No products to convert to reels!")
+                return@launch
+            }
+            
             val reels = products.map { product ->
                 Log.d("PRODUCT_DEBUG", "DEBUG: Converting product ${product.id} to reel")
                 Log.d("PRODUCT_DEBUG", "DEBUG: Product ${product.id} - name: ${product.name}")
@@ -329,8 +379,9 @@ class ProductViewModel : ViewModel() {
 
                 val reel = Reels(
                     id = product.id,
-                    userName = "Store Official",
-
+                    userId = product.userId.ifEmpty { "unknown_user" }, // Use a more descriptive placeholder
+                    userName = if (product.userId.isNotEmpty()) "User_${product.userId.take(8)}" else "Unknown_User", // Placeholder that will be replaced with real data
+                    userImage = R.drawable.profile, // Add missing userImage field
                     video = if (product.reelVideoUrl.isNotEmpty()) Uri.parse(product.reelVideoUrl) else null,
                     images = if (product.productImages.isNotEmpty()) product.productImages.map { Uri.parse(it) } else null,
                     contentDescription = if (product.reelTitle.isNotEmpty()) product.reelTitle else product.description,
@@ -353,8 +404,18 @@ class ProductViewModel : ViewModel() {
                 Log.d("PRODUCT_DEBUG", "DEBUG: Created reel ${reel.id} - video: ${reel.video}, images: ${reel.images}, productImage: ${reel.productImage}")
                 reel
             }
-            Log.d("PRODUCT_DEBUG", "DEBUG: Generated ${reels.size} reels")
+            Log.d("PRODUCT_DEBUG", "🎬 Generated ${reels.size} reels")
+            Log.d("PRODUCT_DEBUG", "📺 Setting productReels to ${reels.size} reels")
+            Log.d("PRODUCT_DEBUG", "📱 Reel IDs: ${reels.map { it.id }}")
             productReels = reels
+            Log.d("PRODUCT_DEBUG", "✅ productReels now contains ${productReels.size} reels")
+        }
+    }
+    
+    fun refreshProducts() {
+        Log.d("PRODUCT_DEBUG", "🔄 refreshProducts called manually")
+        viewModelScope.launch {
+            getAllProductsFromFirebase()
         }
     }
 
@@ -368,6 +429,7 @@ data class Category(
 
 data class Product(
     val id: String = "",
+    val userId: String = "", // Add userId to identify product owner
     val name: String = "",
     val description: String = "",
     val price: String = "0",

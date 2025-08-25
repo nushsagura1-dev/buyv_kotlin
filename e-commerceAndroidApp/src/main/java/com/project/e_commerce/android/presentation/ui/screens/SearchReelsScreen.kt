@@ -84,7 +84,7 @@ val sampleReels = List(15) {
         thumbnail = listOf(
             R.drawable.img1, R.drawable.img2, R.drawable.img3, R.drawable.img4
         )[it % 4],
-        username = "user$it",
+        username = "User_$it",
         profileImage = listOf(
             R.drawable.profile, R.drawable.img2, R.drawable.img3, R.drawable.img4
         )[it % 4],
@@ -96,7 +96,7 @@ val sampleUsers = List(12) {
     User(
         id = it,
         name = "Jenny $it",
-        username = "jenny_wilson$it",
+        username = "User_$it",
         profileImage = listOf(
             R.drawable.profile, R.drawable.img2, R.drawable.img3, R.drawable.img4
         )[it % 4],

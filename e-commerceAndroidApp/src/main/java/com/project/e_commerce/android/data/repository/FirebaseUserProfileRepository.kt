@@ -16,6 +16,20 @@ class FirebaseUserProfileRepository(
     private val firestore: FirebaseFirestore
 ) : UserProfileRepository {
 
+    init {
+        Log.d("REPO_DEBUG", "🚀 FirebaseUserProfileRepository initialized")
+        Log.d("REPO_DEBUG", "🔍 Auth instance: ${auth.app.name}")
+        Log.d("REPO_DEBUG", "🔍 Firestore instance: ${firestore.app.name}")
+        
+        // Test Firestore connection
+        try {
+            val testCollection = firestore.collection("test")
+            Log.d("REPO_DEBUG", "✅ Firestore connection test successful")
+        } catch (e: Exception) {
+            Log.e("REPO_DEBUG", "❌ Firestore connection test failed: ${e.message}")
+        }
+    }
+
     companion object {
         private const val USERS_COLLECTION = "users"
         private const val POSTS_COLLECTION = "posts"
@@ -26,8 +40,31 @@ class FirebaseUserProfileRepository(
     }
 
     override suspend fun getUserProfile(uid: String): Result<UserProfile> = runCatching {
-        Log.d("REPO_DEBUG", "🔍 Getting profile for uid: $uid")
-        val document = firestore.collection(USERS_COLLECTION).document(uid).get().await()
+        // Validate UID before proceeding
+        if (uid.isBlank()) {
+            Log.e("REPO_DEBUG", "❌ Invalid UID: UID is blank or empty")
+            throw IllegalArgumentException("User ID cannot be blank")
+        }
+        
+        Log.d("REPO_DEBUG", "🔍 Getting profile for uid: '$uid'")
+        Log.d("REPO_DEBUG", "🔍 UID length: ${uid.length}")
+        Log.d("REPO_DEBUG", "🔍 UID contains only whitespace: ${uid.isBlank()}")
+        Log.d("REPO_DEBUG", "📁 Document path: ${USERS_COLLECTION}/$uid")
+        
+        val documentRef: com.google.firebase.firestore.DocumentReference
+        val document: com.google.firebase.firestore.DocumentSnapshot
+        
+        try {
+            documentRef = firestore.collection(USERS_COLLECTION).document(uid)
+            Log.d("REPO_DEBUG", "📄 Document reference: ${documentRef.path}")
+            
+            document = documentRef.get().await()
+        } catch (e: Exception) {
+            Log.e("REPO_DEBUG", "❌ Error creating document reference: ${e.message}")
+            Log.e("REPO_DEBUG", "❌ UID value: '$uid'")
+            Log.e("REPO_DEBUG", "❌ USERS_COLLECTION: '$USERS_COLLECTION'")
+            throw e
+        }
         
         if (document.exists()) {
             Log.d("REPO_DEBUG", "📄 Document exists, data: ${document.data}")
@@ -83,19 +120,59 @@ class FirebaseUserProfileRepository(
     }
 
     override suspend fun updateUserProfile(profile: UserProfile): Result<UserProfile> = runCatching {
+        // Validate UID before proceeding
+        if (profile.uid.isBlank()) {
+            Log.e("REPO_DEBUG", "❌ Invalid UID: UID is blank or empty")
+            throw IllegalArgumentException("User ID cannot be blank")
+        }
+        
+        Log.d("REPO_DEBUG", "🔄 Updating profile for UID: '${profile.uid}'")
+        Log.d("REPO_DEBUG", "🔄 UID length: ${profile.uid.length}")
+        Log.d("REPO_DEBUG", "🔄 UID contains only whitespace: ${profile.uid.isBlank()}")
+        Log.d("REPO_DEBUG", "📁 Document path: ${USERS_COLLECTION}/${profile.uid}")
         val updatedProfile = profile.copy(lastUpdated = System.currentTimeMillis())
-        firestore.collection(USERS_COLLECTION)
-            .document(profile.uid)
-            .set(updatedProfile)
-            .await()
+        
+        try {
+            val documentRef = firestore.collection(USERS_COLLECTION).document(profile.uid)
+            Log.d("REPO_DEBUG", "📄 Document reference: ${documentRef.path}")
+            
+            documentRef.set(updatedProfile).await()
+        } catch (e: Exception) {
+            Log.e("REPO_DEBUG", "❌ Error creating document reference: ${e.message}")
+            Log.e("REPO_DEBUG", "❌ UID value: '${profile.uid}'")
+            Log.e("REPO_DEBUG", "❌ USERS_COLLECTION: '$USERS_COLLECTION'")
+            throw e
+        }
+            
+        Log.d("REPO_DEBUG", "✅ Profile updated successfully for UID: ${profile.uid}")
         updatedProfile
     }
 
     override suspend fun createUserProfile(profile: UserProfile): Result<UserProfile> = runCatching {
-        firestore.collection(USERS_COLLECTION)
-            .document(profile.uid)
-            .set(profile)
-            .await()
+        // Validate UID before proceeding
+        if (profile.uid.isBlank()) {
+            Log.e("REPO_DEBUG", "❌ Invalid UID: UID is blank or empty")
+            throw IllegalArgumentException("User ID cannot be blank")
+        }
+        
+        Log.d("REPO_DEBUG", "🔄 Creating profile for UID: '${profile.uid}'")
+        Log.d("REPO_DEBUG", "🔄 UID length: ${profile.uid.length}")
+        Log.d("REPO_DEBUG", "🔄 UID contains only whitespace: ${profile.uid.isBlank()}")
+        Log.d("REPO_DEBUG", "📁 Document path: ${USERS_COLLECTION}/${profile.uid}")
+        
+        try {
+            val documentRef = firestore.collection(USERS_COLLECTION).document(profile.uid)
+            Log.d("REPO_DEBUG", "📄 Document reference: ${documentRef.path}")
+            
+            documentRef.set(profile).await()
+        } catch (e: Exception) {
+            Log.e("REPO_DEBUG", "❌ Error creating document reference: ${e.message}")
+            Log.e("REPO_DEBUG", "❌ UID value: '${profile.uid}'")
+            Log.e("REPO_DEBUG", "❌ USERS_COLLECTION: '$USERS_COLLECTION'")
+            throw e
+        }
+            
+        Log.d("REPO_DEBUG", "✅ Profile created successfully for UID: ${profile.uid}")
         profile
     }
 

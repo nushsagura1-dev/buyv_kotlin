@@ -54,6 +54,7 @@ import com.project.e_commerce.android.presentation.ui.screens.RequireLoginPrompt
 import com.project.e_commerce.android.presentation.utils.VideoThumbnailUtils
 import com.project.e_commerce.android.presentation.viewModel.profileViewModel.ProfileViewModel
 import org.koin.androidx.compose.koinViewModel
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun ProfileScreen(navController: NavHostController) {
@@ -64,6 +65,19 @@ fun ProfileScreen(navController: NavHostController) {
     val userLikedContent by profileViewModel.userLikedContent.collectAsState()
     val userBookmarkedContent by profileViewModel.userBookmarkedContent.collectAsState()
 
+    // Logout state
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
+    // Refresh following data when screen becomes active
+    LaunchedEffect(Unit) {
+        profileViewModel.refreshFollowingData()
+    }
+    
+    // Refresh profile data when screen becomes active (e.g., returning from EditProfileScreen)
+    LaunchedEffect(Unit) {
+        profileViewModel.refreshProfile()
+    }
+
     // Show error dialog if there's an error
     if (uiState.error != null) {
         AlertDialog(
@@ -73,6 +87,36 @@ fun ProfileScreen(navController: NavHostController) {
             confirmButton = {
                 TextButton(onClick = { profileViewModel.clearError() }) {
                     Text("OK")
+                }
+            }
+        )
+    }
+
+    // Show logout confirmation dialog
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Logout") },
+            text = { Text("Are you sure you want to logout?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutDialog = false
+                        // Perform logout
+                        val auth = FirebaseAuth.getInstance()
+                        auth.signOut()
+                        // Navigate to login screen
+                        navController.navigate(Screens.LoginScreen.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text("Yes", color = Color(0xFFFF6F00))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("No", color = Color.Gray)
                 }
             }
         )
@@ -128,45 +172,61 @@ fun ProfileScreen(navController: NavHostController) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
         item {
-            // Top Bar
+            // Top Bar with Logout and Menu
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 6.dp, end = 4.dp),
-                horizontalArrangement = Arrangement.End,
+                    .padding(top = 6.dp, start = 4.dp, end = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { navController.navigate(Screens.ProfileScreen.NotificationScreen.route) }) {
-                    Box(contentAlignment = Alignment.TopEnd) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.notification_icon),
-                            contentDescription = "Notifications",
-                            tint = Color.Unspecified,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .background(Color(0xFFFF3D00), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "1",
-                                color = Color.White,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                // Logout Icon (Left)
+                IconButton(onClick = { showLogoutDialog = true }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_logout),
+                        contentDescription = "Logout",
+                        tint = Color(0xFFFF6F00),
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
 
-                IconButton(onClick = { navController.navigate(Screens.ProfileScreen.SettingsScreen.route) }) {
-                    Icon(
-                        modifier = Modifier.padding(7.dp),
-                        painter = painterResource(id = R.drawable.ic_menu),
-                        contentDescription = "Menu",
-                        tint = Color(0xFFFF6F00)
-                    )
+                // Right side icons
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { navController.navigate(Screens.ProfileScreen.NotificationScreen.route) }) {
+                        Box(contentAlignment = Alignment.TopEnd) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.notification_icon),
+                                contentDescription = "Notifications",
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .background(Color(0xFFFF3D00), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "1",
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    IconButton(onClick = { navController.navigate(Screens.ProfileScreen.SettingsScreen.route) }) {
+                        Icon(
+                            modifier = Modifier.padding(7.dp),
+                            painter = painterResource(id = R.drawable.ic_menu),
+                            contentDescription = "Menu",
+                            tint = Color(0xFFFF6F00)
+                        )
+                    }
                 }
             }
         }
@@ -190,13 +250,20 @@ fun ProfileScreen(navController: NavHostController) {
                         number = uiState.followingCount.toString(),
                         label = "Following"
                     ) {
-                        navController.navigate(
-                            Screens.FollowListScreen.createRoute(
+                        Log.d("PROFILE_DEBUG", "🔄 Navigating to Following tab")
+                        try {
+                            val route = Screens.FollowListScreen.createRoute(
                                 username = uiState.username,
                                 startTab = 1,
                                 showFriendsTab = true
                             )
-                        )
+                            Log.d("PROFILE_DEBUG", "🔄 Route created: $route")
+                            navController.navigate(route)
+                            Log.d("PROFILE_DEBUG", "✅ Navigation successful")
+                        } catch (e: Exception) {
+                            Log.e("PROFILE_DEBUG", "❌ Navigation failed: ${e.message}")
+                            e.printStackTrace()
+                        }
                     }
                     
                     // Profile Image - Use real data if available, fallback to default
@@ -224,13 +291,20 @@ fun ProfileScreen(navController: NavHostController) {
                         number = uiState.followersCount.toString(),
                         label = "Followers"
                     ) {
-                        navController.navigate(
-                            Screens.FollowListScreen.createRoute(
+                        Log.d("PROFILE_DEBUG", "🔄 Navigating to Followers tab")
+                        try {
+                            val route = Screens.FollowListScreen.createRoute(
                                 username = uiState.username,
                                 startTab = 0,
                                 showFriendsTab = true
                             )
-                        )
+                            Log.d("PROFILE_DEBUG", "🔄 Route created: $route")
+                            navController.navigate(route)
+                            Log.d("PROFILE_DEBUG", "✅ Navigation successful")
+                        } catch (e: Exception) {
+                            Log.e("PROFILE_DEBUG", "❌ Navigation failed: ${e.message}")
+                            e.printStackTrace()
+                        }
                     }
                 }
             }
@@ -326,10 +400,8 @@ fun ProfileScreen(navController: NavHostController) {
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
 
-        // Debug buttons removed - no longer needed
-
-
-
+        // Following Feed Button removed - no longer needed
+        // The Following tab is now implemented directly in the main ReelsView
 
         item { Spacer(modifier = Modifier.height(20.dp)) }
 

@@ -18,7 +18,9 @@ class ProfileViewModel(
     private val getUserReelsUseCase: GetUserReelsUseCase,
     private val getUserProductsUseCase: GetUserProductsUseCase,
     private val getUserLikedPostsUseCase: GetUserLikedPostsUseCase,
-    private val getUserBookmarkedPostsUseCase: GetUserBookmarkedPostsUseCase
+    private val getUserBookmarkedPostsUseCase: GetUserBookmarkedPostsUseCase,
+    private val getFollowingUsersUseCase: GetFollowingUsersUseCase,
+    private val getFollowersUseCase: GetFollowersUseCase
 ) : ViewModel(), ProfileScreenInteraction {
 
     private val auth = FirebaseAuth.getInstance()
@@ -62,8 +64,6 @@ class ProfileViewModel(
                             displayName = profile.displayName,
                             username = profile.username,
                             profileImageUrl = profile.profileImageUrl,
-                            followersCount = profile.followersCount,
-                            followingCount = profile.followingCount,
                             likesCount = profile.likesCount
                         )
                         
@@ -72,6 +72,29 @@ class ProfileViewModel(
                     }.onFailure { error ->
                         _uiState.value = _uiState.value.copy(error = error.message)
                         Log.e("PROFILE_DEBUG", "❌ Failed to load profile: ${error.message}")
+                    }
+
+                    // Load REAL following/followers data from following system
+                    try {
+                        val followingUserIds = getFollowingUsersUseCase(currentUser.uid)
+                        val followersUserIds = getFollowersUseCase(currentUser.uid)
+                        
+                        Log.d("PROFILE_DEBUG", "📊 Real following data: ${followingUserIds.size} following, ${followersUserIds.size} followers")
+                        
+                        _uiState.value = _uiState.value.copy(
+                            followingCount = followingUserIds.size,
+                            followersCount = followersUserIds.size
+                        )
+                        
+                        Log.d("PROFILE_DEBUG", "✅ Updated UI state with real following data: Following=${followingUserIds.size}, Followers=${followersUserIds.size}")
+                        
+                    } catch (e: Exception) {
+                        Log.e("PROFILE_DEBUG", "❌ Failed to load following data: ${e.message}")
+                        // Fallback to profile data if following system fails
+                        _uiState.value = _uiState.value.copy(
+                            followingCount = _userProfile.value?.followingCount ?: 0,
+                            followersCount = _userProfile.value?.followersCount ?: 0
+                        )
                     }
 
                     // Load user reels
@@ -126,6 +149,31 @@ class ProfileViewModel(
 
     fun refreshProfile() {
         loadUserProfile()
+    }
+
+    fun refreshFollowingData() {
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            viewModelScope.launch {
+                try {
+                    // Load REAL following/followers data from following system
+                    val followingUserIds = getFollowingUsersUseCase(currentUser.uid)
+                    val followersUserIds = getFollowersUseCase(currentUser.uid)
+                    
+                    Log.d("PROFILE_DEBUG", "🔄 Refreshed following data: ${followingUserIds.size} following, ${followersUserIds.size} followers")
+                    
+                    _uiState.value = _uiState.value.copy(
+                        followingCount = followingUserIds.size,
+                        followersCount = followersUserIds.size
+                    )
+                    
+                    Log.d("PROFILE_DEBUG", "✅ Updated UI state with refreshed following data: Following=${followingUserIds.size}, Followers=${followersUserIds.size}")
+                    
+                } catch (e: Exception) {
+                    Log.e("PROFILE_DEBUG", "❌ Failed to refresh following data: ${e.message}")
+                }
+            }
+        }
     }
 
     fun clearError() {

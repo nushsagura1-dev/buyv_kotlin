@@ -3,6 +3,7 @@ package com.project.e_commerce.android.presentation.ui.navigation
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -38,9 +39,11 @@ import com.project.e_commerce.android.presentation.ui.screens.onboarding.Onboard
 import com.project.e_commerce.android.presentation.ui.screens.splashScreen.SplashScreen
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
+import com.project.e_commerce.android.presentation.viewModel.reelsScreenViewModel.ReelsScreenViewModel
 import com.project_e_commerce.android.presentation.ui.screens.createAccountScreen.CreateAnAccountScreen
 import com.project_e_commerce.android.presentation.ui.screens.forgetPassword.ForgetPasswordRequestScreen
 import org.koin.androidx.compose.koinViewModel
+import com.project.e_commerce.android.presentation.ui.screens.FollowListScreen
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -51,6 +54,7 @@ fun MyNavHost(
 ) {
     val productViewModel: ProductViewModel = koinViewModel()
     val cartViewModel: CartViewModel = koinViewModel()
+    val reelsScreenViewModel: ReelsScreenViewModel = koinViewModel()
 
     NavHost(
         navController = navController,
@@ -68,7 +72,16 @@ fun MyNavHost(
         composable(Screens.LoginScreen.ChangePasswordScreen.route) { ChangePasswordScreen(navController) }
         composable(Screens.LoginScreen.PasswordChangedSuccessScreen.route) { PasswordChangedSuccessScreen(navController) }
 
-        composable(Screens.ReelsScreen.route) { ReelsView(navController,productViewModel,cartViewModel) }
+        composable(Screens.ReelsScreen.route) { 
+            ReelsView(
+                navController = navController,
+                viewModel = reelsScreenViewModel,
+                cartViewModel = cartViewModel,
+                isLoggedIn = true, // TODO: Get actual login state
+                setShowLoginPrompt = { /* Handle login prompt */ },
+                onShowSheet = { /* Handle sheet */ }
+            )
+        }
 
 
 
@@ -86,7 +99,18 @@ fun MyNavHost(
         ) { backStackEntry ->
             val reelId = backStackEntry.arguments?.getString("reelId") ?: ""
             // Navigate to reels screen with specific reel ID
-            ReelsView(navController, productViewModel, cartViewModel, reelId = reelId)
+            ReelsView(
+                navController = navController,
+                viewModel = reelsScreenViewModel,
+                cartViewModel = cartViewModel,
+                isLoggedIn = true, // TODO: Get actual login state
+                setShowLoginPrompt = { /* Handle login prompt */ },
+                onShowSheet = { /* Handle sheet */ }
+            )
+            // Set the reelId in the savedStateHandle for ReelsView to use
+            LaunchedEffect(Unit) {
+                navController.currentBackStackEntry?.savedStateHandle?.set("reelId", reelId)
+            }
         }
         composable(Screens.ReelsScreen.SoundPageScreen.route) {
             SoundPageScreen( navController)
@@ -123,7 +147,7 @@ fun MyNavHost(
 
         composable(Screens.ProfileScreen.route) { ProfileScreen(navController) }
 
-        composable(Screens.ProfileScreen.EditPersonalProfile.route) {
+        composable(Screens.ProfileScreen.EditProfileScreen.route) {
             EditProfileScreen(
                 navController = navController
             )
@@ -165,13 +189,27 @@ fun MyNavHost(
             EditProfileScreen(navController)
         }
 
-        /*composable(
-            route = Screens.ProfileScreen.EditReelScreen.route,
-            arguments = listOf(navArgument("reelId") { type = NavType.StringType })
+        // FollowListScreen route
+        composable(
+            route = Screens.FollowListScreen.route,
+            arguments = listOf(
+                navArgument("username") { type = NavType.StringType },
+                navArgument("startTab") { type = NavType.IntType; defaultValue = 0 },
+                navArgument("showFriendsTab") { type = NavType.BoolType; defaultValue = true }
+            )
         ) { backStackEntry ->
-            val reelId = backStackEntry.arguments?.getString("reelId") ?: "0"
-            EditReelScreen(navController, reelId)
-        }*/
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val startTab = backStackEntry.arguments?.getInt("startTab") ?: 0
+            val showFriendsTab = backStackEntry.arguments?.getBoolean("showFriendsTab") ?: true
+            
+            FollowListScreen(
+                navController = navController,
+                username = username,
+                isCurrentUser = true, // TODO: Determine if viewing own profile
+                startTabIndex = startTab,
+                showFriendsTab = showFriendsTab
+            )
+        }
 
         composable("onboarding1") { OnboardingScreen1(navController) }
         composable("onboarding2") { OnboardingScreen2(navController) }

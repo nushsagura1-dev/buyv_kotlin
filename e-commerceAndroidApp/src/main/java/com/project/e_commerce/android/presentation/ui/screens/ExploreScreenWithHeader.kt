@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
@@ -62,8 +64,23 @@ fun ExploreScreenWithHeader(
     // SIMPLE TEST MESSAGE
     Log.d("EXPLORE_DEBUG", "🔍 EXPLORE SCREEN LOADED - DEBUG IS WORKING!")
     
-    var selectedTab by remember { mutableStateOf("Explore") }
+    // Use the same savedStateHandle approach as ReelsView for consistent tab state
+    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
+    var selectedTab by remember { 
+        mutableStateOf(savedStateHandle?.get("selectedTab") ?: "Explore") 
+    }
+    
     val headerHeight = 60.dp
+    
+    // Sync tab state with savedStateHandle when screen loads
+    LaunchedEffect(savedStateHandle) {
+        savedStateHandle?.getStateFlow<String>("selectedTab", "Explore")?.collect { tab ->
+            if (tab != selectedTab) {
+                Log.d("ExploreScreen", "🔄 Tab state synced from savedStateHandle: $tab")
+                selectedTab = tab
+            }
+        }
+    }
     
     // Get real product data from ProductViewModel
     val exploreItems = productViewModel.productReels.map { reel ->
@@ -116,7 +133,7 @@ fun ExploreScreenWithHeader(
         isVideo = false,
         videoUri = null,
         imageUris = null,
-        userName = "Test User",
+        userName = "User_Test",
         loveCount = 0,
         isLoved = false,
         commentCount = 0,
@@ -227,13 +244,24 @@ fun ExploreScreenWithHeader(
             onClickSearch = { navController.navigate(Screens.ReelsScreen.SearchReelsAndUsersScreen.route) },
             selectedTab = selectedTab,
             onTabChange = { tab ->
+                Log.d("ExploreScreen", "🔄 Tab change requested: $selectedTab -> $tab")
                 if (tab == "For you" || tab == "Following") {
+                    // Update the shared tab state and navigate back to ReelsView
+                    savedStateHandle?.set("selectedTab", tab)
+                    Log.d("ExploreScreen", "✅ Tab state updated to: $tab, navigating back to ReelsView")
                     navController.popBackStack()
                 } else {
+                    // Update local tab state for Explore tab
                     selectedTab = tab
+                    savedStateHandle?.set("selectedTab", tab)
+                    Log.d("ExploreScreen", "✅ Local tab state updated to: $tab")
                 }
             },
-            onClickExplore = { selectedTab = "Explore" },
+            onClickExplore = { 
+                selectedTab = "Explore"
+                savedStateHandle?.set("selectedTab", "Explore")
+                Log.d("ExploreScreen", "✅ Explore tab selected")
+            },
             headerStyle = HeaderStyle.WHITE_BLACK_TEXT,
             modifier = Modifier
                 .fillMaxWidth()

@@ -42,7 +42,18 @@ import androidx.navigation.NavHostController
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.ui.screens.profileScreen.ProfileStat
-
+import com.google.firebase.auth.FirebaseAuth
+import com.project.e_commerce.android.domain.model.UserProfile
+import com.project.e_commerce.android.domain.usecase.GetUserProfileUseCase
+import org.koin.androidx.compose.koinViewModel
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import android.util.Log
+import coil3.compose.AsyncImage
 
 @Composable
 fun UserProfileScreen(navController: NavHostController) {
@@ -53,6 +64,43 @@ fun UserProfileScreen(navController: NavHostController) {
     )
 
     var isFollowing by remember { mutableStateOf(false) }
+    
+    // Get current user ID from navigation arguments or use current logged-in user
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    val getUserProfileUseCase: GetUserProfileUseCase = koinViewModel()
+    val scope = rememberCoroutineScope()
+    
+    // State for user profile data
+    var userProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    
+    // Load user profile data
+    LaunchedEffect(currentUserId) {
+        if (currentUserId != null) {
+            isLoading = true
+            scope.launch {
+                try {
+                    getUserProfileUseCase(currentUserId).onSuccess { profile ->
+                        userProfile = profile
+                        isLoading = false
+                        Log.d("UserProfileScreen", "✅ Profile loaded: ${profile.displayName}")
+                    }.onFailure { 
+                        error = "Failed to load profile"
+                        isLoading = false
+                        Log.e("UserProfileScreen", "❌ Failed to load profile")
+                    }
+                } catch (e: Exception) {
+                    error = "Error loading profile: ${e.message}"
+                    isLoading = false
+                    Log.e("UserProfileScreen", "❌ Exception loading profile: ${e.message}")
+                }
+            }
+        } else {
+            error = "User not found"
+            isLoading = false
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -69,37 +117,34 @@ fun UserProfileScreen(navController: NavHostController) {
             ) {
                 IconButton(
                     onClick = { navController.popBackStack() },
-                    modifier = Modifier
-                        .size(22.dp)
-                        .padding(start = 2.dp)
+                    modifier = Modifier.size(34.dp)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_back),
                         contentDescription = "Back",
-                        tint = Color(0xFF0066CC)
+                        tint = Color(0xFF0D3D67),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(
-                    onClick = { /* Show more actions */ },
-                    modifier = Modifier
-                        .size(48.dp)
 
+                IconButton(
+                    onClick = { /* Menu action */ },
+                    modifier = Modifier.size(34.dp)
                 ) {
                     Icon(
-                        painter = painterResource(id = R.drawable.ic_more), // ثلاث نقاط فوق بعضهم
+                        painter = painterResource(id = R.drawable.ic_menu),
                         contentDescription = "Menu",
-                        tint = Color(0xFF0066CC),
-                        modifier = Modifier.size(32.dp)
+                        tint = Color(0xFFFF6600),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
         }
 
+        item { Spacer(modifier = Modifier.height(8.dp)) }
 
         item {
-            // Stats
-
+            // Stats + Profile Image
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -111,59 +156,106 @@ fun UserProfileScreen(navController: NavHostController) {
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ProfileStat("122", "Following") {
-                        navController.navigate(
-                            Screens.FollowListScreen.createRoute(
-                                username = "karme",
-                                startTab = 1,
-                                showFriendsTab = false
-                            )
-                        )
-                    }
-                    Image(
-                        painter = painterResource(id = R.drawable.profile),
-                        contentDescription = null,
-                        modifier = Modifier.size(100.dp).clip(CircleShape)
+                    ProfileStat(
+                        number = userProfile?.followingCount?.toString() ?: "0",
+                        label = "Following"
                     )
-                    ProfileStat("150K", "Followers") {
-                        navController.navigate(
-                            Screens.FollowListScreen.createRoute(
-                                username = "karme",
-                                startTab = 0,
-                                showFriendsTab = false
-                            )
+                    
+                    // Profile Image - Use real data if available, fallback to default
+                    if (userProfile?.profileImageUrl != null) {
+                        AsyncImage(
+                            model = userProfile?.profileImageUrl,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(id = R.drawable.profile)
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.profile),
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(CircleShape)
                         )
                     }
+                    
+                    ProfileStat(
+                        number = userProfile?.followersCount?.toString() ?: "0",
+                        label = "Followers"
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-
         }
+
         item {
             // Name & Username
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            if (isLoading) {
+                // Show loading state
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Loading...",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0D3D67)
+                    )
+                    Text(
+                        text = "@loading",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                }
+            } else if (error != null) {
+                // Show error state
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Error",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Red
+                    )
+                    Text(
+                        text = error!!,
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                }
+            } else {
+                // Show real user data
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = userProfile?.displayName?.ifEmpty { "User" } ?: "User",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0D3D67)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Image(
+                        painter = painterResource(id = R.drawable.verified_badge),
+                        contentDescription = "Verified",
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
                 Text(
-                    text = "Karme Show",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0D3D67)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Image(
-                    painter = painterResource(id = R.drawable.verified_badge),
-                    contentDescription = "Verified",
-                    modifier = Modifier.size(22.dp)
+                    text = "@${userProfile?.username?.ifEmpty { "user" } ?: "user"}",
+                    fontSize = 13.sp,
+                    color = Color.Gray
                 )
             }
-            Text("@karme ", fontSize = 13.sp, color = Color.Gray)
             Spacer(modifier = Modifier.height(8.dp))
         }
 
         item { Spacer(modifier = Modifier.height(4.dp)) }
 
         item {
-            ProfileStat("1.5M", "Likes")
+            ProfileStat(
+                number = userProfile?.likesCount?.toString() ?: "0",
+                label = "Likes"
+            )
         }
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -193,8 +285,6 @@ fun UserProfileScreen(navController: NavHostController) {
         }
 
         item { Spacer(modifier = Modifier.height(10.dp)) }
-
-
 
         item {
             // Tabs Row (Reels, Products only)

@@ -78,7 +78,7 @@ fun BottomNavigation(
             currentRoute != Screens.ProfileScreen.OrdersHistoryScreen.route &&
             currentRoute != Screens.ProfileScreen.FavouritesScreen.route &&
             currentRoute != Screens.ProfileScreen.RequestHelpScreen.route &&
-            currentRoute != Screens.ProfileScreen.EditPersonalProfile.route &&
+            currentRoute != Screens.ProfileScreen.EditProfileScreen.route &&
             currentRoute != Screens.ReelsScreen.SearchReelsAndUsersScreen.route &&
             currentRoute != Screens.ProfileScreen.NotificationScreen.route &&
             currentRoute != Screens.ProductScreen.SearchScreen.route &&

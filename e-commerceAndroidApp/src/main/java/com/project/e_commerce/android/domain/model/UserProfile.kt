@@ -7,6 +7,7 @@ data class UserProfile(
     val username: String = "",
     val profileImageUrl: String? = null,
     val bio: String = "",
+    val phone: String = "",
     val followersCount: Int = 0,
     val followingCount: Int = 0,
     val likesCount: Int = 0,
@@ -53,6 +54,31 @@ data class UserInteraction(
     val targetId: String = "",
     val targetType: InteractionType = InteractionType.LIKE,
     val createdAt: Long = System.currentTimeMillis()
+)
+
+// New: Following relationship model
+data class FollowRelationship(
+    val id: String = "",
+    val followerId: String = "",  // User who is following
+    val followedId: String = "",  // User being followed
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+// New: Following status for UI
+data class FollowingStatus(
+    val isFollowing: Boolean = false,
+    val isFollowedBy: Boolean = false,
+    val isMutual: Boolean = false
+)
+
+// New: User follow model for UI
+data class UserFollowModel(
+    val id: String = "",
+    val name: String = "",
+    val username: String = "",
+    val profileImageUrl: String? = null,
+    val isFollowingMe: Boolean = false,
+    val isIFollow: Boolean = false
 )
 
 enum class PostType {

@@ -36,8 +36,6 @@ sealed class Screens(val route: String, val title : String? = null, val icon : I
 
     object ProfileScreen : Screens(title = "Profile", route = "profile_screen",icon = R.drawable.ic_profile, ){
 
-        object EditPersonalProfile: Screens(route = "edit_personal_profile")
-
         object OrdersHistoryScreen : Screens(route = "orders_history_screen")
 
         object TrackOrderScreen : Screens(route = "orders_track_screen")

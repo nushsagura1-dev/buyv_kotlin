@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,14 +46,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.google.accompanist.pager.HorizontalPager
 import com.google.accompanist.pager.rememberPagerState
 import kotlinx.coroutines.launch
-
-
-data class UserFollowModel(
-    val name: String,
-    val username: String,
-    val isFollowingMe: Boolean,
-    val isIFollow: Boolean
-)
+import com.google.firebase.auth.FirebaseAuth
+import com.project.e_commerce.android.domain.model.FollowingStatus
+import com.project.e_commerce.android.domain.model.UserProfile
+import com.project.e_commerce.android.domain.model.UserFollowModel
+import com.project.e_commerce.android.presentation.viewModel.followingViewModel.FollowingViewModel
+import org.koin.androidx.compose.koinViewModel
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,50 +63,25 @@ fun FollowListScreen(
     startTabIndex: Int = 0,
     showFriendsTab: Boolean = true
 ) {
+    val followingViewModel: FollowingViewModel = koinViewModel()
+    val auth = remember { FirebaseAuth.getInstance() }
+    val currentUserId = auth.currentUser?.uid
+    
     val allTabs = listOf("Followers", "Following", "Friends", "Suggested")
     val tabs = if (showFriendsTab) allTabs else listOf("Followers", "Following", "Suggested")
 
-    // قوائم وهمية مختلفة لكل تبويب
-    // تعديل القوائم الوهمية
-    val followersList = List(10) { index ->
-        UserFollowModel(
-            name = "Follower $index",
-            username = "@follower$index",
-            isFollowingMe = if (showFriendsTab) true else index % 3 != 0, // عند showFriendsTab=false، تجعل بعض المستخدمين لا يتابعونك
-            isIFollow = index % 2 == 0 // بعض المستخدمين تتابعهم، والبعض لا
-        )
-    }
-
-    val followingList = List(10) { index ->
-        UserFollowModel(
-            name = "Following $index",
-            username = "@following$index",
-            isFollowingMe = index % 2 == 0, // بعض المستخدمين يتابعونك
-            isIFollow = if (showFriendsTab) true else index % 3 != 0 // عند showFriendsTab=false، تجعل بعض المستخدمين لا تتابعهم
-        )
-    }
-
-    val friendsList = List(10) {
-        UserFollowModel(
-            name = "Friend $it",
-            username = "@friend$it",
-            isFollowingMe = true,
-            isIFollow = true
-        )
-    }
-
-    val suggestedList = List(10) { index ->
-        UserFollowModel(
-            name = "Suggested $index",
-            username = "@suggested$index",
-            isFollowingMe = index % 2 == 0,
-            isIFollow = false
-        )
-    }
-
-
     val pagerState = rememberPagerState(initialPage = startTabIndex)
     val coroutineScope = rememberCoroutineScope()
+
+    // Load data when component is created
+    LaunchedEffect(currentUserId, username) {
+        currentUserId?.let { userId ->
+            followingViewModel.loadUserData(userId, username)
+        }
+    }
+
+    // Observe UI state
+    val uiState by followingViewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier
@@ -154,8 +129,8 @@ fun FollowListScreen(
         ) {
             tabs.forEachIndexed { index, title ->
                 val labelWithCount = when (title) {
-                    "Followers" -> "Followers (${followersList.size})"
-                    "Following" -> "Following (${followingList.size})"
+                    "Followers" -> "Followers (${uiState.followersCount})"
+                    "Following" -> "Following (${uiState.followingCount})"
                     "Friends" -> "Friends"
                     else -> title
                 }
@@ -181,110 +156,282 @@ fun FollowListScreen(
             }
         }
 
-
         HorizontalPager(count = tabs.size, state = pagerState) { page ->
-
-            val users = when (tabs[page]) {
-                "Followers" -> followersList
-                "Following" -> followingList
-                "Friends" -> friendsList
-                else -> suggestedList
+            when (tabs[page]) {
+                "Followers" -> FollowersTab(
+                    users = uiState.followers,
+                    currentUserId = currentUserId,
+                    onFollowClick = { targetUserId ->
+                        currentUserId?.let { userId ->
+                            followingViewModel.toggleFollow(userId, targetUserId)
+                        }
+                    },
+                    isLoading = uiState.isLoading
+                )
+                "Following" -> FollowingTab(
+                    users = uiState.following,
+                    currentUserId = currentUserId,
+                    onFollowClick = { targetUserId ->
+                        currentUserId?.let { userId ->
+                            followingViewModel.toggleFollow(userId, targetUserId)
+                        }
+                    },
+                    isLoading = uiState.isLoading
+                )
+                "Friends" -> FriendsTab(
+                    users = uiState.friends,
+                    currentUserId = currentUserId,
+                    onFollowClick = { targetUserId ->
+                        currentUserId?.let { userId ->
+                            followingViewModel.toggleFollow(userId, targetUserId)
+                        }
+                    },
+                    isLoading = uiState.isLoading
+                )
+                else -> SuggestedTab(
+                    users = uiState.suggestedUsers,
+                    currentUserId = currentUserId,
+                    onFollowClick = { targetUserId ->
+                        currentUserId?.let { userId ->
+                            followingViewModel.toggleFollow(userId, targetUserId)
+                        }
+                    },
+                    isLoading = uiState.isLoading
+                )
             }
+        }
+    }
+}
 
-            LazyColumn(modifier = Modifier.fillMaxSize().background(color = Color.White)) {
-                items(users.size) { index ->
-                    val user = users[index]
+@Composable
+fun FollowersTab(
+    users: List<UserFollowModel>,
+    currentUserId: String?,
+    onFollowClick: (String) -> Unit,
+    isLoading: Boolean
+) {
+    if (isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Color(0xFFFF6F00))
+        }
+    } else if (users.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("No followers yet", color = Color.Gray)
+        }
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxSize().background(color = Color.White)) {
+            items(users.size) { index ->
+                val user = users[index]
+                UserFollowItem(
+                    user = user,
+                    currentUserId = currentUserId,
+                    onFollowClick = { onFollowClick(user.id) }
+                )
+            }
+        }
+    }
+}
 
-                    val initialState = when {
-                        !showFriendsTab -> {
-                            when (tabs[page]) {
-                                "Followers", "Following" -> {
-                                    when {
-                                        user.isFollowingMe && user.isIFollow -> "Friends"
-                                        user.isFollowingMe -> "Follow back"
-                                        user.isIFollow -> "Following"
-                                        else -> "Follow"
-                                    }
-                                }
-                                "Suggested" -> {
-                                    if (user.isFollowingMe) "Follow back" else "Follow"
-                                }
-                                else -> "Follow" // لن يحدث هذا لأن التبويبات محدودة
-                            }
-                        }
-                        else -> {
-                            // السلوك الافتراضي عندما تكون showFriendsTab = true
-                            when (tabs[page]) {
-                                "Following" -> if (user.isFollowingMe) "Friends" else "Following"
-                                "Followers" -> if (user.isIFollow) "Friends" else "Follow back"
-                                "Friends" -> "Friends"
-                                "Suggested" -> if (user.isFollowingMe) "Follow back" else "Follow"
-                                else -> "Follow"
-                            }
-                        }
-                    }
+@Composable
+fun FollowingTab(
+    users: List<UserFollowModel>,
+    currentUserId: String?,
+    onFollowClick: (String) -> Unit,
+    isLoading: Boolean
+) {
+    if (isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Color(0xFFFF6F00))
+        }
+    } else if (users.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Not following anyone yet", color = Color.Gray)
+        }
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxSize().background(color = Color.White)) {
+            items(users.size) { index ->
+                val user = users[index]
+                UserFollowItem(
+                    user = user,
+                    currentUserId = currentUserId,
+                    onFollowClick = { onFollowClick(user.id) }
+                )
+            }
+        }
+    }
+}
 
-                    var buttonState by remember(tabs[page], user, showFriendsTab) {
-                        mutableStateOf(initialState)
-                    }
+@Composable
+fun FriendsTab(
+    users: List<UserFollowModel>,
+    currentUserId: String?,
+    onFollowClick: (String) -> Unit,
+    isLoading: Boolean
+) {
+    if (isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Color(0xFFFF6F00))
+        }
+    } else if (users.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("No mutual friends yet", color = Color.Gray)
+        }
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxSize().background(color = Color.White)) {
+            items(users.size) { index ->
+                val user = users[index]
+                UserFollowItem(
+                    user = user,
+                    currentUserId = currentUserId,
+                    onFollowClick = { onFollowClick(user.id) }
+                )
+            }
+        }
+    }
+}
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.profile),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                        )
+@Composable
+fun SuggestedTab(
+    users: List<UserFollowModel>,
+    currentUserId: String?,
+    onFollowClick: (String) -> Unit,
+    isLoading: Boolean
+) {
+    if (isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Color(0xFFFF6F00))
+        }
+    } else if (users.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("No suggestions available", color = Color.Gray)
+        }
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxSize().background(color = Color.White)) {
+            items(users.size) { index ->
+                val user = users[index]
+                UserFollowItem(
+                    user = user,
+                    currentUserId = currentUserId,
+                    onFollowClick = { onFollowClick(user.id) }
+                )
+            }
+        }
+    }
+}
 
-                        Spacer(modifier = Modifier.width(12.dp))
+@Composable
+fun UserFollowItem(
+    user: UserFollowModel,
+    currentUserId: String?,
+    onFollowClick: () -> Unit
+) {
+    var buttonState by remember { mutableStateOf(
+        when {
+            user.isFollowingMe && user.isIFollow -> "Friends"
+            user.isFollowingMe -> "Follow back"
+            user.isIFollow -> "Following"
+            else -> "Follow"
+        }
+    ) }
 
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(user.name, fontWeight = FontWeight.Bold, color = Color(0xFF0D3D67))
-                            Text(user.username, fontSize = 12.sp, color = Color.Gray)
-                        }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Profile Image
+        if (user.profileImageUrl != null) {
+            // TODO: Use AsyncImage for real profile images
+            Image(
+                painter = painterResource(id = R.drawable.profile),
+                contentDescription = "Profile",
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+            )
+        } else {
+            Image(
+                painter = painterResource(id = R.drawable.profile),
+                contentDescription = "Profile",
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+            )
+        }
 
+        Spacer(modifier = Modifier.width(12.dp))
 
-                            Button(
-                                modifier = Modifier.width(110.dp),
-                                onClick = {
-                                    buttonState = when (buttonState) {
-                                        "Follow" -> "Following"
-                                        "Follow back" -> "Friends"
-                                        "Following" -> "Follow"
-                                        "Friends" -> "Follow back"
-                                        else -> "Follow"
-                                    }
+        // User Info
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = user.name,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = Color.Black
+            )
+            Text(
+                text = user.username,
+                fontSize = 14.sp,
+                color = Color.Gray
+            )
+        }
 
-                                },
-                                shape = RoundedCornerShape(24.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    backgroundColor = when (buttonState) {
-                                        "Follow" -> Color(0xFFFF6600)
-                                        "Follow back" -> Color(0xFFFF6600)
-                                        "Friends" -> Color(0xFFF2F2F2)
-                                        else -> Color(0xFFF2F2F2)
-                                    },
-                                    contentColor = if (buttonState == "Friends") Color.Black else Color.White
-                                )
-                            ) {
-                                Text(
-                                    buttonState,
-                                    color = if (buttonState == "Friends" || buttonState == "Following") Color.Black else Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                )
-                            }
-
-                    }
+        // Follow Button
+        Button(
+            modifier = Modifier.width(110.dp),
+            onClick = {
+                onFollowClick()
+                buttonState = when (buttonState) {
+                    "Follow" -> "Following"
+                    "Follow back" -> "Friends"
+                    "Following" -> "Follow"
+                    "Friends" -> "Follow back"
+                    else -> "Follow"
                 }
-            }
+            },
+            shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(
+                backgroundColor = when (buttonState) {
+                    "Follow" -> Color(0xFFFF6600)
+                    "Follow back" -> Color(0xFFFF6600)
+                    "Friends" -> Color(0xFFF2F2F2)
+                    else -> Color(0xFFF2F2F2)
+                },
+                contentColor = if (buttonState == "Friends") Color.Black else Color.White
+            )
+        ) {
+            Text(
+                buttonState,
+                color = if (buttonState == "Friends" || buttonState == "Following") Color.Black else Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(vertical = 2.dp)
+            )
         }
     }
 }
@@ -295,7 +442,9 @@ fun FollowListScreenPreview() {
     val fakeNavController = rememberNavController()
     FollowListScreen(
         navController = fakeNavController,
+        username = "User_Test",
         isCurrentUser = true,
-        username = "Username"
+        startTabIndex = 0,
+        showFriendsTab = true
     )
 }

@@ -1,6 +1,7 @@
 package com.project.e_commerce.android.data.repository
 
 
+import com.google.android.gms.common.util.CollectionUtils.mapOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseUser
@@ -30,12 +31,26 @@ class FirebaseAuthRepository(
                 user.updateProfile(profile).await()
             }
 
-            // 👇 احفظ "username فقط" في Firestore: users/<uid>
+            // 👇 احفظ UserProfile كامل في Firestore: users/<uid>
             if (!displayName.isNullOrBlank()) {
                 val db = FirebaseFirestore.getInstance()
+                val userProfile = mapOf(
+                    "uid" to user.uid,
+                    "email" to user.email ?: "",
+                    "displayName" to displayName,
+                    "username" to displayName,
+                    "bio" to "",
+                    "phone" to "",
+                    "profileImageUrl" to null,
+                    "followersCount" to 0,
+                    "followingCount" to 0,
+                    "likesCount" to 0,
+                    "createdAt" to System.currentTimeMillis(),
+                    "lastUpdated" to System.currentTimeMillis()
+                )
                 db.collection("users")
                     .document(user.uid) // docId = uid
-                    .set(mapOf("username" to displayName))
+                    .set(userProfile)
                     .await()
             }
 
