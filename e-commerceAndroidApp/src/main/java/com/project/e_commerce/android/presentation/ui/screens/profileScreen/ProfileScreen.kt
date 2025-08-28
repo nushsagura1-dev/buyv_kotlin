@@ -58,6 +58,7 @@ import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun ProfileScreen(navController: NavHostController) {
+    Log.d("CrashDebug", "ProfileScreen: entered composable")
     val profileViewModel: ProfileViewModel = koinViewModel()
     val uiState by profileViewModel.uiState.collectAsState()
     val userReels by profileViewModel.userReels.collectAsState()
@@ -155,6 +156,7 @@ fun ProfileScreen(navController: NavHostController) {
     )
 
     if (uiState.isLoading) {
+        Log.d("CrashDebug", "ProfileScreen: loading")
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -268,6 +270,7 @@ fun ProfileScreen(navController: NavHostController) {
                     
                     // Profile Image - Use real data if available, fallback to default
                     if (uiState.profileImageUrl != null) {
+                        Log.d("CrashDebug", "ProfileScreen: loading profile image")
                         AsyncImage(
                             model = uiState.profileImageUrl,
                             contentDescription = "Profile Picture",
@@ -278,6 +281,7 @@ fun ProfileScreen(navController: NavHostController) {
                             error = painterResource(id = R.drawable.profile)
                         )
                     } else {
+                        Log.d("CrashDebug", "ProfileScreen: loading default profile image")
                         Image(
                             painter = painterResource(id = R.drawable.profile),
                             contentDescription = "Profile Picture",
@@ -433,22 +437,52 @@ fun ProfileScreen(navController: NavHostController) {
 
         // Content Grid based on selected tab
         item {
-            Log.d("PROFILE_DEBUG", "🎯 Selected Tab: $selectedTabIndex")
+            Log.d("CrashDebug", "ProfileScreen: selectedTabIndex = $selectedTabIndex")
+            when (selectedTabIndex) {
+                0 -> Log.d(
+                    "CrashDebug",
+                    "ProfileScreen: Showing Reels with ${userReels.size} reels"
+                )
+
+                1 -> Log.d(
+                    "CrashDebug",
+                    "ProfileScreen: Showing Products with ${userProducts.size} products"
+                )
+
+                2 -> Log.d(
+                    "CrashDebug",
+                    "ProfileScreen: Showing Saved with ${userBookmarkedContent.size} items"
+                )
+
+                3 -> Log.d(
+                    "CrashDebug",
+                    "ProfileScreen: Showing Likes with ${userLikedContent.size} items"
+                )
+            }
             when (selectedTabIndex) {
                 0 -> {
-                    Log.d("PROFILE_DEBUG", "🎬 Showing Reels Tab with ${userReels.size} reels")
+                    Log.d("CrashDebug", "ProfileScreen: Showing Reels with ${userReels.size} reels")
                     UserReelsGrid(userReels, navController)
                 }
                 1 -> {
-                    Log.d("PROFILE_DEBUG", "📦 Showing Products Tab with ${userProducts.size} products")
+                    Log.d(
+                        "CrashDebug",
+                        "ProfileScreen: Showing Products with ${userProducts.size} products"
+                    )
                     UserProductsGrid(userProducts, navController)
                 }
                 2 -> {
-                    Log.d("PROFILE_DEBUG", "🔖 Showing Saved Tab with ${userBookmarkedContent.size} bookmarked posts")
+                    Log.d(
+                        "CrashDebug",
+                        "ProfileScreen: Showing Saved with ${userBookmarkedContent.size} items"
+                    )
                     UserBookmarkedGrid(userBookmarkedContent, navController)
                 }
                 3 -> {
-                    Log.d("PROFILE_DEBUG", "❤️ Showing Likes Tab with ${userLikedContent.size} liked posts")
+                    Log.d(
+                        "CrashDebug",
+                        "ProfileScreen: Showing Likes with ${userLikedContent.size} items"
+                    )
                     UserLikedGrid(userLikedContent, navController)
                 }
             }
@@ -470,14 +504,15 @@ fun ProfileStat(number: String, label: String, onClick: () -> Unit = {}) {
 
 @Composable
 fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPost>, navController: NavHostController) {
-    Log.d("PROFILE_DEBUG", "🎬 UserReelsGrid called with ${reels.size} reels")
+    Log.d("CrashDebug", "UserReelsGrid: entered composable with ${reels.size} reels")
     
     if (reels.isEmpty()) {
-        Log.d("PROFILE_DEBUG", "🎬 No reels to display")
+        Log.d("CrashDebug", "UserReelsGrid: no reels to display")
         EmptyStateGrid("No reels yet", "Start creating reels to see them here")
         return
     }
-    
+
+    Log.d("CrashDebug", "UserReelsGrid: displaying ${reels.size} reels")
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.height(650.dp),
@@ -500,9 +535,10 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
                     videoUrl = reel.mediaUrl,
                     fallbackUrl = reel.thumbnailUrl
                 )
-                
+
+                Log.d("CrashDebug", "UserReelsGrid: loading thumbnail for reel with id ${reel.id}")
                 // Debug logging - make it more visible
-                Log.d("PROFILE_DEBUG", "🎬 ===== REEL THUMBNAIL DEBUG =====")
+                Log.d("PROFILE_DEBUG", "🎯 ===== REEL THUMBNAIL DEBUG =====")
                 Log.d("PROFILE_DEBUG", "🎬 Reel Title: ${reel.title}")
                 Log.d("PROFILE_DEBUG", "🎬 Reel ID: ${reel.id}")
                 Log.d("PROFILE_DEBUG", "🎬 Images List: ${reel.images}")
@@ -513,8 +549,10 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
                 Log.d("PROFILE_DEBUG", "🎬 =================================")
                 
                 if (!bestThumbnail.isNullOrBlank()) {
-                    Log.d("PROFILE_DEBUG", "🎬 Loading AsyncImage with: $bestThumbnail")
-
+                    Log.d(
+                        "CrashDebug",
+                        "UserReelsGrid: loading AsyncImage with thumbnail $bestThumbnail"
+                    )
                     // Use the actual bestThumbnail instead of test image
                     AsyncImage(
                         model = bestThumbnail, // Use the calculated best thumbnail
@@ -522,17 +560,29 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                         onError = {
-                            Log.e("PROFILE_DEBUG", "❌ AsyncImage failed to load: $bestThumbnail")
+                            Log.e(
+                                "CrashDebug",
+                                "UserReelsGrid: failed to load AsyncImage with thumbnail $bestThumbnail"
+                            )
                         },
                         onSuccess = {
-                            Log.d("PROFILE_DEBUG", "✅ AsyncImage loaded successfully: $bestThumbnail")
+                            Log.d(
+                                "CrashDebug",
+                                "UserReelsGrid: loaded AsyncImage with thumbnail $bestThumbnail"
+                            )
                         },
                         onLoading = {
-                            Log.d("PROFILE_DEBUG", "⏳ AsyncImage is loading: $bestThumbnail")
+                            Log.d(
+                                "CrashDebug",
+                                "UserReelsGrid: loading AsyncImage with thumbnail $bestThumbnail"
+                            )
                         }
                     )
                 } else {
-                    Log.d("PROFILE_DEBUG", "🎬 No thumbnail available - showing clean background")
+                    Log.d(
+                        "CrashDebug",
+                        "UserReelsGrid: no thumbnail available for reel with id ${reel.id}"
+                    )
                     // Show clean background instead of hardcoded image
                     Box(
                         modifier = Modifier
@@ -595,11 +645,14 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
 
 @Composable
 fun UserProductsGrid(products: List<com.project.e_commerce.android.domain.model.UserProduct>, navController: NavHostController) {
+    Log.d("CrashDebug", "UserProductsGrid: entered composable with ${products.size} products")
     if (products.isEmpty()) {
+        Log.d("CrashDebug", "UserProductsGrid: no products to display")
         EmptyStateGrid("No products yet", "Start adding products to see them here")
         return
     }
-    
+
+    Log.d("CrashDebug", "UserProductsGrid: displaying ${products.size} products")
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.height(650.dp),
@@ -617,6 +670,10 @@ fun UserProductsGrid(products: List<com.project.e_commerce.android.domain.model.
                         .fillMaxWidth()
                         .height(120.dp)
                 ) {
+                    Log.d(
+                        "CrashDebug",
+                        "UserProductsGrid: loading product image for product with id ${product.id}"
+                    )
                     if (product.images.isNotEmpty()) {
                         AsyncImage(
                             model = product.images.first(),
@@ -666,17 +723,20 @@ fun UserProductsGrid(products: List<com.project.e_commerce.android.domain.model.
 
 @Composable
 fun UserBookmarkedGrid(bookmarkedContent: List<com.project.e_commerce.android.domain.model.UserPost>, navController: NavHostController) {
-    Log.d("PROFILE_DEBUG", "🔖 UserBookmarkedGrid called with ${bookmarkedContent.size} bookmarked posts")
+    Log.d(
+        "CrashDebug",
+        "UserBookmarkedGrid: entered composable with ${bookmarkedContent.size} bookmarked posts"
+    )
     
     if (bookmarkedContent.isEmpty()) {
-        Log.d("PROFILE_DEBUG", "🔖 No bookmarked content to display")
+        Log.d("CrashDebug", "UserBookmarkedGrid: no bookmarked content to display")
         EmptyStateGrid("No saved posts yet", "Save posts and products to see them here")
         return
     }
-    
-    Log.d("PROFILE_DEBUG", "🔖 Displaying ${bookmarkedContent.size} bookmarked posts")
+
+    Log.d("CrashDebug", "UserBookmarkedGrid: displaying ${bookmarkedContent.size} bookmarked posts")
     bookmarkedContent.forEach { post ->
-        Log.d("PROFILE_DEBUG", "🔖 Bookmarked Post: ${post.title} - ${post.mediaUrl}")
+        Log.d("CrashDebug", "UserBookmarkedGrid: bookmarked post with id ${post.id}")
     }
     
     LazyVerticalGrid(
@@ -691,6 +751,10 @@ fun UserBookmarkedGrid(bookmarkedContent: List<com.project.e_commerce.android.do
                     .background(Color(0xFFF8F8F8))
                     .height(130.dp)
             ) {
+                Log.d(
+                    "CrashDebug",
+                    "UserBookmarkedGrid: loading thumbnail for bookmarked post with id ${post.id}"
+                )
                 if (post.thumbnailUrl != null) {
                     AsyncImage(
                         model = post.thumbnailUrl,
@@ -714,17 +778,17 @@ fun UserBookmarkedGrid(bookmarkedContent: List<com.project.e_commerce.android.do
 
 @Composable
 fun UserLikedGrid(likedContent: List<com.project.e_commerce.android.domain.model.UserPost>, navController: NavHostController) {
-    Log.d("PROFILE_DEBUG", "❤️ UserLikedGrid called with ${likedContent.size} liked posts")
+    Log.d("CrashDebug", "UserLikedGrid: entered composable with ${likedContent.size} liked posts")
     
     if (likedContent.isEmpty()) {
-        Log.d("PROFILE_DEBUG", "❤️ No liked content to display")
+        Log.d("CrashDebug", "UserLikedGrid: no liked content to display")
         EmptyStateGrid("No likes yet", "Like posts and products to see them here")
         return
     }
-    
-    Log.d("PROFILE_DEBUG", "❤️ Displaying ${likedContent.size} liked posts")
+
+    Log.d("CrashDebug", "UserLikedGrid: displaying ${likedContent.size} liked posts")
     likedContent.forEach { post ->
-        Log.d("PROFILE_DEBUG", "❤️ Liked Post: ${post.title} - ${post.mediaUrl}")
+        Log.d("CrashDebug", "UserLikedGrid: liked post with id ${post.id}")
     }
     
     LazyVerticalGrid(
@@ -739,6 +803,10 @@ fun UserLikedGrid(likedContent: List<com.project.e_commerce.android.domain.model
                     .background(Color(0xFFF8F8F8))
                     .height(130.dp)
             ) {
+                Log.d(
+                    "CrashDebug",
+                    "UserLikedGrid: loading thumbnail for liked post with id ${post.id}"
+                )
                 if (post.thumbnailUrl != null) {
                     AsyncImage(
                         model = post.thumbnailUrl,

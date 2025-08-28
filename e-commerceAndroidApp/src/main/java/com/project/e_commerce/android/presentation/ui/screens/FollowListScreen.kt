@@ -163,7 +163,12 @@ fun FollowListScreen(
                     currentUserId = currentUserId,
                     onFollowClick = { targetUserId ->
                         currentUserId?.let { userId ->
-                            followingViewModel.toggleFollow(userId, targetUserId)
+                            coroutineScope.launch {
+                                followingViewModel.toggleFollow(
+                                    userId,
+                                    targetUserId
+                                )
+                            }
                         }
                     },
                     isLoading = uiState.isLoading
@@ -173,7 +178,12 @@ fun FollowListScreen(
                     currentUserId = currentUserId,
                     onFollowClick = { targetUserId ->
                         currentUserId?.let { userId ->
-                            followingViewModel.toggleFollow(userId, targetUserId)
+                            coroutineScope.launch {
+                                followingViewModel.toggleFollow(
+                                    userId,
+                                    targetUserId
+                                )
+                            }
                         }
                     },
                     isLoading = uiState.isLoading
@@ -183,7 +193,12 @@ fun FollowListScreen(
                     currentUserId = currentUserId,
                     onFollowClick = { targetUserId ->
                         currentUserId?.let { userId ->
-                            followingViewModel.toggleFollow(userId, targetUserId)
+                            coroutineScope.launch {
+                                followingViewModel.toggleFollow(
+                                    userId,
+                                    targetUserId
+                                )
+                            }
                         }
                     },
                     isLoading = uiState.isLoading
@@ -193,7 +208,12 @@ fun FollowListScreen(
                     currentUserId = currentUserId,
                     onFollowClick = { targetUserId ->
                         currentUserId?.let { userId ->
-                            followingViewModel.toggleFollow(userId, targetUserId)
+                            coroutineScope.launch {
+                                followingViewModel.toggleFollow(
+                                    userId,
+                                    targetUserId
+                                )
+                            }
                         }
                     },
                     isLoading = uiState.isLoading
@@ -225,7 +245,9 @@ fun FollowersTab(
             Text("No followers yet", color = Color.Gray)
         }
     } else {
-        LazyColumn(modifier = Modifier.fillMaxSize().background(color = Color.White)) {
+        LazyColumn(modifier = Modifier
+            .fillMaxSize()
+            .background(color = Color.White)) {
             items(users.size) { index ->
                 val user = users[index]
                 UserFollowItem(
@@ -260,7 +282,9 @@ fun FollowingTab(
             Text("Not following anyone yet", color = Color.Gray)
         }
     } else {
-        LazyColumn(modifier = Modifier.fillMaxSize().background(color = Color.White)) {
+        LazyColumn(modifier = Modifier
+            .fillMaxSize()
+            .background(color = Color.White)) {
             items(users.size) { index ->
                 val user = users[index]
                 UserFollowItem(
@@ -295,7 +319,9 @@ fun FriendsTab(
             Text("No mutual friends yet", color = Color.Gray)
         }
     } else {
-        LazyColumn(modifier = Modifier.fillMaxSize().background(color = Color.White)) {
+        LazyColumn(modifier = Modifier
+            .fillMaxSize()
+            .background(color = Color.White)) {
             items(users.size) { index ->
                 val user = users[index]
                 UserFollowItem(
@@ -330,7 +356,9 @@ fun SuggestedTab(
             Text("No suggestions available", color = Color.Gray)
         }
     } else {
-        LazyColumn(modifier = Modifier.fillMaxSize().background(color = Color.White)) {
+        LazyColumn(modifier = Modifier
+            .fillMaxSize()
+            .background(color = Color.White)) {
             items(users.size) { index ->
                 val user = users[index]
                 UserFollowItem(

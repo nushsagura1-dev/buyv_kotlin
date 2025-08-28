@@ -10,6 +10,7 @@ import com.project.e_commerce.android.presentation.viewModel.baseViewModel.BaseV
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import android.util.Log
 
@@ -32,6 +33,18 @@ class FollowingViewModel(
     private val _uiState = MutableStateFlow(FollowingUiState())
     val uiState: StateFlow<FollowingUiState> = _uiState.asStateFlow()
 
+    init {
+        Log.d("FollowingTabDebug", "FollowingViewModel created")
+        viewModelScope.launch {
+            uiState.collect { state ->
+                Log.d(
+                    "FollowingTabDebug",
+                    "uiState changed: isLoading=${state.isLoading}, followingCount=${state.following.size}"
+                )
+            }
+        }
+    }
+
     override fun setLoadingState(loadingState: Boolean) {
         _uiState.value = _uiState.value.copy(isLoading = loadingState)
     }
@@ -43,6 +56,10 @@ class FollowingViewModel(
     }
 
     fun loadUserData(currentUserId: String, targetUsername: String) {
+        Log.d(
+            "FollowingTabDebug",
+            "loadUserData called for userId=$currentUserId username=$targetUsername"
+        )
         viewModelScope.launch {
             try {
                 // Prevent multiple simultaneous loads
@@ -81,49 +98,44 @@ class FollowingViewModel(
         Log.d(TAG, "🔄 Reset load attempts counter")
     }
 
-    fun toggleFollow(currentUserId: String, targetUserId: String) {
-        viewModelScope.launch {
-            try {
-                Log.d(TAG, "🔄 Toggling follow: $currentUserId -> $targetUserId")
-                
-                // Get current following status
-                val currentStatus = getFollowingStatusUseCase(currentUserId, targetUserId)
-                Log.d(TAG, "📊 Current following status: $currentStatus")
-                
-                if (currentStatus.isFollowing) {
-                    // Unfollow
-                    Log.d(TAG, "❌ Unfollowing user: $targetUserId")
-                    val unfollowResult = unfollowUserUseCase(currentUserId, targetUserId)
-                    if (unfollowResult.isSuccess) {
-                        Log.d(TAG, "✅ Unfollow result: $unfollowResult")
-                    } else {
-                        Log.e(TAG, "❌ Unfollow failed: ${unfollowResult.exceptionOrNull()?.message}")
-                        setErrorState(true, "Failed to unfollow user: ${unfollowResult.exceptionOrNull()?.message}")
-                        return@launch
-                    }
-                } else {
-                    // Follow
-                    Log.d(TAG, "➕ Following user: $targetUserId")
-                    val followResult = followUserUseCase(currentUserId, targetUserId)
-                    if (followResult.isSuccess) {
-                        Log.d(TAG, "✅ Follow result: $followResult")
-                    } else {
-                        Log.e(TAG, "❌ Follow failed: ${followResult.exceptionOrNull()?.message}")
-                        setErrorState(true, "Failed to follow user: ${followResult.exceptionOrNull()?.message}")
-                        return@launch
-                    }
-                }
-                
-                // Refresh the data
-                Log.d(TAG, "🔄 Refreshing following data after toggle")
-                loadRealFollowingData(currentUserId)
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to toggle follow: ${e.message}")
-                Log.e(TAG, "❌ Exception details: ", e)
-                setErrorState(true, e.message ?: "Failed to toggle follow")
-            }
+    suspend fun toggleFollow(currentUserId: String, targetUserId: String) {
+        if (isFollowing(currentUserId, targetUserId)) {
+            unfollowUser(currentUserId, targetUserId)
+        } else {
+            followUser(currentUserId, targetUserId)
         }
+        refreshFollowing(currentUserId)
+    }
+
+    private suspend fun isFollowing(currentUserId: String, targetUserId: String): Boolean {
+        return getFollowingStatusUseCase(currentUserId, targetUserId).isFollowing
+    }
+
+    private suspend fun unfollowUser(currentUserId: String, targetUserId: String) {
+        val unfollowResult = unfollowUserUseCase(currentUserId, targetUserId)
+        if (unfollowResult.isSuccess) {
+            Log.d(TAG, "✅ Unfollow result: $unfollowResult")
+        } else {
+            Log.e(TAG, "❌ Unfollow failed: ${unfollowResult.exceptionOrNull()?.message}")
+            setErrorState(
+                true,
+                "Failed to unfollow user: ${unfollowResult.exceptionOrNull()?.message}"
+            )
+        }
+    }
+
+    private suspend fun followUser(currentUserId: String, targetUserId: String) {
+        val followResult = followUserUseCase(currentUserId, targetUserId)
+        if (followResult.isSuccess) {
+            Log.d(TAG, "✅ Follow result: $followResult")
+        } else {
+            Log.e(TAG, "❌ Follow failed: ${followResult.exceptionOrNull()?.message}")
+            setErrorState(true, "Failed to follow user: ${followResult.exceptionOrNull()?.message}")
+        }
+    }
+
+    private suspend fun refreshFollowing(userId: String) {
+        loadRealFollowingData(userId)
     }
 
     private suspend fun loadRealFollowingData(currentUserId: String) {

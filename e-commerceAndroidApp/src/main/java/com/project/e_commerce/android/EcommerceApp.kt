@@ -18,22 +18,28 @@ class EcommerceApp : Application() {
     
     override fun onCreate() {
         super.onCreate()
-        
-        // Initialize Cloudinary
-        CloudinaryConfig.init(this)
-        
-        // Temporarily use default Coil configuration to test if custom fetcher is the issue
-        imageLoader = ImageLoader.Builder(this)
-            // .components(componentRegistry) // Comment out custom components temporarily
-            .build()
-        
-        startKoin {
-            androidContext(this@EcommerceApp)
-            modules(
-                listOf(
-                    viewModelModule,
+        android.util.Log.d("CrashDebug", "EcommerceApp: onCreate started")
+        try {
+            android.util.Log.d("CrashDebug", "EcommerceApp: Initializing CloudinaryConfig")
+            CloudinaryConfig.init(this)
+            android.util.Log.d("CrashDebug", "EcommerceApp: CloudinaryConfig initialized")
+            android.util.Log.d("CrashDebug", "EcommerceApp: Initializing Coil imageLoader")
+            imageLoader = ImageLoader.Builder(this)
+                // .components(componentRegistry) // Comment out custom components temporarily
+                .build()
+            android.util.Log.d("CrashDebug", "EcommerceApp: Coil imageLoader initialized")
+            android.util.Log.d("CrashDebug", "EcommerceApp: Starting Koin")
+            startKoin {
+                androidContext(this@EcommerceApp)
+                modules(
+                    listOf(
+                        viewModelModule,
+                    )
                 )
-            )
+            }
+            android.util.Log.d("CrashDebug", "EcommerceApp: Koin started successfully")
+        } catch (e: Exception) {
+            android.util.Log.e("CrashDebug", "EcommerceApp: Exception during init: ${e.message}", e)
         }
     }
 }

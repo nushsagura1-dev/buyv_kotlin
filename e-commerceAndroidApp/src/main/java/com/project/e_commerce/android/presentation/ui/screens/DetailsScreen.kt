@@ -270,6 +270,8 @@ fun DetailsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // زر الإضافة/الذهاب للكارت
+        val isInCart by cartViewModel.isProductInCart(product?.id ?: "").collectAsState(initial = false)
+        
         Button(
             onClick = {
                 if (isInCart) {

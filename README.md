@@ -1,10 +1,73 @@
-# E-Commerce Mobile Application
+# E-Commerce Mobile Application (Current State, August 2024)
 
-A modern, feature-rich e-commerce mobile application built with **Kotlin Multiplatform** and **Jetpack Compose**, featuring a unique reels-based shopping experience similar to TikTok/Instagram Reels.
+A modern, feature-rich e-commerce app with TikTok-inspired vertical product reels, social
+interactions, cloud video, and robust Firebase+Cloudinary backend.
 
-## 🚀 Project Overview
+---
 
-This is a comprehensive e-commerce platform that combines traditional online shopping with modern social media features. The app allows users to discover products through engaging video reels, browse catalogs, manage shopping carts, and complete purchases with a seamless user experience.
+## 🚀 Overview
+
+- TikTok-like reels feed (For you/Following/Explore tabs) with videos/images for social shopping.
+- Classic right-side (vertical) engagement bar: Like, Comment, Cart, Share, Music, each with counts.
+- Product overlays, hashtags, and info on the left, always above the tab bar.
+- Classic “Buy” FAB, docked, visible only on Reels screen, above the bottom navigation bar.
+- Fully reactive UI state with Compose/Koin, no infinite loops or navigation crashes.
+
+## 📦 Project Structure & Core Tech
+
+- **Kotlin Multiplatform, Compose, Koin 3.x** for DI
+- **Firebase Auth/Firestore** for user/data, **Cloudinary** for all media assets
+- **Media3/ExoPlayer** for video
+- **One navController** for the entire app (single source of tab/screen truth)
+- Modern Compose state: all overlays, prompts, and engagement use robust, single-source `remember`/
+  `MutableState`.
+
+## 🧩 Key Features (LIVE & TESTED)
+
+- For You, Following, and Explore tabs as top tabs in Reels screen—Explore navigates, others are
+  state-local.
+- **Vertical right sidebar**: TikTok-style engagement with live icons/counters, never clipped,
+  always correct spacing/padding.
+- **Cart, Profile, and Product tabs**: All Compose/Koin/Firestore logic is error-free and robust.
+- **FAB (Buy) logic**: Central floating buy FAB, Compose-docked and correctly animated on only the
+  home screen.
+- **Real video playback** via Media3/ExoPlayer for Cloudinary MP4 URLs; images and fallback logic in
+  place.
+- **Robust login/signup overlay handling**, never lost scope, and no shadowed UI state.
+- **No infinite spinner or loading loop bug**: Following tab now loads just once, lists only what is
+  expected, and never relaunches loading automatically after playing a reel.
+
+## 😬 Problems and Known Issues
+
+- **Following tab infinite loop (now fixed):** Caused by child/subcomponent repeatedly retriggering
+  `loadUserData`/isLoading. SOLUTION: Only trigger loading in `LaunchedEffect(currentUserId)`, with
+  a proper remember/hasLoaded flag. Removed any other calls in UserInfo etc.
+- **FAB Floating Action Button** clipping: Must always be in MainActivity/Scaffold’s
+  floatingActionButton, never child of AppBottomBar. Avoids all visibility/clipping/overlap issues.
+- **Compose navigation splitting:** Only one navController through the whole app. This means
+  login/signup and cart tab never crash or break navigation.
+- **Cart, Profile, Product no longer crash:** DI and Koin/viewModel wiring now robust; no more
+  missing dependencies or multiple VM instance bugs.
+- **Overlay engagement/interaction UI:** All like/comment/cart/share/music buttons and counts now
+  always vertically stacked on the right in the feed.
+- **Media3/ExoPlayer video works for all valid .mp4 URLs; shows error for missing/bad video file.**
+
+## 🛠️ Remaining ToDos / Improvement Areas
+
+- Upgrade all UI logic to latest Compose (migrate from deprecated Accompanist pager as soon as
+  possible).
+- Continue to test login/logout switching and multi-profile robustness.
+- Polish engagement icons, add more nuanced UI/animation if desired.
+- Keep refactoring following tab logic as needed for more users and better caching.
+
+## 🛡️ How to Keep It Healthy
+
+- Always use one navController (rememberNavController at top App level).
+- Guard all data fetches against recomposition/side effect triggers (never trigger loadUserData from
+  UserInfo, only from main Following tab entry).
+- For conditional overlays/login, use top-level `remember { mutableStateOf(...) }` as the sole
+  control for overlays.
+- Use fallback/error visuals for all video/image loads for best UX!
 
 ## 🏗️ Architecture & Technology Stack
 

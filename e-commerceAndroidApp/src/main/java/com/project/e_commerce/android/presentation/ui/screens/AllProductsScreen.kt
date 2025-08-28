@@ -31,7 +31,7 @@ import androidx.navigation.compose.rememberNavController
 import coil3.compose.rememberAsyncImagePainter
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
-import com.project.e_commerce.android.presentation.viewModel.Product
+import com.project.e_commerce.android.domain.model.Product
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
 import org.koin.androidx.compose.koinViewModel
 

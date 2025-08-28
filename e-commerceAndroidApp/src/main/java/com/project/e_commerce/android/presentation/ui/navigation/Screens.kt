@@ -57,6 +57,13 @@ sealed class Screens(val route: String, val title : String? = null, val icon : I
 
 
     }
+    
+    object OtherUserProfileScreen : Screens(
+        route = "other_user_profile/{userId}"
+    ) {
+        fun createRoute(userId: String) = "other_user_profile/$userId"
+    }
+    
     object FollowListScreen : Screens(
         route = "follow_list_screen/{username}?startTab={startTab}&showFriendsTab={showFriendsTab}"
     ) {

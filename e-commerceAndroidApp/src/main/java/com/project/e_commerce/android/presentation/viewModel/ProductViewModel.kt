@@ -14,10 +14,13 @@ import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.LoveIt
 import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.NewComment
 import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Ratings
 import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
+import com.project.e_commerce.android.domain.model.Product
+import com.project.e_commerce.android.domain.model.Category
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import android.util.Log
 import com.project.e_commerce.android.R
+import com.project.e_commerce.android.data.model.CartStats
 
 class ProductViewModel : ViewModel() {
     var categories by mutableStateOf<List<Category>>(emptyList())
@@ -40,18 +43,27 @@ class ProductViewModel : ViewModel() {
         private set
 
     init {
-        Log.d("PRODUCT_DEBUG", "🔍 PRODUCT VIEWMODEL INITIALIZED - DEBUG IS WORKING!")
-        Log.d("PRODUCT_DEBUG", "🚀 Starting to load products from Firebase...")
-        Log.d("PRODUCT_DEBUG", "📱 ProductViewModel instance: $this")
-        
-        viewModelScope.launch {
-            Log.d("PRODUCT_DEBUG", "🔄 Starting Firebase operations in viewModelScope")
-            checkFirebaseCollections()
-            getCategoriesFromFirebase()
-            getFeaturedProductsFromFirebase()
-            getBestSellerProductsFromFirebase()
-            getAllProductsFromFirebase()
-            Log.d("PRODUCT_DEBUG", "✅ All Firebase operations completed")
+        try {
+            Log.d("PRODUCT_DEBUG", "🔍 PRODUCT VIEWMODEL INITIALIZED - DEBUG IS WORKING!")
+            Log.d("PRODUCT_DEBUG", "🚀 Starting to load products from Firebase...")
+            Log.d("PRODUCT_DEBUG", "📱 ProductViewModel instance: $this")
+            
+            viewModelScope.launch {
+                try {
+                    Log.d("PRODUCT_DEBUG", "🔄 Starting Firebase operations in viewModelScope")
+                    checkFirebaseCollections()
+                    getCategoriesFromFirebase()
+                    getFeaturedProductsFromFirebase()
+                    getBestSellerProductsFromFirebase()
+                    getAllProductsFromFirebase()
+                    fetchReelsFromFirestore() // NEW: actually query a 'reels' collection
+                    Log.d("PRODUCT_DEBUG", "✅ All Firebase operations completed")
+                } catch (e: Exception) {
+                    Log.e("PRODUCT_DEBUG", "Error in init LaunchedEffect", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PRODUCT_DEBUG", "Error in init block", e)
         }
     }
 
@@ -198,9 +210,26 @@ class ProductViewModel : ViewModel() {
                 }
                 Log.d("PRODUCT_DEBUG", "✅ Successfully processed ${products.size} products")
                 Log.d("PRODUCT_DEBUG", "📱 Product IDs: ${products.map { it.id }}")
-                Log.d("PRODUCT_DEBUG", "🎬 Calling generateReelsFromProducts with ${products.size} products")
+                // Commented out since we now load reels from posts collection
+                // Log.d("PRODUCT_DEBUG", "🎬 Calling generateReelsFromProducts with ${products.size} products")
                 allProducts = products
-                generateReelsFromProducts(products)
+                // generateReelsFromProducts(products)
+                
+                // Now load reels (will fall back to products if posts collection is empty)
+                Log.d("PRODUCT_DEBUG", "🔄 Products loaded, now loading reels...")
+                loadReelsFromPostsCollection()
+                Log.d("PRODUCT_DEBUG", "✅ Reels loading completed. Final productReels count: ${productReels.size}")
+
+                // Always populate productReels from products as fallback if none are loaded
+                if (productReels.isEmpty() && products.isNotEmpty()) {
+                    productReels = generateReelsFromProducts(products)
+                    Log.d(
+                        "PRODUCT_DEBUG",
+                        "Used products-to-reels fallback: now ${productReels.size} reels"
+                    )
+                    // Notify possible listeners/state flows of the new data (if needed)
+                    refreshReels() // This will notify/emit if needed in ReelsScreenViewModel
+                }
             } catch (e: Exception) {
                 Log.d("PRODUCT_DEBUG", "DEBUG: Error in getAllProductsFromFirebase: ${e.message}")
                 e.printStackTrace()
@@ -243,7 +272,8 @@ class ProductViewModel : ViewModel() {
                     )
                 }
                 bestSellerProducts = products
-                generateReelsFromProducts(products)
+                // Commented out since we now load reels from posts collection
+                // generateReelsFromProducts(products)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -286,7 +316,8 @@ class ProductViewModel : ViewModel() {
                     )
                 }
                 featuredProducts = products
-                generateReelsFromProducts(products)
+                // Commented out since we now load reels from posts collection
+                // generateReelsFromProducts(products)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -351,64 +382,108 @@ class ProductViewModel : ViewModel() {
         }
     }
 
-    private fun generateReelsFromProducts(products: List<Product>) {
-        viewModelScope.launch {
-            Log.d("PRODUCT_DEBUG", "🎬 generateReelsFromProducts called with ${products.size} products")
-            if (products.isEmpty()) {
-                Log.w("PRODUCT_DEBUG", "⚠️ No products to convert to reels!")
-                return@launch
+    private fun generateReelsFromProducts(products: List<Product>): List<Reels> {
+        Log.d("ProductViewModel", "🎬 generateReelsFromProducts called with ${products.size} products")
+        return try {
+            val reels = products.mapNotNull { product ->
+                try {
+                    Log.d("ProductViewModel", "🎬 Processing product: ${product.id}, name: ${product.name}")
+                    
+                    val reel = Reels(
+                        id = product.id,
+                        userId = product.userId,
+                        userName = "User_${product.userId.take(8)}",
+                        userImage = R.drawable.profile,
+                        video = try {
+                            if (product.reelVideoUrl.isNotEmpty() && product.reelVideoUrl.startsWith("http")) {
+                                Log.d("ProductViewModel", "🎬 Creating video URI for product ${product.id}: ${product.reelVideoUrl}")
+                                Uri.parse(product.reelVideoUrl)
+                            } else {
+                                Log.w("ProductViewModel", "🎬 Invalid video URL for product ${product.id}: ${product.reelVideoUrl}")
+                                null
+                            }
+                        } catch (e: Exception) {
+                            Log.e("ProductViewModel", "🎬 CRASH: Failed to parse video URL for product ${product.id}: ${product.reelVideoUrl}", e)
+                            null
+                        },
+                        images = try {
+                            if (product.productImages.isNotEmpty()) {
+                                Log.d("ProductViewModel", "🎬 Processing ${product.productImages.size} images for product ${product.id}")
+                                product.productImages.mapNotNull { url ->
+                                    try {
+                                        if (url.isNotEmpty() && url.startsWith("http")) {
+                                            Uri.parse(url)
+                                        } else {
+                                            Log.w("ProductViewModel", "🎬 Invalid image URL: $url")
+                                            null
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("ProductViewModel", "🎬 CRASH: Failed to parse image URL: $url", e)
+                                        null
+                                    }
+                                }
+                            } else {
+                                Log.d("ProductViewModel", "🎬 No images for product ${product.id}")
+                                emptyList()
+                            }
+                        } catch (e: Exception) {
+                            Log.e("ProductViewModel", "🎬 CRASH: Failed to parse product images for ${product.id}", e)
+                            emptyList()
+                        },
+                        contentDescription = product.description,
+                        love = LoveItem(0, false),
+                        ratings = emptyList(),
+                        comments = emptyList(),
+                        isLoading = false,
+                        isError = false,
+                        numberOfCart = 0,
+                        numberOfComments = 0,
+                        newComment = NewComment(),
+                        cartStats = CartStats(productId = product.id),
+                        productName = product.name,
+                        productPrice = product.price.toString(),
+                        productImage = product.productImages.firstOrNull() ?: "",
+                        sizes = product.sizeColorData
+                            .mapNotNull { it["size"] as? String }
+                            .filter { it.isNotBlank() }
+                            .distinct(),
+                        colors = product.sizeColorData
+                            .mapNotNull { it["color"] as? String }
+                            .filter { it.isNotBlank() }
+                            .distinct(),
+                        rating = product.rating
+                    )
+                    
+                    Log.d("ProductViewModel", "🎬 Successfully created reel for product ${product.id}")
+                    reel
+                } catch (e: Exception) {
+                    Log.e("ProductViewModel", "🎬 CRASH: Error creating reel for product ${product.id}", e)
+                    null
+                }
             }
             
-            val reels = products.map { product ->
-                Log.d("PRODUCT_DEBUG", "DEBUG: Converting product ${product.id} to reel")
-                Log.d("PRODUCT_DEBUG", "DEBUG: Product ${product.id} - name: ${product.name}")
-                Log.d("PRODUCT_DEBUG", "DEBUG: Product ${product.id} - productImages: ${product.productImages}")
-                Log.d("PRODUCT_DEBUG", "DEBUG: Product ${product.id} - reelVideoUrl: ${product.reelVideoUrl}")
-                
-                val (comments, ratings) = getCommentsAndRatesForProduct(product.id)
+            Log.d("ProductViewModel", "🎬 Successfully generated ${reels.size} reels from ${products.size} products")
+            reels
+        } catch (e: Exception) {
+            Log.e("ProductViewModel", "🎬 CRASH: Error in generateReelsFromProducts", e)
+            emptyList()
+        }
+    }
 
-                val sizes = product.sizeColorData
-                    .mapNotNull { it["size"] as? String }
-                    .filter { it.isNotBlank() }
-                    .distinct()
-
-                val colors = product.sizeColorData
-                    .mapNotNull { it["color"] as? String }
-                    .filter { it.isNotBlank() }
-                    .distinct()
-
-                val reel = Reels(
-                    id = product.id,
-                    userId = product.userId.ifEmpty { "unknown_user" }, // Use a more descriptive placeholder
-                    userName = if (product.userId.isNotEmpty()) "User_${product.userId.take(8)}" else "Unknown_User", // Placeholder that will be replaced with real data
-                    userImage = R.drawable.profile, // Add missing userImage field
-                    video = if (product.reelVideoUrl.isNotEmpty()) Uri.parse(product.reelVideoUrl) else null,
-                    images = if (product.productImages.isNotEmpty()) product.productImages.map { Uri.parse(it) } else null,
-                    contentDescription = if (product.reelTitle.isNotEmpty()) product.reelTitle else product.description,
-                    love = LoveItem(0, false),
-                    ratings = ratings,
-                    comments = comments,
-                    isLoading = false,
-                    isError = false,
-                    numberOfCart = 0,
-                    numberOfComments = comments.size,
-                    newComment = NewComment(),
-                    productName = product.name,
-                    productPrice = product.price,
-                    productImage = product.productImages.firstOrNull() ?: "",
-                    sizes = sizes,
-                    colors = colors,
-                    rating = product.rating,
-                )
-                
-                Log.d("PRODUCT_DEBUG", "DEBUG: Created reel ${reel.id} - video: ${reel.video}, images: ${reel.images}, productImage: ${reel.productImage}")
-                reel
+    private suspend fun loadReelsFromPostsCollection(): List<Reels> {
+        Log.d("ProductViewModel", "🎬 loadReelsFromPostsCollection called")
+        return try {
+            val reels = generateReelsFromProducts(allProducts)
+            Log.d("ProductViewModel", "🎬 Generated ${reels.size} reels from ${allProducts.size} products")
+            
+            reels.forEachIndexed { index, reel ->
+                Log.d("ProductViewModel", "🎬 Reel $index: id=${reels[index].id}, video=${reels[index].video}, images=${reels[index].images?.size}")
             }
-            Log.d("PRODUCT_DEBUG", "🎬 Generated ${reels.size} reels")
-            Log.d("PRODUCT_DEBUG", "📺 Setting productReels to ${reels.size} reels")
-            Log.d("PRODUCT_DEBUG", "📱 Reel IDs: ${reels.map { it.id }}")
-            productReels = reels
-            Log.d("PRODUCT_DEBUG", "✅ productReels now contains ${productReels.size} reels")
+            
+            reels
+        } catch (e: Exception) {
+            Log.e("ProductViewModel", "🎬 CRASH: Error generating reels from products", e)
+            emptyList()
         }
     }
     
@@ -416,33 +491,72 @@ class ProductViewModel : ViewModel() {
         Log.d("PRODUCT_DEBUG", "🔄 refreshProducts called manually")
         viewModelScope.launch {
             getAllProductsFromFirebase()
+            // Reload reels from posts collection to ensure consistency
+            loadReelsFromPostsCollection()
+        }
+    }
+    
+    fun refreshReels() {
+        Log.d("PRODUCT_DEBUG", "🎬 refreshReels called manually")
+        viewModelScope.launch {
+            loadReelsFromPostsCollection()
         }
     }
 
+    fun fetchReelsFromFirestore() {
+        viewModelScope.launch {
+            try {
+                Log.d("PRODUCT_DEBUG", "🔄 fetchReelsFromFirestore called")
+                val db = FirebaseFirestore.getInstance()
+                val snapshot =
+                    db.collection("reels").get().await() // or use "posts" depending on your schema
+                Log.d("PRODUCT_DEBUG", "📊 Fetched ${snapshot.documents.size} reels")
+                val reelsList = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        // Parse the Firestore doc into a Reels object (edit mapping to your schema!)
+                        Reels(
+                            id = doc.id,
+                            userId = doc.getString("userId") ?: "",
+                            userName = doc.getString("userName") ?: "User",
+                            userImage = R.drawable.profile, // or parse Cloudinary URL if needed
+                            video = doc.getString("videoUrl")
+                                ?.let { if (it.isNotBlank()) Uri.parse(it) else null },
+                            images = (doc.get("images") as? List<*>)?.mapNotNull { url ->
+                                url?.let { u ->
+                                    Uri.parse(
+                                        u.toString()
+                                    )
+                                }
+                            } ?: emptyList(),
+                            contentDescription = doc.getString("description") ?: "",
+                            love = LoveItem(0, false), // Map as needed
+                            ratings = emptyList(),
+                            comments = emptyList(),
+                            isLoading = false,
+                            isError = false,
+                            numberOfCart = 0,
+                            numberOfComments = 0,
+                            newComment = NewComment(),
+                            cartStats = CartStats(productId = doc.id),
+                            productName = doc.getString("productName") ?: "",
+                            productPrice = doc.getString("productPrice") ?: "0",
+                            productImage = (doc.get("images") as? List<*>)?.firstOrNull()
+                                ?.toString() ?: "",
+                            sizes = emptyList(),
+                            colors = emptyList(),
+                            rating = doc.getDouble("rating") ?: 0.0
+                        )
+                    } catch (e: Exception) {
+                        Log.e("PRODUCT_DEBUG", "Error parsing reel doc: ", e)
+                        null
+                    }
+                }
+                productReels = reelsList
+                Log.d("PRODUCT_DEBUG", "✅ Loaded ${reelsList.size} reels from Firestore")
+            } catch (e: Exception) {
+                Log.e("PRODUCT_DEBUG", "❌ Error fetching reels from Firestore: ${e.message}")
+                e.printStackTrace()
+            }
+        }
+    }
 }
-
-data class Category(
-    val id: String,
-    val name: String,
-    val image: String
-)
-
-data class Product(
-    val id: String = "",
-    val userId: String = "", // Add userId to identify product owner
-    val name: String = "",
-    val description: String = "",
-    val price: String = "0",
-    val categoryId: String = "",
-    val categoryName: String = "",
-    val quantity: String = "0",
-    val rating: Double = 0.0,
-    val productImages: List<String> = emptyList(),
-    val image: String = "",
-    val reelTitle: String = "",
-    val reelVideoUrl: String = "",
-    val searchQuery: String = "",
-    val tags: String = "",
-    val sizeColorData: List<Map<String, Any>> = emptyList(),
-    val createdAt: Timestamp? = null
-)

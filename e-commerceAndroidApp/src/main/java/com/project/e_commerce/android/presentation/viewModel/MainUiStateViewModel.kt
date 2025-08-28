@@ -1,6 +1,7 @@
 package com.project.e_commerce.android.presentation.viewModel
 
 import androidx.lifecycle.ViewModel
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -11,11 +12,20 @@ class MainUiStateViewModel : ViewModel() {
     private val _isAddToCartSheetVisible = MutableStateFlow(false)
     val isAddToCartSheetVisible: StateFlow<Boolean> = _isAddToCartSheetVisible
 
-    fun showAddToCartSheet() { _isAddToCartSheetVisible.value = true }
-    fun hideAddToCartSheet() { _isAddToCartSheetVisible.value = false }
+    private val _selectedReelForCart = MutableStateFlow<Reels?>(null)
+    val selectedReelForCart: StateFlow<Reels?> = _selectedReelForCart
+
+    fun showAddToCartSheet(reel: Reels) { 
+        _selectedReelForCart.value = reel
+        _isAddToCartSheetVisible.value = true 
+    }
+    
+    fun hideAddToCartSheet() { 
+        _isAddToCartSheetVisible.value = false 
+        _selectedReelForCart.value = null
+    }
 
     fun setBottomSheetVisible(visible: Boolean) {
         _isBottomSheetVisible.value = visible
     }
-
 }

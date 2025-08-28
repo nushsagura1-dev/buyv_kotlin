@@ -25,17 +25,44 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import coil3.compose.AsyncImage
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
+import com.project.e_commerce.android.presentation.ui.screens.RequireLoginPrompt
 import com.project.e_commerce.android.presentation.viewModel.CartItem
 import com.project.e_commerce.android.presentation.viewModel.CartState
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import org.koin.androidx.compose.koinViewModel
+import android.util.Log
 
 @Composable
 fun CartScreen(
     navController: NavController,
     cartViewModel: CartViewModel = koinViewModel()
 ) {
+    Log.d("CrashDebug", "CartScreen: composable entry")
+    Log.d("CrashDebug", "CartScreen: about to collect state from cartViewModel=$cartViewModel")
     val state by cartViewModel.state.collectAsState()
+    Log.d(
+        "CrashDebug",
+        "CartScreen: collected state, isLoading=${state.isLoading}, error=${state.error}, items=${state.items.size}"
+    )
+    Log.d("CrashDebug", "CartScreen: entered UI column, still alive")
+
+    val authUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+    if (authUser == null) {
+        Log.w("CartViewModel", "CartScreen: No user authenticated, showing login prompt")
+        RequireLoginPrompt(
+            onLogin = {
+                Log.d("CrashDebug", "Tapped Login: about to navigate to LoginScreen")
+                navController.navigate(com.project.e_commerce.android.presentation.ui.navigation.Screens.LoginScreen.route)
+            },
+            onSignUp = {
+                Log.d("CrashDebug", "Tapped SignUp: about to navigate to CreateAccountScreen")
+                navController.navigate(com.project.e_commerce.android.presentation.ui.navigation.Screens.LoginScreen.CreateAccountScreen.route)
+            },
+            onDismiss = {},
+            showCloseButton = false
+        )
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -44,7 +71,7 @@ fun CartScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        // Header
+        Log.d("CartScreenDebug", "CartScreen: Header block")
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -59,8 +86,44 @@ fun CartScreen(
                 textAlign = TextAlign.Center
             )
         }
-
-        if (state.items.isEmpty()) {
+        Log.d("CartScreenDebug", "CartScreen: State block start")
+        if (state.isLoading) {
+            Log.d("CartScreenDebug", "CartScreen: Loading state true")
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color(0xFF0066CC))
+            }
+        } else if (state.error != null) {
+            Log.d("CartScreenDebug", "CartScreen: Error block, error=${state.error}")
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Error: ${state.error}",
+                        color = Color.Red,
+                        textAlign = TextAlign.Center,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            cartViewModel.clearError()
+                            cartViewModel.refreshCart()
+                        },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF0066CC))
+                    ) {
+                        Text("Retry", color = Color.White)
+                    }
+                }
+            }
+        } else if (state.items.isEmpty()) {
+            Log.d("CartScreenDebug", "CartScreen: Cart is empty")
             Text(
                 "Your cart is empty",
                 modifier = Modifier.fillMaxWidth(),
@@ -69,6 +132,7 @@ fun CartScreen(
                 color = Color.Gray
             )
         } else {
+            Log.d("CartScreenDebug", "CartScreen: Rendering items (${state.items.size})")
             state.items.forEach { item ->
                 CartProductCard(
                     item = item,
@@ -80,13 +144,10 @@ fun CartScreen(
                     }
                 )
             }
-
             Spacer(modifier = Modifier.height(16.dp))
             CostSummary(state)
-
             Spacer(modifier = Modifier.height(12.dp))
             PromoCodeField()
-
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = {
@@ -99,9 +160,13 @@ fun CartScreen(
                 shape = RoundedCornerShape(10.dp),
                 elevation = ButtonDefaults.elevation(6.dp)
             ) {
-                Text("Checkout", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "Checkout",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
-
             Spacer(modifier = Modifier.height(86.dp))
         }
     }

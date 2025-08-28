@@ -1,4 +1,4 @@
-package com.project_e_commerce.android.presentation.ui.screens.createAccountScreen
+package com.project.e_commerce.android.presentation.ui.screens.createAccountScreen
 
 import android.widget.Toast
 import androidx.compose.foundation.background

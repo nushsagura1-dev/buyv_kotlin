@@ -84,7 +84,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.text.TextStyle
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
-import com.project.e_commerce.android.presentation.viewModel.Product
+import com.project.e_commerce.android.domain.model.Product
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
 import org.koin.androidx.compose.koinViewModel
 

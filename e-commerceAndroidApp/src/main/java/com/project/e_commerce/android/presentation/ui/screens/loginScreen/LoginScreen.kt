@@ -34,11 +34,15 @@ import com.project.e_commerce.android.presentation.viewModel.AuthEffect
 import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
+import android.util.Log
 
 @Composable
 fun LoginScreen(navController: NavController) {
+    Log.d("CrashDebug", "LoginScreen: composable entry")
     val vm: AuthViewModel = koinViewModel()
+    Log.d("CrashDebug", "LoginScreen: got AuthViewModel=$vm")
     val s by vm.state.collectAsState()
+    Log.d("CrashDebug", "LoginScreen: collected state loading=${s.loading} email=${s.email}")
     val context = LocalContext.current
 
     // One-shot effects: Navigation + Toasts (بدون أي تغيير بصري)
@@ -46,17 +50,27 @@ fun LoginScreen(navController: NavController) {
         vm.effect.collectLatest { eff ->
             when (eff) {
                 is AuthEffect.NavigateToHome -> {
+                    Log.d(
+                        "CrashDebug",
+                        "LoginScreen: NavigateToHome effect triggered, navigating to ReelsScreen"
+                    )
                     navController.navigate(Screens.ReelsScreen.route) {
                         popUpTo(0) { inclusive = true }
                     }
                 }
                 is AuthEffect.NavigateToLogin -> {
+                    Log.d(
+                        "CrashDebug",
+                        "LoginScreen: NavigateToLogin effect triggered, navigating to LoginScreen"
+                    )
                     navController.navigate(Screens.LoginScreen.route) {
                         popUpTo(0) { inclusive = true }
                     }
                 }
-                is AuthEffect.Toast ->
+                is AuthEffect.Toast -> {
+                    Log.d("CrashDebug", "LoginScreen: Toast effect: ${eff.message}")
                     Toast.makeText(context, eff.message, Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

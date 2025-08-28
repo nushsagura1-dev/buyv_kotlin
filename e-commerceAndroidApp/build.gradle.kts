@@ -63,7 +63,7 @@ dependencies {
     // Lifecycle
     val lifecycleVersion = "2.9.2"
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2") // Updated for Compose/Koin compatibility
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycleVersion")
 
     // Navigation
@@ -73,9 +73,8 @@ dependencies {
     implementation("androidx.navigation:navigation-ui-ktx:$navigationVersion")
 
     // Koin
-    val koinVersion = "4.1.0"
-    implementation("io.insert-koin:koin-android:$koinVersion")
-    implementation("io.insert-koin:koin-androidx-compose:$koinVersion")
+    implementation("io.insert-koin:koin-android:3.5.3")
+    implementation("io.insert-koin:koin-androidx-compose:3.5.3")
 
     // Retrofit + Coroutines
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
@@ -106,9 +105,9 @@ dependencies {
     implementation("com.google.accompanist:accompanist-pager-indicators:0.36.0")
 
     // Media3
-    implementation("androidx.media3:media3-exoplayer:1.8.0")
-    implementation("androidx.media3:media3-exoplayer-dash:1.8.0")
-    implementation("androidx.media3:media3-ui:1.8.0")
+    implementation("androidx.media3:media3-exoplayer:1.2.1")
+    implementation("androidx.media3:media3-exoplayer-dash:1.2.1")
+    implementation("androidx.media3:media3-ui:1.2.1")
 
     // Core
     implementation("androidx.core:core-ktx:1.17.0")

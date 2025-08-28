@@ -29,12 +29,12 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                implementation("io.insert-koin:koin-core:4.1.0")
+                implementation("io.insert-koin:koin-core:3.5.3")
             }
         }
         val androidMain by getting {
             dependencies {
-                implementation("io.insert-koin:koin-android:4.1.0")
+                implementation("io.insert-koin:koin-android:3.5.3")
             }
         }
         val iosMain by getting {

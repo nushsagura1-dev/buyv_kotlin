@@ -9,8 +9,10 @@ import com.project.e_commerce.android.data.repository.CountriesRepository
 import com.project.e_commerce.android.data.repository.FirebaseAuthRepository
 import com.project.e_commerce.android.data.repository.FirebaseUserProfileRepository
 import com.project.e_commerce.android.data.repository.FirebaseFollowingRepository
+import com.project.e_commerce.android.data.repository.FirebaseCartRepository
 import com.project.e_commerce.android.domain.repository.UserProfileRepository
 import com.project.e_commerce.android.domain.repository.FollowingRepository
+import com.project.e_commerce.android.domain.repository.CartRepository
 import com.project.e_commerce.android.domain.usecase.CheckEmailValidation
 import com.project.e_commerce.android.domain.usecase.CheckLoginValidation
 import com.project.e_commerce.android.domain.usecase.CheckMatchedPasswordUseCase
@@ -26,6 +28,7 @@ import com.project.e_commerce.android.presentation.viewModel.reelsScreenViewMode
 import com.project.e_commerce.android.presentation.viewModel.restPasswordViewModel.RestPasswordViewModel
 import com.project.e_commerce.android.presentation.viewModel.followingViewModel.FollowingViewModel
 import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
+import com.project.e_commerce.android.presentation.viewModel.otherUserProfile.OtherUserProfileViewModel
 import okhttp3.OkHttpClient
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -33,103 +36,260 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 val viewModelModule = module {
-    // Firebase & Repo
-    single { FirebaseAuth.getInstance() }
-    single { FirebaseFirestore.getInstance() }
-    single<AuthRepository> { FirebaseAuthRepository(get()) }
-    single<UserProfileRepository> { FirebaseUserProfileRepository(get(), get()) }
-    single<FollowingRepository> { FirebaseFollowingRepository(get(), get()) }
+    try {
+        // Firebase & Repo
+        single {
+            val firebaseAuth = FirebaseAuth.getInstance()
+            android.util.Log.d("CrashDebug", "AppModule: FirebaseAuth created")
+            firebaseAuth
+        }
+        single {
+            val firebaseFirestore = FirebaseFirestore.getInstance()
+            android.util.Log.d("CrashDebug", "AppModule: FirebaseFirestore created")
+            firebaseFirestore
+        }
+        single<AuthRepository> {
+            val repo = FirebaseAuthRepository(get())
+            android.util.Log.d("CrashDebug", "AppModule: FirebaseAuthRepository created")
+            repo
+        }
+        single<UserProfileRepository> {
+            val repo = FirebaseUserProfileRepository(get(), get())
+            android.util.Log.d("CrashDebug", "AppModule: FirebaseUserProfileRepository created")
+            repo
+        }
+        single<FollowingRepository> {
+            val repo = FirebaseFollowingRepository(get(), get())
+            android.util.Log.d("CrashDebug", "AppModule: FirebaseFollowingRepository created")
+            repo
+        }
+        single<CartRepository> {
+            val auth: FirebaseAuth = get()
+            val firestore: FirebaseFirestore = get()
+            android.util.Log.d(
+                "CrashDebug",
+                "AppModule: Registering CartRepository with auth=$auth firestore=$firestore"
+            )
+            val repo = FirebaseCartRepository(auth, firestore)
+            android.util.Log.d(
+                "CrashDebug",
+                "AppModule: FirebaseCartRepository constructed successfully"
+            )
+            repo
+        }
 
-    // Use cases
-    single { CheckMatchedPasswordUseCase() }
-    single { CheckLoginValidation() }
-    single { CheckEmailValidation() }
-    single { CheckPasswordValidation() }
-    single { LoginByEmailAndPasswordUseCase(get()) }
-    
-    // User Profile Use Cases
-    single { GetUserProfileUseCase(get()) }
-    single { UpdateUserProfileUseCase(get()) }
-    single { GetUserPostsUseCase(get()) }
-    single { GetUserReelsUseCase(get()) }
-    single { GetUserProductsUseCase(get()) }
-    single { GetUserLikedPostsUseCase(get()) }
-    single { GetUserBookmarkedPostsUseCase(get()) }
-    
-    // Following Use Cases
-    single { FollowUserUseCase(get()) }
-    single { UnfollowUserUseCase(get()) }
-    single { GetFollowingStatusUseCase(get()) }
-    single { GetFollowingUsersUseCase(get()) }
-    single { GetUserProfilesByIdsUseCase(get()) }
-    single { GetFollowersUseCase(get()) }
+        // Use cases
+        single {
+            val useCase = CheckMatchedPasswordUseCase()
+            android.util.Log.d("CrashDebug", "AppModule: CheckMatchedPasswordUseCase created")
+            useCase
+        }
+        single {
+            val useCase = CheckLoginValidation()
+            android.util.Log.d("CrashDebug", "AppModule: CheckLoginValidation created")
+            useCase
+        }
+        single {
+            val useCase = CheckEmailValidation()
+            android.util.Log.d("CrashDebug", "AppModule: CheckEmailValidation created")
+            useCase
+        }
+        single {
+            val useCase = CheckPasswordValidation()
+            android.util.Log.d("CrashDebug", "AppModule: CheckPasswordValidation created")
+            useCase
+        }
+        single {
+            val useCase = LoginByEmailAndPasswordUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: LoginByEmailAndPasswordUseCase created")
+            useCase
+        }
 
-    // ViewModels
-    viewModel {
-        AuthViewModel(
-            repo = get(),
-            checkEmailValidation = get(),
-            checkPasswordValidation = get(),
-            checkMatchedPassword = get()
+        // User Profile Use Cases
+        single {
+            val useCase = GetUserProfileUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetUserProfileUseCase created")
+            useCase
+        }
+        single {
+            val useCase = UpdateUserProfileUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: UpdateUserProfileUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetUserPostsUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetUserPostsUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetUserReelsUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetUserReelsUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetUserProductsUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetUserProductsUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetUserLikedPostsUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetUserLikedPostsUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetUserBookmarkedPostsUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetUserBookmarkedPostsUseCase created")
+            useCase
+        }
+
+        // Following Use Cases
+        single {
+            val useCase = FollowUserUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: FollowUserUseCase created")
+            useCase
+        }
+        single {
+            val useCase = UnfollowUserUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: UnfollowUserUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetFollowingStatusUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetFollowingStatusUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetFollowingUsersUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetFollowingUsersUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetUserProfilesByIdsUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetUserProfilesByIdsUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetFollowersUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetFollowersUseCase created")
+            useCase
+        }
+
+        // ViewModels
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: AuthViewModel created")
+            AuthViewModel(
+                repo = get(),
+                checkEmailValidation = get(),
+                checkPasswordValidation = get(),
+                checkMatchedPassword = get()
+            )
+        }
+
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: LoginScreenViewModel created")
+            LoginScreenViewModel(
+                checkLoginValidation = get(),
+                checkEmailValidation = get(),
+                checkPasswordValidation = get(),
+                loginByEmailAndPasswordUseCase = get()
+            )
+        }
+
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: ProfileViewModel created")
+            ProfileViewModel(
+                userProfileRepository = get(),
+                getUserProfileUseCase = get(),
+                getUserReelsUseCase = get(),
+                getUserProductsUseCase = get(),
+                getUserLikedPostsUseCase = get(),
+                getUserBookmarkedPostsUseCase = get(),
+                getFollowingUsersUseCase = get(),
+                getFollowersUseCase = get()
+            )
+        }
+
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: EditProfileViewModel created")
+            EditProfileViewModel(
+                getUserProfileUseCase = get(),
+                updateUserProfileUseCase = get()
+            )
+        }
+
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: RestPasswordViewModel created")
+            RestPasswordViewModel(get(), get())
+        }
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: ProductViewModel created")
+            ProductViewModel()
+        }
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: ReelsScreenViewModel created")
+            ReelsScreenViewModel(get(), get(), get(), get())
+        }
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: CartViewModel created")
+            CartViewModel(
+                cartRepository = get<CartRepository>(),
+                auth = get<FirebaseAuth>()
+            )
+        }
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: FollowingViewModel created")
+            FollowingViewModel(
+                followUserUseCase = get(),
+                unfollowUserUseCase = get(),
+                getFollowingStatusUseCase = get(),
+                getFollowingUsersUseCase = get(),
+                getUserProfilesByIdsUseCase = get(),
+                getFollowersUseCase = get()
+            )
+        }
+
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: OtherUserProfileViewModel created")
+            OtherUserProfileViewModel(
+                getUserProfileUseCase = get(),
+                getFollowingStatusUseCase = get(),
+                followUserUseCase = get(),
+                unfollowUserUseCase = get(),
+                getUserReelsUseCase = get(),
+                getUserProductsUseCase = get(),
+                getFollowersUseCase = get(),
+                getFollowingUsersUseCase = get()
+            )
+        }
+
+        // Retrofit
+        single {
+            val okHttp = OkHttpClient.Builder()
+                .addInterceptor(Interceptor())
+                .build()
+            android.util.Log.d("CrashDebug", "AppModule: OkHttpClient created")
+            Retrofit.Builder()
+                .client(okHttp)
+                .baseUrl("https://restcountries.com/")
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+        }
+        single {
+            val countriesApi = get<Retrofit>().create(CountriesApi::class.java)
+            android.util.Log.d("CrashDebug", "AppModule: CountriesApi created")
+            countriesApi
+        }
+        single {
+            val countriesRepository = CountriesRepository(get())
+            android.util.Log.d("CrashDebug", "AppModule: CountriesRepository created")
+            countriesRepository
+        }
+        android.util.Log.d("CrashDebug", "AppModule: viewModelModule DI instantiations complete")
+    } catch (e: Exception) {
+        android.util.Log.e(
+            "CrashDebug",
+            "AppModule: Exception during viewModelModule instantiation: ${e.message}",
+            e
         )
     }
-
-    viewModel {
-        LoginScreenViewModel(
-            checkLoginValidation = get (),
-            checkEmailValidation = get(),
-            checkPasswordValidation = get(),
-            loginByEmailAndPasswordUseCase = get()
-        )
-    }
-
-    viewModel { 
-        ProfileViewModel(
-            userProfileRepository = get(),
-            getUserProfileUseCase = get(),
-            getUserReelsUseCase = get(),
-            getUserProductsUseCase = get(),
-            getUserLikedPostsUseCase = get(),
-            getUserBookmarkedPostsUseCase = get(),
-            getFollowingUsersUseCase = get(),
-            getFollowersUseCase = get()
-        ) 
-    }
-    
-    viewModel { 
-        EditProfileViewModel(
-            getUserProfileUseCase = get(),
-            updateUserProfileUseCase = get()
-        ) 
-    }
-    
-    viewModel { RestPasswordViewModel(get(), get()) }
-    viewModel { ProductViewModel() }
-    viewModel { ReelsScreenViewModel(get(), get()) }
-    viewModel { CartViewModel() }
-    viewModel { 
-        FollowingViewModel(
-            followUserUseCase = get(),
-            unfollowUserUseCase = get(),
-            getFollowingStatusUseCase = get(),
-            getFollowingUsersUseCase = get(),
-            getUserProfilesByIdsUseCase = get(),
-            getFollowersUseCase = get()
-        ) 
-    }
-
-    // Retrofit
-    single {
-        val okHttp = OkHttpClient.Builder()
-            .addInterceptor(Interceptor())
-            .build()
-
-        Retrofit.Builder()
-            .client(okHttp)
-            .baseUrl("https://restcountries.com/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-    single { get<Retrofit>().create(CountriesApi::class.java) }
-    single { CountriesRepository(get()) }
 }

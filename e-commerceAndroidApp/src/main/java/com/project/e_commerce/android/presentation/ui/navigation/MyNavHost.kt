@@ -2,6 +2,9 @@ package com.project.e_commerce.android.presentation.ui.navigation
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
@@ -28,6 +31,7 @@ import com.project.e_commerce.android.presentation.ui.screens.TrackOrderScreen
 import com.project.e_commerce.android.presentation.ui.screens.loginScreen.LoginScreen
 import com.project.e_commerce.android.presentation.ui.screens.profileScreen.ProfileScreen
 import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.ReelsView
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.SheetType
 
 import com.project.e_commerce.android.presentation.ui.screens.changePasswordScreen.ChangePasswordScreen
 import com.project.e_commerce.android.presentation.ui.screens.changePasswordScreen.PasswordChangedSuccessScreen
@@ -40,14 +44,22 @@ import com.project.e_commerce.android.presentation.ui.screens.splashScreen.Splas
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
 import com.project.e_commerce.android.presentation.viewModel.reelsScreenViewModel.ReelsScreenViewModel
-import com.project_e_commerce.android.presentation.ui.screens.createAccountScreen.CreateAnAccountScreen
+import com.project.e_commerce.android.presentation.ui.screens.createAccountScreen.CreateAnAccountScreen
 import com.project_e_commerce.android.presentation.ui.screens.forgetPassword.ForgetPasswordRequestScreen
 import org.koin.androidx.compose.koinViewModel
 import com.project.e_commerce.android.presentation.ui.screens.FollowListScreen
+import com.project.e_commerce.android.presentation.ui.screens.otherUserProfile.OtherUserProfileScreen
+import android.util.Log
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MyNavHost(
+    modifier: Modifier = Modifier,
     navController: NavHostController,
     startDestination: String,
     mainUiStateViewModel: com.project.e_commerce.android.presentation.viewModel.MainUiStateViewModel
@@ -73,14 +85,31 @@ fun MyNavHost(
         composable(Screens.LoginScreen.PasswordChangedSuccessScreen.route) { PasswordChangedSuccessScreen(navController) }
 
         composable(Screens.ReelsScreen.route) { 
+            Log.d("MyNavHost", "🎬 ReelsScreen route composable started")
+            Log.d("MyNavHost", "🎬 Creating ReelsView with reelsScreenViewModel: $reelsScreenViewModel")
+            
             ReelsView(
                 navController = navController,
                 viewModel = reelsScreenViewModel,
                 cartViewModel = cartViewModel,
                 isLoggedIn = true, // TODO: Get actual login state
-                setShowLoginPrompt = { /* Handle login prompt */ },
-                onShowSheet = { /* Handle sheet */ }
+                onShowSheet = { sheetType, reel ->
+                    Log.d("MyNavHost", "🎬 onShowSheet called with type: $sheetType, reel: ${reel?.id}")
+                    when (sheetType) {
+                        SheetType.AddToCart -> {
+                            if (reel != null) {
+                                Log.d("MyNavHost", "🎬 Showing add to cart sheet for reel: ${reel.id}")
+                                mainUiStateViewModel.showAddToCartSheet(reel)
+                            }
+                        }
+                        SheetType.Comments -> {
+                            Log.d("MyNavHost", "🎬 Comments sheet requested")
+                            // Handle comments sheet if needed
+                        }
+                    }
+                }
             )
+            Log.d("MyNavHost", "🎬 ReelsView rendered successfully")
         }
 
 
@@ -104,8 +133,18 @@ fun MyNavHost(
                 viewModel = reelsScreenViewModel,
                 cartViewModel = cartViewModel,
                 isLoggedIn = true, // TODO: Get actual login state
-                setShowLoginPrompt = { /* Handle login prompt */ },
-                onShowSheet = { /* Handle sheet */ }
+                onShowSheet = { sheetType, reel ->
+                    when (sheetType) {
+                        SheetType.AddToCart -> {
+                            if (reel != null) {
+                                mainUiStateViewModel.showAddToCartSheet(reel)
+                            }
+                        }
+                        SheetType.Comments -> {
+                            // Handle comments sheet if needed
+                        }
+                    }
+                }
             )
             // Set the reelId in the savedStateHandle for ReelsView to use
             LaunchedEffect(Unit) {
@@ -187,6 +226,20 @@ fun MyNavHost(
 
         composable(Screens.ProfileScreen.EditProfileScreen.route) {
             EditProfileScreen(navController)
+        }
+
+        // OtherUserProfileScreen route
+        composable(
+            route = Screens.OtherUserProfileScreen.route,
+            arguments = listOf(
+                navArgument("userId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            com.project.e_commerce.android.presentation.ui.screens.otherUserProfile.OtherUserProfileScreen(
+                navController = navController,
+                userId = userId
+            )
         }
 
         // FollowListScreen route

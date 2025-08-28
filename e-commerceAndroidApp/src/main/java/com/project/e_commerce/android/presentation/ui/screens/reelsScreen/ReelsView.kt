@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,7 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavHostController
+import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import coil3.compose.rememberAsyncImagePainter
 import com.google.accompanist.pager.*
@@ -69,6 +70,7 @@ import com.project.e_commerce.android.presentation.ui.screens.HeartAnimation
 import com.project.e_commerce.android.presentation.ui.screens.RequireLoginPrompt
 import com.project.e_commerce.android.presentation.ui.utail.noRippleClickable
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
+import com.project.e_commerce.android.presentation.viewModel.CartItem
 import com.project.e_commerce.android.presentation.viewModel.followingViewModel.FollowingViewModel
 import com.project.e_commerce.android.presentation.viewModel.reelsScreenViewModel.ReelsScreenViewModel
 
@@ -76,80 +78,116 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import android.util.Log
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flowOf
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun ReelsView(
-    navController: NavHostController,
+    navController: NavController,
     viewModel: ReelsScreenViewModel,
     cartViewModel: CartViewModel,
-    isLoggedIn: Boolean,
-    setShowLoginPrompt: (Boolean) -> Unit,
-    onShowSheet: (SheetType) -> Unit
+    isLoggedIn: Boolean = true,
+    onShowSheet: (SheetType, Reels?) -> Unit
 ) {
-    // Get the saved tab from navigation
-    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
-    var selectedTab by rememberSaveable { 
-        mutableStateOf(savedStateHandle?.get("selectedTab") ?: "For you") 
+    val showLoginPrompt = remember { mutableStateOf(false) }
+    android.util.Log.d("CrashDebug", "ReelsView: composable entry, viewModel=$viewModel")
+    val reelsList by viewModel.state.collectAsState()
+    android.util.Log.d("CrashDebug", "ReelsView: collected reels state, size=${reelsList.size}")
+    val currentUserId = remember {
+        runCatching {
+            val auth = FirebaseAuth.getInstance()
+            if (auth.currentUser != null) {
+                auth.currentUser?.uid ?: ""
+            } else {
+                Log.w("ReelsView", "🎬 No authenticated user found")
+                ""
+            }
+        }.getOrElse { e ->
+            Log.e("ReelsView", "🎬 Error getting current user ID", e)
+            ""
+        }
     }
     
-    var showLoginPrompt by remember { mutableStateOf(false) }
+    Log.d("ReelsView", "🎬 Current user ID: $currentUserId")
+    Log.d("ReelsView", "🎬 Reels list size: ${reelsList.size}")
+    
+    if (reelsList.isEmpty()) {
+        Log.w("ReelsView", "🎬 No reels available, showing loading or empty state")
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Color.White)
+        }
+        return
+    }
+    
+    // Additional safety check for reels list
+    if (reelsList.any { it.id.isBlank() }) {
+        Log.w("ReelsView", "🎬 Some reels have blank IDs, filtering them out")
+        // Filter out reels with blank IDs to prevent crashes
+        val validReels = reelsList.filter { it.id.isNotBlank() }
+        if (validReels.isEmpty()) {
+            Log.w("ReelsView", "🎬 No valid reels after filtering, showing empty state")
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
+            return
+        }
+    }
+    
+    // Initialize pager state with safety bounds - only when reels are available
+    val initialPage = if (reelsList.isNotEmpty()) {
+        minOf(0, maxOf(0, reelsList.size - 1))
+    } else {
+        0
+    }
+    Log.d("ReelsView", "🎬 Initializing pager state with initialPage: $initialPage, total pages: ${reelsList.size}")
+    
+    val pagerState = rememberPagerState(
+        initialPage = initialPage
+    )
+    
+    Log.d("ReelsView", "🎬 Pager state initialized successfully")
+    
+    var currentPage by remember { mutableStateOf(initialPage) }
+    Log.d("ReelsView", "🎬 Current page state initialized: $currentPage")
+    
+    var isSelectedComments by remember { mutableStateOf(true) }
+    var showHeart by remember { mutableStateOf(false) }
+    var heartPosition by remember { mutableStateOf(Offset.Zero) }
+
+    // NEW: Use only local selectedTab state for tab logic (never use savedStateHandle)
+    val tabList = listOf("For you", "Following", "Explore")
+    var selectedTab by remember { mutableStateOf("For you") }
+    
+    // Force refresh from ProductViewModel when needed
+    LaunchedEffect(Unit) {
+        viewModel.forceRefreshFromProductViewModel()
+    }
+    
     var isVisible by remember { mutableStateOf(false) }
     
     // Refresh following data when reels view becomes active
     val followingViewModel: FollowingViewModel = koinViewModel()
-    val auth = remember { FirebaseAuth.getInstance() }
-    val currentUserId = auth.currentUser?.uid
+    val auth = remember { 
+        try {
+            FirebaseAuth.getInstance()
+        } catch (e: Exception) {
+            Log.e("ReelsView", "Error getting Firebase Auth instance: ${e.message}")
+            null
+        }
+    }
     
     LaunchedEffect(Unit) {
-        currentUserId?.let { userId ->
-            val currentUser = auth.currentUser
-            val username = currentUser?.displayName ?: currentUser?.email?.split("@")?.firstOrNull() ?: "user"
-            followingViewModel.loadUserData(userId, username)
-        }
-        
         // Force refresh reels when screen becomes active
         Log.d("ReelsView", "🔄 ReelsView became active, forcing reels refresh")
         viewModel.forceRefreshFromProductViewModel()
     }
-
-    val state = viewModel.state.collectAsState().value
     
-    // Debug logging for reels state
-    LaunchedEffect(state) {
-        Log.d("ReelsView", "📊 Reels state updated: ${state.size} reels")
-        if (state.isNotEmpty()) {
-            Log.d("ReelsView", "📺 First reel: ${state.first().id} - ${state.first().productName}")
-        } else {
-            Log.d("ReelsView", "⚠️ No reels in state")
-        }
-    }
-
-    // Save tab state to savedStateHandle when it changes
-    LaunchedEffect(selectedTab) {
-        savedStateHandle?.set("selectedTab", selectedTab)
-    }
-    
-    // Load tab state from savedStateHandle when component initializes
-    LaunchedEffect(Unit) {
-        val tab: String? = savedStateHandle?.get("selectedTab")
-        if (tab != null && tab != selectedTab) {
-            selectedTab = tab
-        }
-    }
-
-    // Find the initial page index if a specific reel is requested
-    val initialPage = try {
-        val reelId = savedStateHandle?.get("reelId") as? String
-        if (reelId != null) {
-            val index = state.indexOfFirst { it.id == reelId }
-            if (index >= 0) index else 0
-        } else 0
-    } catch (e: Exception) {
-        0
-    }
-
-    var isSelectedComments by remember { mutableStateOf(true) }
     var isSelectedRatings by remember { mutableStateOf(false) }
     val modalBottomSheetState = rememberModalBottomSheetState(
         initialValue = ModalBottomSheetValue.Hidden,
@@ -171,43 +209,35 @@ fun ReelsView(
     val showSheet = remember { mutableStateOf(false) }
     val sheetTab = remember { mutableStateOf(SheetTab.Comments) }
 
-    // Tab change + Explore navigation
-    val onTabChange = { newTab: String ->
-        if (newTab != selectedTab) {
+    // Tab change handler - only navigate to Explore, otherwise just change local selectedTab
+    val onTabChange: (String) -> Unit = { newTab ->
+        if (newTab == "Explore") {
+            navController.navigate(Screens.ReelsScreen.ExploreScreen.route)
+        } else {
             selectedTab = newTab
-            savedStateHandle?.set("selectedTab", newTab)
         }
     }
-    
-    // Handle Explore tab click
-    val currentTab = selectedTab
-    if (currentTab == "Explore") {
-        // Save current tab state before navigating
-        savedStateHandle?.set("selectedTab", currentTab)
-        navController.navigate(Screens.ReelsScreen.ExploreScreen.route)
-    }
 
-    LaunchedEffect(selectedTab) { Log.d("ReelsView", "📱 Tab state changed to: $selectedTab") }
-    LaunchedEffect(Unit) { Log.d("ReelsView", "🚀 ReelsView initialized with tab: $selectedTab") }
+    // When returning from Explore, always default to "For you"
+    LaunchedEffect(Unit) {
+        // Could further refine if you want to auto-detect, but here we just resync on screen appear
+        selectedTab = "For you"
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .imePadding()
     ) {
-        val currentTab = selectedTab
-        when (currentTab) {
-            "Explore" -> {
-                // Navigate to explore screen
-                savedStateHandle?.set("selectedTab", currentTab)
-                navController.navigate(Screens.ReelsScreen.ExploreScreen.route)
-            }
+        // Always use the local selectedTab state for top tab bar
+        when (selectedTab) {
             "Following" -> {
                 FollowingReelsContent(
                     navController = navController,
                     followingViewModel = followingViewModel,
                     reelsViewModel = viewModel,
-                    onShowSheet = { sheetType ->
+                    cartViewModel = cartViewModel,
+                    onShowSheet = { sheetType, reel ->
                         showSheet.value = true
                         currentSheet = sheetType
                         // mainUiStateViewModel.setBottomSheetVisible(true)
@@ -223,38 +253,22 @@ fun ReelsView(
                         sheetTab.value = SheetTab.Comments
                     },
                     viewModel = viewModel,
+                    cartViewModel = cartViewModel,
                     onClickCartButton = {
-                        if (!isLoggedIn) showLoginPrompt = true
+                        if (!isLoggedIn) showLoginPrompt.value = true
                         showSheet.value = true
                         sheetTab.value = SheetTab.Ratings
                     },
                     onClickMoreButton = { /* no-op */ },
-                    reelsList = state,
+                    reelsList = reelsList,
                     isLoggedIn = isLoggedIn,
-                    setShowLoginPrompt = { showLoginPrompt = it },
+                    showLoginPrompt = showLoginPrompt,
                     initialPage = initialPage
                 )
             }
             else -> {
-                ReelsList(
-                    navController = navController,
-                    onClickCommentButton = {
-                        showSheet.value = true
-                        // mainUiStateViewModel.setBottomSheetVisible(true)
-                        sheetTab.value = SheetTab.Comments
-                    },
-                    viewModel = viewModel,
-                    onClickCartButton = {
-                        if (!isLoggedIn) showLoginPrompt = true
-                        showSheet.value = true
-                        sheetTab.value = SheetTab.Ratings
-                    },
-                    onClickMoreButton = { /* no-op */ },
-                    reelsList = state,
-                    isLoggedIn = isLoggedIn,
-                    setShowLoginPrompt = { showLoginPrompt = it },
-                    initialPage = initialPage
-                )
+                // Defensive fallback: should not show UI for "Explore" here (it navigates away)
+                // Display nothing or do nothing here; navigation to Explore already happens on tab click
             }
         }
 
@@ -270,7 +284,7 @@ fun ReelsView(
                     }
             )
             ModernBottomSheetContent(
-                state = state,
+                state = reelsList,
                 isSelectedComments = isSelectedComments,
                 isSelectedRatings = isSelectedRatings,
                 onCommentTabClick = onCommentTabClick,
@@ -284,17 +298,11 @@ fun ReelsView(
             )
         }
 
-        if (showLoginPrompt) {
+        if (showLoginPrompt.value) {
             RequireLoginPrompt(
-                onLogin = {
-                    showLoginPrompt = false
-                    navController.navigate(Screens.LoginScreen.route)
-                },
-                onSignUp = {
-                    showLoginPrompt = false
-                    navController.navigate(Screens.LoginScreen.CreateAccountScreen.route)
-                },
-                onDismiss = { showLoginPrompt = false }
+                onLogin = { showLoginPrompt.value = false },
+                onSignUp = { showLoginPrompt.value = false },
+                onDismiss = { showLoginPrompt.value = false }
             )
         }
 
@@ -303,12 +311,46 @@ fun ReelsView(
             onClickSearch = { navController.navigate(Screens.ReelsScreen.SearchReelsAndUsersScreen.route) },
             selectedTab = selectedTab,
             onTabChange = onTabChange,
-            onClickExplore = { /* no-op */ },
+            onClickExplore = { selectedTab = "Explore" },
             headerStyle = HeaderStyle.TRANSPARENT_WHITE_TEXT,
             modifier = Modifier
         )
-        
+    }
 
+    if (showLoginPrompt.value) {
+        RequireLoginPrompt(
+            onLogin = { showLoginPrompt.value = false },
+            onSignUp = { showLoginPrompt.value = false },
+            onDismiss = { showLoginPrompt.value = false }
+        )
+    }
+
+    // Monitor page changes with safety bounds checking
+    LaunchedEffect(pagerState.currentPage) {
+        Log.d("ReelsView", "🎬 Page changed to: ${pagerState.currentPage}")
+        
+        // Safety check: ensure reelsList is not empty and page index is valid
+        if (reelsList.isEmpty()) {
+            Log.w("ReelsView", "🎬 Reels list is empty, skipping page update")
+            return@LaunchedEffect
+        }
+        
+        val pageIndex = pagerState.currentPage
+        if (pageIndex < 0 || pageIndex >= reelsList.size) {
+            Log.w("ReelsView", "🎬 Invalid page index: $pageIndex, reelsList size: ${reelsList.size}")
+            return@LaunchedEffect
+        }
+        
+        currentPage = pageIndex
+        
+        // Update current reel for cart status with safety check
+        val currentReel = reelsList[pageIndex]
+        if (currentReel != null && currentReel.id.isNotBlank()) {
+            Log.d("ReelsView", "🎬 Current reel updated: ${currentReel.id}")
+            viewModel.checkCartStatus(currentReel.id)
+        } else {
+            Log.w("ReelsView", "🎬 No valid current reel available")
+        }
     }
 }
 
@@ -427,56 +469,120 @@ enum class SheetTab { Comments, Ratings }
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReelsList(
-    navController: NavHostController,
-    onClickCommentButton: () -> Unit,
+    navController: NavController,
+    onClickCommentButton: (Reels) -> Unit,
     viewModel: ReelsScreenViewModel,
-    onClickCartButton: () -> Unit,
-    onClickMoreButton: () -> Unit,
+    cartViewModel: CartViewModel,
+    onClickCartButton: (Reels) -> Unit,
+    onClickMoreButton: (Reels) -> Unit,
     reelsList: List<Reels>,
     isLoggedIn: Boolean,
-    setShowLoginPrompt: (Boolean) -> Unit,
+    showLoginPrompt: androidx.compose.runtime.MutableState<Boolean>,
     initialPage: Int = 0
 ) {
     val pagerState = rememberPagerState(
-        initialPage = initialPage
+        initialPage = if (reelsList.isNotEmpty()) {
+            initialPage.coerceIn(0, reelsList.size - 1)
+        } else {
+            0
+        }
     )
     val currentPage = pagerState.currentPage
+
+    // Safety check: ensure we have valid reels to display
+    if (reelsList.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("No reels available")
+        }
+        return
+    }
 
     var showHeart by remember { mutableStateOf(false) }
     var heartPosition by remember { mutableStateOf(Offset.Zero) }
 
     VerticalPager(
         state = pagerState,
-        modifier = Modifier.fillMaxSize()
-            .padding(bottom = 44.dp),
+        modifier = Modifier.fillMaxSize(),
         count = reelsList.size
     ) { page ->
+        val reel = reelsList[page]
+        Log.d(
+            "ReelsCrash",
+            "Rendering reel at page=$page: id=${reel.id}, video=${reel.video}, userName=${reel.userName}, productName=${reel.productName}, images=${reel.images}, price=${reel.productPrice}, image placeholder?=${reel.productImage}"
+        )
+
+        // New guards and data logging as requested:
+        if ((reel.video == null || "${reel.video}".isBlank() || !(reel.video.toString()
+                .startsWith("http"))) && (reel.images == null || reel.images.isEmpty())
+        ) {
+            Log.e("ReelsCrash", "No valid video or image for reel ${reel.id}. Showing fallback.")
+            Image(
+                painter = painterResource(id = R.drawable.profile),
+                contentDescription = "Fallback Image",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            return@VerticalPager
+        }
+        if (page < 0 || page >= reelsList.size) {
+            Log.w("ReelsView", "🎬 Invalid page index: $page, bounds: 0-${reelsList.size-1}")
+            return@VerticalPager
+        }
+
+        Log.d("ReelsView", "🎬 Rendering reel ${reel.id} at page $page")
+        Log.d("ReelsView", "🎬 Reel video: ${reel.video}, isError: ${reel.isError}")
+        Log.d("ReelsView", "🎬 Reel images count: ${reel.images?.size}")
+        Log.d("ReelsView", "🎬 Reel fallback image: ${reel.fallbackImageRes}")
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = { offset ->
-                            showHeart = true
-                            heartPosition = offset
-                            if (!isLoggedIn) {
-                                setShowLoginPrompt(true)
-                            } else {
-                                viewModel.forceLoveReels(reelsList[page].id)
-                            }
+                .background(Color.Red)
+        ) {
+            val branchLabel: String =
+                if (reel.video != null && !reel.isError && reel.video.toString()
+                        .isNotEmpty() && reel.video.toString().startsWith("http")
+                ) {
+                    "VIDEO"
+                } else if (reel.images != null && reel.images.isNotEmpty() && reel.images.all {
+                        it != null && it.toString().isNotBlank()
+                    }) {
+                    "IMAGES"
+                } else {
+                    "FALLBACK"
+                }
+            Text(
+                branchLabel,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .background(Color.Black.copy(alpha = 0.7f))
+                    .padding(6.dp)
+            )
+
+            val videoUriToUse = reel.video
+            Log.d("ReelsCrash", "[DEBUG] Using videoUri: $videoUriToUse for reel.id=${reel.id}")
+            if (videoUriToUse != null && !reel.isError && videoUriToUse.toString().isNotEmpty() && videoUriToUse.toString().startsWith("http")) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                ) {
+                    VideoPlayer(
+                        uri = videoUriToUse,
+                        isPlaying = (currentPage == page),
+                        onPlaybackStarted = {
+                            Log.d("ReelsView", "🎬 Video playback started for reel ${reel.id}")
                         }
                     )
                 }
-        ) {
-
-            val reel = reelsList[page]
-            if (reel.video != null && !reel.isError) {
-                VideoPlayer(
-                    uri = reel.video,
-                    isPlaying = (currentPage == page),
-                    onPlaybackStarted = { }
-                )
-            } else if (reel.images != null && reel.images.isNotEmpty() ) {
+            } else if (reel.images != null && reel.images.isNotEmpty() && reel.images.all {
+                    it != null && it.toString().isNotBlank()
+                }) {
+                Log.d("ReelsView", "🎬 Showing images for reel ${reel.id}, count: ${reel.images.size}")
                 val imagesPagerState = rememberPagerState(initialPage = 0)
                 val aspect = 1f
                 Box(
@@ -496,12 +602,26 @@ fun ReelsList(
                                 .aspectRatio(aspect),
                             count = reel.images.size
                         ) { imgIndex ->
-                            Image(
-                                painter = rememberAsyncImagePainter(reel.images[imgIndex]),
-                                contentDescription = "Reel Image $imgIndex",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            val imageUri = reel.images[imgIndex]
+                            if (imageUri != null && imageUri.toString().startsWith("http")) {
+                                Image(
+                                    painter = rememberAsyncImagePainter(imageUri),
+                                    contentDescription = "Reel Image $imgIndex",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Log.e(
+                                    "ReelsCrash",
+                                    "Missing or invalid image for reel ${reel.id} at imgIndex=$imgIndex. Using placeholder."
+                                )
+                                Image(
+                                    painter = painterResource(id = R.drawable.profile),
+                                    contentDescription = "Fallback Image (Invalid URI)",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
 
                         Row(
@@ -517,7 +637,9 @@ fun ReelsList(
                                         .padding(horizontal = 4.dp)
                                         .size(if (imagesPagerState.currentPage == idx) 10.dp else 7.dp)
                                         .background(
-                                            if (imagesPagerState.currentPage == idx) Color.White else Color.White.copy(alpha = 0.5f),
+                                            if (imagesPagerState.currentPage == idx) Color.White else Color.White.copy(
+                                                alpha = 0.5f
+                                            ),
                                             shape = CircleShape
                                         )
                                 )
@@ -526,52 +648,131 @@ fun ReelsList(
                     }
                 }
             } else {
+                Log.e(
+                    "ReelsCrash",
+                    "Neither video nor images are valid for reel ${reel.id}. Using fallback image."
+                )
                 Image(
-                    painter = painterResource(id = reel.fallbackImageRes),
+                    painter = painterResource(id = R.drawable.profile),
                     contentDescription = "Fallback Image",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             }
 
-            HeartAnimation(
-                isVisible = showHeart,
-                position = heartPosition,
-                iconPainter = painterResource(id = R.drawable.ic_heart_checked),
-                onAnimationEnd = {
-                    showHeart = false
-                },
-                iconSize = 70.dp
-            )
-
-
-            Box(
+            // Right-side vertical engagement column overlay
+            Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.4f)
-                            )
-                        )
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 14.dp, bottom = 100.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = if (reel.love.isLoved) R.drawable.ic_love_checked else R.drawable.ic_love),
+                    contentDescription = "Like",
+                    tint = if (reel.love.isLoved) Color.Red else Color.White,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clickable {
+                            if (!isLoggedIn) showLoginPrompt.value = true else showHeart = true
+                        }
+                )
+                Text(text = "${reel.love.number}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(14.dp))
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_comment),
+                    contentDescription = "Comments",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clickable { /* Comment action */ }
+                )
+                Text(text = "${reel.numberOfComments}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(14.dp))
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_cart),
+                    contentDescription = "Add to Cart",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clickable { /* Add to cart action */ }
+                )
+                Text(
+                    text = "0",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_share),
+                    contentDescription = "Share",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clickable { }
+                )
+                Spacer(modifier = Modifier.height(17.dp))
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_music),
+                    contentDescription = "Music",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clickable { }
+                )
+            }
+
+            // Bottom-left info meta, product card, hashtags, description
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 70.dp),
+                verticalArrangement = Arrangement.Bottom
+            ) {
+                UserInfo(
+                    reel = reel,
+                    navController = navController,
+                    isLoggedIn = isLoggedIn,
+                    showLoginPrompt = showLoginPrompt
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                if (reel.contentDescription.isNotBlank()) {
+                    ReelDescription(description = reel.contentDescription)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                ReelHashtags(hashtags = listOf("satisfying", "roadmarking"))
+                Spacer(modifier = Modifier.height(10.dp))
+                if (reel.productName.isNotBlank()) {
+                    OfferCard(
+                        productName = reel.productName,
+                        productType = "Shirt",
+                        productPrice = "${reel.productPrice} $",
+                        productImage = R.drawable.profile,
+                        onViewClick = { }
                     )
-            )
+                }
+            }
 
-            ReelContent(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .align(Alignment.BottomStart),
-                navController = navController,
-                reel = reelsList[page],
-                viewModel = viewModel,
-                onClickCommentButton = onClickCommentButton,
-                onClickMoreButton = onClickMoreButton,
-                onClickCartButton = onClickCartButton,
-                setShowLoginPrompt = setShowLoginPrompt,
-                isLoggedIn = isLoggedIn
-            )
+            // Heart animation overlay for like
+            if (showHeart) {
+                HeartAnimation(
+                    isVisible = true,
+                    position = heartPosition,
+                    iconPainter = painterResource(id = R.drawable.ic_love_checked),
+                    onAnimationEnd = { showHeart = false },
+                    iconSize = 70.dp
+                )
+            }
+            // RequireLoginPrompt overlay
+            if (showLoginPrompt.value) {
+                RequireLoginPrompt(
+                    onLogin = { showLoginPrompt.value = false },
+                    onSignUp = { showLoginPrompt.value = false },
+                    onDismiss = { showLoginPrompt.value = false }
+                )
+            }
         }
     }
 }
@@ -580,13 +781,14 @@ fun ReelsList(
 @Composable
 fun ReelContent(
     modifier: Modifier,
-    navController: NavHostController,
+    navController: NavController,
     reel: Reels,
     viewModel: ReelsScreenViewModel,
-    onClickCommentButton: () -> Unit,
-    onClickCartButton: () -> Unit,
-    onClickMoreButton: () -> Unit,
-    setShowLoginPrompt: (Boolean) -> Unit,
+    cartViewModel: CartViewModel,
+    onClickCommentButton: (Reels) -> Unit,
+    onClickCartButton: (Reels) -> Unit,
+    onClickMoreButton: (Reels) -> Unit,
+    showLoginPrompt: MutableState<Boolean>,
     isLoggedIn: Boolean,
 ) {
     Row(
@@ -601,7 +803,7 @@ fun ReelContent(
                 .weight(1f)
                 .padding(end = 16.dp)
         ) {
-            UserInfo(reel = reel, navController = navController, isLoggedIn = isLoggedIn, setShowLoginPrompt = setShowLoginPrompt)
+            UserInfo(reel = reel, navController = navController, isLoggedIn = isLoggedIn, showLoginPrompt = showLoginPrompt)
             Spacer(modifier = Modifier.height(8.dp))
             ReelDescription(description = reel.contentDescription)
             Spacer(modifier = Modifier.height(4.dp))
@@ -622,14 +824,16 @@ fun ReelContent(
             reel = reel,
             onClickLoveButton = {
                 if (!isLoggedIn) {
-                    setShowLoginPrompt(true)
+                    showLoginPrompt.value = true
                 } else {
                     viewModel.onClackLoveReelsButton(reel.id)
                 }
             },
-            onClickCommentButton = onClickCommentButton,
-            onClickCartButton = onClickCartButton,
-            onClickMoreButton = onClickMoreButton
+            onClickCommentButton = { onClickCommentButton(reel) },
+            onClickCartButton = { onClickCartButton(reel) },
+            onClickMoreButton = { onClickMoreButton(reel) },
+            cartViewModel = cartViewModel,
+            reelsViewModel = viewModel
         )
     }
 }
@@ -640,13 +844,20 @@ fun ReelContent(
 @Composable
 fun UserInfo(
     reel: Reels,
-    navController: NavHostController,
+    navController: NavController,
     isLoggedIn: Boolean,
-    setShowLoginPrompt: (Boolean) -> Unit
+    showLoginPrompt: androidx.compose.runtime.MutableState<Boolean>
 ) {
     // Get current user ID to check if they own this reel
     val auth = remember { FirebaseAuth.getInstance() }
-    val currentUserId = auth.currentUser?.uid
+    val currentUserId = remember {
+        runCatching {
+            auth.currentUser?.uid
+        }.getOrElse { e ->
+            Log.e("UserInfo", "Error getting current user: ${e.message}")
+            null
+        }
+    }
     val isOwner = currentUserId == reel.userId
     val isActuallyLoggedIn = currentUserId != null // Use Firebase Auth directly
     
@@ -668,19 +879,15 @@ fun UserInfo(
     val coroutineScope = rememberCoroutineScope()
     
     // Check if current user is following the reel owner
-    val isFollowing = remember(reel.userId, uiState.following) { 
-        uiState.following.any { it.id == reel.userId }
-    }
+    val isFollowing = uiState.following.any { it.id == reel.userId }
+    Log.d(
+        "FollowBtnDebug",
+        "UserInfo: reel.userId=${reel.userId}, currentUserId=$currentUserId, uiState.following ids=[" +
+                uiState.following.joinToString { it.id } + "] isFollowing=$isFollowing"
+    )
     
     // Load current user's following data when component is created
-    LaunchedEffect(currentUserId) {
-        currentUserId?.let { userId ->
-            // Get the current user's actual username from Firebase Auth
-            val currentUser = auth.currentUser
-            val username = currentUser?.displayName ?: currentUser?.email?.split("@")?.firstOrNull() ?: "user"
-            followingViewModel.loadUserData(userId, username)
-        }
-    }
+    // (REMOVED loadUserData call: should only run in FollowingReelsContent's LaunchedEffect)
     
     // Monitor following state changes
     LaunchedEffect(uiState.following, isFollowing) {
@@ -697,7 +904,20 @@ fun UserInfo(
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.clickable {
-                navController.navigate(Screens.ReelsScreen.UserProfileScreen.route)
+                // Navigate to appropriate profile based on ownership
+                if (isOwner) {
+                    // Navigate to my profile
+                    Log.d("UserInfo", "🔄 Navigating to my profile")
+                    navController.navigate(Screens.ProfileScreen.route)
+                } else {
+                    // Navigate to other user's profile
+                    if (reel.userId.isNotBlank()) {
+                        Log.d("UserInfo", "🔄 Navigating to other user profile: ${reel.userId}")
+                        navController.navigate(Screens.OtherUserProfileScreen.createRoute(reel.userId))
+                    } else {
+                        Log.e("UserInfo", "❌ Cannot navigate: reel.userId is blank or null")
+                    }
+                }
             }
         )
         
@@ -724,17 +944,19 @@ fun UserInfo(
                     )
                     .clickable {
                         if (!isActuallyLoggedIn) {
-                            setShowLoginPrompt(true)
+                            showLoginPrompt.value = true
                         } else {
                             // Call actual follow/unfollow functionality
                             currentUserId?.let { userId ->
-                                followingViewModel.toggleFollow(userId, reel.userId)
-                                
-                                // Refresh following data immediately after the operation
                                 coroutineScope.launch {
+                                    followingViewModel.toggleFollow(userId, reel.userId)
+
+                                    // Refresh following data immediately after the operation
                                     delay(500) // Small delay to allow Firebase operation to complete
                                     val currentUser = auth.currentUser
-                                    val username = currentUser?.displayName ?: currentUser?.email?.split("@")?.firstOrNull() ?: "user"
+                                    val username =
+                                        currentUser?.displayName ?: currentUser?.email?.split("@")
+                                            ?.firstOrNull() ?: "user"
                                     followingViewModel.loadUserData(userId, username)
                                 }
                             }
@@ -768,7 +990,7 @@ fun OfferCard(
 ) {
     Row(
         modifier = Modifier
-                            .offset(x = (-12f).dp)
+            .offset(x = (-12f).dp)
             .background(Color(0xCC222222), shape = RoundedCornerShape(16.dp))
             .padding(8.dp)
         ,
@@ -867,14 +1089,70 @@ fun ReelHashtags(hashtags: List<String>) {
 // @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun InteractionButtons(
-    navController: NavHostController,
+    navController: NavController,
     reel: Reels,
     onClickLoveButton: () -> Unit,
-    onClickCommentButton: () -> Unit,
-    onClickCartButton: () -> Unit,
-    onClickMoreButton: () -> Unit
+    onClickCommentButton: (Reels) -> Unit,
+    onClickCartButton: (Reels) -> Unit,
+    onClickMoreButton: (Reels) -> Unit,
+    cartViewModel: CartViewModel,
+    reelsViewModel: ReelsScreenViewModel
 ) {
-    var isCarted by remember { mutableStateOf(false) }
+    // Get current user ID to check if they own this reel
+    val auth = remember { FirebaseAuth.getInstance() }
+    val currentUserId = remember {
+        runCatching {
+            auth.currentUser?.uid
+        }.getOrElse { e ->
+            Log.e("InteractionButtons", "Error getting current user: ${e.message}")
+            null
+        }
+    }
+    val isOwner = currentUserId == reel.userId
+    
+    // NEW: Get real cart state with safety checks using CartViewModel
+    val cartState by cartViewModel.state.collectAsState()
+    
+    // Refresh cart state when reel changes
+    LaunchedEffect(reel.id) {
+        if (reel.id.isNotBlank() && currentUserId != null) {
+            Log.d("InteractionButtons", "Refreshing cart state for product ${reel.id}")
+        }
+    }
+    
+    val isInCart = remember(currentUserId, reel.id, cartState.items) {
+        runCatching {
+            currentUserId?.let { userId ->
+                // Check if this product is in the current user's cart using CartViewModel
+                if (reel.id.isNotBlank() && cartState.items.isNotEmpty()) {
+                    val inCart = cartState.items.any { it.productId == reel.id }
+                    Log.d("InteractionButtons", "Cart state for product ${reel.id}: inCart=$inCart, cartItems=${cartState.items.size}")
+                    inCart
+                } else {
+                    Log.w("InteractionButtons", "Reel ID is blank or cart is empty, cannot check cart state")
+                    false
+                }
+            } ?: false
+        }.getOrElse { e ->
+            Log.e("InteractionButtons", "Error checking cart state: ${e.message}")
+            false
+        }
+    }
+    
+    // NEW: Get cart statistics for this product with error handling
+    val cartStats by remember(reel.id) {
+        runCatching {
+            if (currentUserId != null && reel.id.isNotBlank()) {
+                reelsViewModel.getProductCartStats(reel.id)
+            } else {
+                flowOf(reel.cartStats)
+            }
+        }.getOrElse { e ->
+            Log.e("InteractionButtons", "Error creating cart stats flow: ${e.message}")
+            flowOf(reel.cartStats)
+        }
+    }.collectAsState(initial = reel.cartStats)
+    
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -883,20 +1161,6 @@ fun InteractionButtons(
             modifier = Modifier
                 .size(46.dp) // مساحة أكبر لتضمين التوثيق
         ) {
-            // ORIGINAL GLIDE CODE (COMMENTED OUT):
-            // GlideImage(
-            //     model = reel.userImage,
-            //     contentScale = ContentScale.Crop,
-            //     modifier = Modifier
-            //         .size(40.dp)
-            //         .align(Alignment.TopCenter)
-            //         .clip(CircleShape)
-            //         .clickable {
-            //             navController.navigate(Screens.ReelsScreen.UserProfileScreen.route)
-            //         },
-            //     contentDescription = "User Avatar"
-            // )
-            
             // NEW COIL CODE:
             AsyncImage(
                 model = reel.userImage,
@@ -906,7 +1170,28 @@ fun InteractionButtons(
                     .align(Alignment.TopCenter)
                     .clip(CircleShape)
                     .clickable {
-                        navController.navigate(Screens.ReelsScreen.UserProfileScreen.route)
+                        // Navigate to appropriate profile based on ownership
+                        if (isOwner) {
+                            Log.d("UserInfo", "🔄 Avatar click: Navigating to my profile")
+                            navController.navigate(Screens.ProfileScreen.route)
+                        } else {
+                            if (reel.userId.isNotBlank()) {
+                                Log.d(
+                                    "UserInfo",
+                                    "🔄 Avatar click: Navigating to other user profile: ${reel.userId}"
+                                )
+                                navController.navigate(
+                                    Screens.OtherUserProfileScreen.createRoute(
+                                        reel.userId
+                                    )
+                                )
+                            } else {
+                                Log.e(
+                                    "UserInfo",
+                                    "❌ Avatar click: Cannot navigate: reel.userId is blank or null"
+                                )
+                            }
+                        }
                     },
                 contentDescription = "User Avatar"
             )
@@ -931,18 +1216,61 @@ fun InteractionButtons(
         InteractionButton(
             painter = painterResource(id = R.drawable.ic_comment),
             count = reel.numberOfComments.toString(),
-            onClick = onClickCommentButton
+            onClick = { onClickCommentButton(reel) }
         )
+        
+        // NEW: Updated cart button with real state and error handling
         InteractionButton(
-            painter = painterResource(id = R.drawable.ic_cart),
-            count = reel.numberOfCart.toString(),
-            tint = if (isCarted) Color(0xFFFFC107) else Color.White, // لون أصفر ذهبي عند التفعيل
-            onClick = { isCarted = !isCarted }
+            painter = painterResource(
+                id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart
+            ),
+            count = if (isInCart && cartState.items.isNotEmpty()) {
+                // Get quantity from cart state with safety check
+                val cartItem = cartState.items.find { it.productId == reel.id }
+                cartItem?.quantity?.toString() ?: "1"
+            } else {
+                "0"
+            },
+            tint = if (isInCart) Color(0xFFFFC107) else Color.White,
+            onClick = {
+                Log.d("InteractionButtons", "Cart button clicked for product ${reel.id}, isInCart=$isInCart, currentUserId=$currentUserId")
+                if (isInCart) {
+                    // Remove from cart with safety check
+                    if (reel.id.isNotBlank()) {
+                        Log.d("InteractionButtons", "Removing product ${reel.id} from cart")
+                        cartViewModel.removeFromCartByProductId(reel.id)
+                    } else {
+                        Log.e("InteractionButtons", "Cannot remove from cart: reel.id is blank")
+                    }
+                } else {
+                    // Add to cart directly
+                    if (reel.id.isNotBlank() && currentUserId != null && currentUserId.isNotBlank()) {
+                        Log.d("InteractionButtons", "Adding product ${reel.id} to cart")
+                        runCatching {
+                            // Create a CartItem from the reel data with safety checks
+                            val cartItem = com.project.e_commerce.android.presentation.viewModel.CartItem(
+                                productId = reel.id,
+                                name = reel.productName.ifEmpty { "Product" },
+                                price = reel.productPrice.toDoubleOrNull() ?: 0.0,
+                                imageUrl = reel.productImage.ifEmpty { "" },
+                                quantity = 1
+                            )
+                            Log.d("InteractionButtons", "Created cart item: $cartItem")
+                            cartViewModel.addToCart(cartItem)
+                        }.onFailure { e ->
+                            Log.e("InteractionButtons", "Error adding to cart: ${e.message}")
+                            e.printStackTrace()
+                        }
+                    } else {
+                        Log.e("InteractionButtons", "Cannot add to cart: reel.id=${reel.id}, currentUserId=${currentUserId}")
+                    }
+                }
+            }
         )
         InteractionButton(
             painter = painterResource(id = R.drawable.ic_share),
             count = "Share",
-            onClick = onClickMoreButton
+            onClick = { onClickMoreButton(reel) }
         )
         InteractionButton(
             painter = painterResource(id = R.drawable.ic_music),
@@ -1636,7 +1964,7 @@ fun ModernCommentItem(
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() }
-                        ){
+                        ) {
                             isLoved = !isLoved
                             likesCount += if (isLoved) 1 else -1
                         }
@@ -1983,16 +2311,16 @@ fun TabWithIconAndIndicator(
 @Composable
 fun AddToCartBottomSheet(
     onClose: () -> Unit,
+    productId: String,
     productName: String,
-    productPrice: String,
-    productDescription: String = "Upgrade Your Wardrobe With This Premium Item — Combining Comfort, Style, And Durability.",
-    rating: Double = 4.8,
-    onAddToCart: (String, String, Int) -> Unit,
+    productPrice: Double,
+    productImage: String,
+    cartViewModel: CartViewModel,
     modifier: Modifier = Modifier
 ) {
     var selectedColor by remember { mutableStateOf("Orange") }
     var selectedSize by remember { mutableStateOf("S") }
-    var quantity by remember { mutableStateOf(0) }
+    var quantity by remember { mutableStateOf(1) }
 
     Column(
         modifier = modifier // هذا يجعل كل align أو خصائص تأتي من الخارج
@@ -2043,14 +2371,14 @@ fun AddToCartBottomSheet(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("$rating", color = Color(0xFFFFC107), fontSize = 14.sp)
+                Text("4.8", color = Color(0xFFFFC107), fontSize = 14.sp)
             }
         }
 
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = productDescription,
+            text = "Upgrade Your Wardrobe With This Premium Item — Combining Comfort, Style, And Durability.",
             color = Color.Gray,
             fontSize = 13.sp,
             textAlign = TextAlign.Center,
@@ -2123,7 +2451,7 @@ fun AddToCartBottomSheet(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = productPrice,
+                text = "$${String.format("%.2f", productPrice)}",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFFF6F00)
@@ -2139,7 +2467,7 @@ fun AddToCartBottomSheet(
                     .border(1.dp, Color(0xFF176DBA), RoundedCornerShape(8.dp))
                     .padding(horizontal = 6.dp)
             ) {
-                IconButton(onClick = { if (quantity > 0) quantity-- }) {
+                IconButton(onClick = { if (quantity > 1) quantity-- }) {
                     Text("-", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                 }
                 Text(
@@ -2154,6 +2482,37 @@ fun AddToCartBottomSheet(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // NEW: Add to Cart Button
+        Button(
+            onClick = {
+                cartViewModel.addToCart(
+                    CartItem(
+                        productId = productId,
+                        name = productName,
+                        price = productPrice,
+                        imageUrl = productImage,
+                        quantity = quantity,
+                        size = selectedSize.takeIf { it.isNotBlank() },
+                        color = selectedColor.takeIf { it.isNotBlank() }
+                    )
+                )
+                onClose()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFFF6F00)),
+            shape = RoundedCornerShape(12.dp),
+            elevation = ButtonDefaults.elevation(6.dp)
+        ) {
+            Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.White)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Add to Cart", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+
         Spacer(modifier = Modifier.height(4.dp))
     }
 }
@@ -2162,29 +2521,43 @@ fun AddToCartBottomSheet(
 
 @Composable
 fun FollowingReelsContent(
-    navController: NavHostController,
+    navController: NavController,
     followingViewModel: FollowingViewModel,
     reelsViewModel: ReelsScreenViewModel,
-    onShowSheet: (SheetType) -> Unit
+    cartViewModel: CartViewModel,
+    onShowSheet: (SheetType, Reels?) -> Unit
 ) {
+    Log.d("FollowingTabDebug", "Entered FollowingReelsContent")
     val followingState by followingViewModel.uiState.collectAsState()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-
-    Log.d("FollowingReelsContent", "🚀 COMPONENT CREATED/RENDERED - currentUserId: $currentUserId, timestamp: ${System.currentTimeMillis()}")
-
-    // Load following data when needed (allows retries and updates)
+    val hasLoadedFollowing =
+        androidx.compose.runtime.saveable.rememberSaveable(currentUserId) { mutableStateOf(false) }
+    Log.d(
+        "FollowingTabDebug",
+        "currentUserId=$currentUserId hasLoadedFollowing.value=${hasLoadedFollowing.value}"
+    )
     LaunchedEffect(currentUserId) {
-        if (currentUserId != null && followingState.following.isEmpty() && !followingState.isLoading) {
-            Log.d("FollowingReelsContent", "🔄 Loading following data for user: $currentUserId")
-            followingViewModel.resetLoadAttempts() // Reset retry counter
+        Log.d(
+            "FollowingTabDebug",
+            "LaunchedEffect(currentUserId=$currentUserId) running, hasLoadedFollowing.value=${hasLoadedFollowing.value}"
+        )
+        if (!hasLoadedFollowing.value && currentUserId != null) {
+            Log.d(
+                "FollowingTabDebug",
+                "Calling loadUserData for userId=$currentUserId in FollowingReelsContent"
+            )
+            followingViewModel.resetLoadAttempts()
             followingViewModel.loadUserData(currentUserId, "current_user")
+            hasLoadedFollowing.value = true
         }
     }
 
     // Debug logging for state changes - only log when state actually changes
-    LaunchedEffect(followingState.isLoading, followingState.following.size) {
-        Log.d("FollowingReelsContent", "🔍 State changed - isLoading: ${followingState.isLoading}, followingCount: ${followingState.following.size}")
-    }
+    // (Removed LaunchedEffect to prevent recomposition loop)
+    Log.d(
+        "FollowingReelsContent",
+        "🔍 State changed - isLoading: ${followingState.isLoading}, followingCount: ${followingState.following.size}"
+    )
 
     // Log when component recomposes to track unnecessary recompositions
     Log.d("FollowingReelsContent", "🔄 Component recomposed - isLoading: ${followingState.isLoading}, followingCount: ${followingState.following.size}")
@@ -2250,6 +2623,7 @@ fun FollowingReelsContent(
                 navController = navController,
                 followingUserIds = followingUserIds,
                 reelsViewModel = reelsViewModel,
+                cartViewModel = cartViewModel,
                 onShowSheet = onShowSheet
             )
         }
@@ -2258,10 +2632,11 @@ fun FollowingReelsContent(
 
 @Composable
 fun FollowingReelsList(
-    navController: NavHostController,
+    navController: NavController,
     followingUserIds: List<String>,
     reelsViewModel: ReelsScreenViewModel,
-    onShowSheet: (SheetType) -> Unit
+    cartViewModel: CartViewModel,
+    onShowSheet: (SheetType, Reels?) -> Unit
 ) {
     val reelsState by reelsViewModel.state.collectAsState()
 
@@ -2305,13 +2680,14 @@ fun FollowingReelsList(
         // Use the existing ReelsList composable for proper reel display
         ReelsList(
             navController = navController,
-            onClickCommentButton = { onShowSheet(SheetType.Comments) },
+            onClickCommentButton = { onShowSheet(SheetType.Comments, reelsState.firstOrNull()) },
             viewModel = reelsViewModel,
-            onClickCartButton = { onShowSheet(SheetType.AddToCart) },
+            cartViewModel = cartViewModel,
+            onClickCartButton = { onShowSheet(SheetType.AddToCart, reelsState.firstOrNull()) },
             onClickMoreButton = { /* TODO: Handle more options */ },
             reelsList = followingReels,
             isLoggedIn = true, // Since we're in the following tab, user is logged in
-            setShowLoginPrompt = { /* Not needed in following tab */ },
+            showLoginPrompt = remember { mutableStateOf(false) },
             initialPage = 0
         )
     }
