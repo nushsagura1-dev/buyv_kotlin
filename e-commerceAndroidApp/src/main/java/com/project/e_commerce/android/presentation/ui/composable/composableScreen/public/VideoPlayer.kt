@@ -42,6 +42,7 @@ import androidx.media3.common.Player
 @OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayer(
+    modifier: Modifier = Modifier,
     uri: Uri?,
     isPlaying: Boolean,
     onPlaybackStarted: () -> Unit
@@ -84,19 +85,21 @@ fun VideoPlayer(
                 if (uri != null) {
                     val mediaItem = MediaItem.fromUri(uri)
                     player.setMediaItem(mediaItem)
-                    Log.d("VideoPlayer", "🎥 Media item set successfully")
+                    Log.d("VideoPlayer", " Media item set successfully")
                     
                     player.prepare()
-                    Log.d("VideoPlayer", "🎥 Player prepared successfully")
+                    Log.d("VideoPlayer", " Player prepared successfully")
+                    player.playWhenReady = true
+                    player.play()
+                    Log.d("VideoPlayer", " Autoplay called, player should start")
                     
                     if (isPlaying) {
-                        Log.d("VideoPlayer", "🎥 Starting playback")
-                        player.play()
+                        Log.d("VideoPlayer", " Starting playback")
                         shouldCallPlaybackStarted = true
-                        Log.d("VideoPlayer", "🎥 Playback started successfully")
+                        Log.d("VideoPlayer", " Playback started successfully")
                     }
                 } else {
-                    Log.w("VideoPlayer", "🎥 URI is null, cannot create media item")
+                    Log.w("VideoPlayer", " URI is null, cannot create media item")
                     hasError = true
                     errorMessage = "No video URI provided"
                 }
@@ -175,7 +178,7 @@ fun VideoPlayer(
     if (hasError) {
         Log.w("VideoPlayer", "🎥 Showing error UI: $errorMessage")
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .background(Color.Black),
             contentAlignment = Alignment.Center
@@ -190,7 +193,7 @@ fun VideoPlayer(
                     fontSize = 18.sp,
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = modifier.height(8.dp))
                 Text(
                     text = errorMessage,
                     color = Color.Gray,
@@ -205,10 +208,11 @@ fun VideoPlayer(
             factory = { context ->
                 Log.d("VideoPlayer", "🎥 Creating AndroidView factory")
                 PlayerView(context).apply {
+                    useController = false // HIDE ALL DEFAULT CONTROLS! (progress, play, seek, etc)
                     Log.d("VideoPlayer", "🎥 PlayerView created")
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize(),
             update = { playerView ->
                 Log.d("VideoPlayer", "🎥 Updating PlayerView with ExoPlayer")
                 exoPlayer?.let { player ->

@@ -46,15 +46,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import android.util.Log
+import androidx.compose.runtime.LaunchedEffect
 import coil3.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.ui.screens.RequireLoginPrompt
 import com.project.e_commerce.android.presentation.utils.VideoThumbnailUtils
+import com.project.e_commerce.android.presentation.viewModel.CartViewModel
+import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
 import com.project.e_commerce.android.presentation.viewModel.profileViewModel.ProfileViewModel
 import org.koin.androidx.compose.koinViewModel
-import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun ProfileScreen(navController: NavHostController) {
@@ -65,6 +67,8 @@ fun ProfileScreen(navController: NavHostController) {
     val userProducts by profileViewModel.userProducts.collectAsState()
     val userLikedContent by profileViewModel.userLikedContent.collectAsState()
     val userBookmarkedContent by profileViewModel.userBookmarkedContent.collectAsState()
+    val cartViewModel: CartViewModel = koinViewModel()
+    val cartState by cartViewModel.state.collectAsState()
 
     // Logout state
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -451,7 +455,7 @@ fun ProfileScreen(navController: NavHostController) {
 
                 2 -> Log.d(
                     "CrashDebug",
-                    "ProfileScreen: Showing Saved with ${userBookmarkedContent.size} items"
+                    "ProfileScreen: Showing Saved with ${cartState.items.size} items"
                 )
 
                 3 -> Log.d(
@@ -474,9 +478,9 @@ fun ProfileScreen(navController: NavHostController) {
                 2 -> {
                     Log.d(
                         "CrashDebug",
-                        "ProfileScreen: Showing Saved with ${userBookmarkedContent.size} items"
+                        "ProfileScreen: Showing Saved with ${cartState.items.size} items"
                     )
-                    UserBookmarkedGrid(userBookmarkedContent, navController)
+                    UserCartBookmarkGrid(cartState.items, navController)
                 }
                 3 -> {
                     Log.d(
@@ -714,6 +718,57 @@ fun UserProductsGrid(products: List<com.project.e_commerce.android.domain.model.
                         color = Color(0xFFFF6F00),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun UserCartBookmarkGrid(
+    cartItems: List<com.project.e_commerce.android.presentation.viewModel.CartItem>,
+    navController: NavHostController
+) {
+    val productViewModel: ProductViewModel = org.koin.androidx.compose.koinViewModel()
+    val allProducts = productViewModel.allProducts
+    if (cartItems.isEmpty()) {
+        EmptyStateGrid("No bookmarked products yet", "Add items to your cart and they will show here.")
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.height(650.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        items(cartItems) { item ->
+            Box(
+                modifier = Modifier
+                    .background(Color(0xFFF8F8F8))
+                    .height(130.dp)
+                    .clickable {
+                        val found = allProducts.find { it.id == item.productId }
+                        if (found != null) {
+                            productViewModel.selectedProduct = found
+                        }
+                        navController.navigate("details_screen/${item.productId}")
+                    }
+            ) {
+                if (item.imageUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = item.imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        error = painterResource(id = R.drawable.img2)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.img2),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }

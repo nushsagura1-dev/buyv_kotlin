@@ -111,7 +111,7 @@ fun DetailsScreen(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(250.dp)
+                    .height(200.dp)
                     .clip(RoundedCornerShape(16.dp))
             )
 
