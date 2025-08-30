@@ -41,97 +41,147 @@ class ReelsScreenViewModel(
     private val _showAddToCart = MutableStateFlow(false)
     val showAddToCart: StateFlow<Boolean> get() = _showAddToCart.asStateFlow()
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> get() = _isLoading.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> get() = _errorMessage.asStateFlow()
+
     init {
         try {
-            Log.d("CrashDebug", "ReelsScreenViewModel: initialized")
             Log.d("ReelsScreenViewModel", "🚀 ReelsScreenViewModel initialized")
             viewModelScope.launch {
                 try {
-                    // Observe ProductViewModel changes and always keep _state in sync
-                    launch {
-                        while (true) {
-                            val newReels = productViewModel.productReels
-                            if (_state.value != newReels && newReels.isNotEmpty()) {
-                                Log.d(
-                                    "ReelsScreenViewModel",
-                                    " ProductViewModel.productReels changed, updating _state with "+newReels.size+" reels"
-                                )
-                                _state.emit(newReels)
-                            }
-                            kotlinx.coroutines.delay(1000)
-                        }
-                    }
-                    // Normal initialization continues
-                    loadReelsFromDatabase()
-                    observeProductViewModelChanges()
+                    _isLoading.emit(true)
+                    _errorMessage.emit(null)
+
+                    waitForAuthentication()
+
+                    loadReelsWithRetry()
+
                 } catch (e: Exception) {
                     Log.e("ReelsScreenViewModel", "Error in init LaunchedEffect", e)
+                    _errorMessage.emit("Failed to initialize: ${e.message}")
+                    _isLoading.emit(false)
                 }
             }
         } catch (e: Exception) {
-            Log.e("CrashDebug", "ReelsScreenViewModel: Exception in init: ${e.message}", e)
             Log.e("ReelsScreenViewModel", "Error in init block", e)
         }
     }
 
-    private fun loadReelsFromDatabase() {
-        Log.d("ReelsScreenViewModel", "🚀 Loading reels from database")
-        viewModelScope.launch {
-            try {
-                Log.d("ReelsScreenViewModel", "🚀 Getting reels from ProductViewModel")
-                val reels = productViewModel.productReels
-                Log.d("ReelsScreenViewModel", "🚀 Received ${reels.size} reels from ProductViewModel")
-                
-                reels.forEachIndexed { index, reel ->
-                    Log.d("ReelsScreenViewModel", "🚀 Reel $index: id=${reel.id}, video=${reel.video}, images=${reel.images?.size}")
-                }
-                
-                _state.emit(reels)
-                Log.d("ReelsScreenViewModel", "🚀 State updated with ${reels.size} reels")
-            } catch (e: Exception) {
-                Log.e("ReelsScreenViewModel", "🚀 CRASH: Error loading reels from database", e)
-                _state.emit(emptyList())
+    private suspend fun waitForAuthentication() {
+        var attempts = 0
+        while (attempts < 10) {
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            if (currentUser != null) {
+                Log.d("ReelsScreenViewModel", "✅ Authentication ready: ${currentUser.uid}")
+                return
             }
+            delay(500)
+            attempts++
         }
+        Log.w("ReelsScreenViewModel", "⚠️ Authentication timeout, proceeding anyway")
     }
 
-    private suspend fun observeProductViewModelChanges() {
-        // Only check for changes a few times, not infinitely
-        repeat(3) {
-            delay(2000) // Check every 2 seconds, but only 3 times
-            val currentReels = productViewModel.productReels
-            val currentState = _state.value
-            
-            // If we have new reels, update the state
-            if (currentReels.size != currentState.size || 
-                currentReels.any { reel -> currentState.none { it.id == reel.id } }) {
-                Log.d("ReelsScreenViewModel", "🔄 New reels detected, updating state")
-                // Update new reels with real user profile data
-                val updatedCurrentReels = updateReelsWithRealUserData(currentReels)
-                _state.emit(updatedCurrentReels)
-                return // Exit the function after first update
+    private suspend fun loadReelsWithRetry() {
+        var attempts = 0
+        val maxAttempts = 3
+
+        while (attempts < maxAttempts) {
+            try {
+                Log.d("ReelsScreenViewModel", "🔄 Loading reels attempt ${attempts + 1}")
+
+                ensureProductsLoaded()
+
+                val reels = loadReelsFromDatabase()
+
+                if (reels.isNotEmpty()) {
+                    Log.d("ReelsScreenViewModel", "✅ Successfully loaded ${reels.size} reels")
+                    _state.emit(reels)
+                    _isLoading.emit(false)
+                    _errorMessage.emit(null)
+                    return
+                } else {
+                    Log.w("ReelsScreenViewModel", "⚠️ No reels loaded on attempt ${attempts + 1}")
+                }
+                
+            } catch (e: Exception) {
+                Log.e("ReelsScreenViewModel", "❌ Error loading reels on attempt ${attempts + 1}", e)
             }
+
+            attempts++
+            if (attempts < maxAttempts) {
+                delay(1000L * attempts)
+            }
+        }
+
+        _errorMessage.emit("Failed to load reels after $maxAttempts attempts")
+        _isLoading.emit(false)
+        _state.emit(emptyList())
+    }
+
+    private suspend fun ensureProductsLoaded() {
+        var attempts = 0
+        while (attempts < 20) {
+            if (productViewModel.allProducts.isNotEmpty()) {
+                Log.d(
+                    "ReelsScreenViewModel",
+                    "✅ Products loaded: ${productViewModel.allProducts.size}"
+                )
+                return
+            }
+            delay(500)
+            attempts++
+        }
+        Log.w("ReelsScreenViewModel", "⚠️ ProductViewModel products still empty after timeout")
+    }
+
+    private suspend fun loadReelsFromDatabase(): List<Reels> {
+        Log.d("ReelsScreenViewModel", "🚀 Loading reels from database")
+        return try {
+            delay(1000)
+
+            val reels = productViewModel.productReels
+            Log.d("ReelsScreenViewModel", "🚀 Received ${reels.size} reels from ProductViewModel")
+
+            if (reels.isEmpty()) {
+                val products = productViewModel.allProducts
+                if (products.isNotEmpty()) {
+                    Log.d(
+                        "ReelsScreenViewModel",
+                        "🔄 Generating reels from ${products.size} products"
+                    )
+                    productViewModel.refreshReels()
+                    delay(500)
+                    productViewModel.productReels
+                } else {
+                    Log.w("ReelsScreenViewModel", "⚠️ No products available either")
+                    emptyList()
+                }
+            } else {
+                reels
+            }
+        } catch (e: Exception) {
+            Log.e("ReelsScreenViewModel", "❌ Error loading reels from database", e)
+            throw e
         }
     }
 
     fun refreshReels() {
         Log.d("ReelsScreenViewModel", "🚀 Refreshing reels")
-        loadReelsFromDatabase()
+        viewModelScope.launch {
+            loadReelsWithRetry()
+        }
     }
     
     fun forceRefreshFromProductViewModel() {
         viewModelScope.launch {
             Log.d("ReelsScreenViewModel", "🔄 forceRefreshFromProductViewModel called")
-            // Debug current state before refresh
-            debugCurrentState()
-            // Force ProductViewModel to reload products and reels
             productViewModel.refreshProducts()
-            // Also refresh reels specifically
             productViewModel.refreshReels()
-            delay(1000) // Wait a bit longer for products to load and process
-            // Debug state after refresh
-            debugCurrentState()
-            loadReelsFromDatabase()
+            delay(1000)
+            loadReelsWithRetry()
         }
     }
 
@@ -140,7 +190,7 @@ class ReelsScreenViewModel(
             Log.d("ReelsScreenViewModel", "🔍 ensureReelsLoaded called - current reels in state: ${_state.value.size}")
             if (_state.value.isEmpty()) {
                 Log.d("ReelsScreenViewModel", "🔄 No reels in state, loading from database...")
-                loadReelsFromDatabase()
+                loadReelsWithRetry()
             } else {
                 Log.d("ReelsScreenViewModel", "✅ Reels already loaded: ${_state.value.size}")
             }
@@ -161,9 +211,6 @@ class ReelsScreenViewModel(
         Log.d("ReelsScreenViewModel", "📱 ProductViewModel allProducts IDs: ${productViewModel.allProducts.map { it.id }}")
     }
     
-    /**
-     * Fetch real user profile data and update reels with actual usernames
-     */
     private suspend fun updateReelsWithRealUserData(reels: List<Reels>): List<Reels> {
         return try {
             Log.d("ReelsScreenViewModel", "🔄 Starting user data update for ${reels.size} reels")
@@ -174,12 +221,10 @@ class ReelsScreenViewModel(
                 
                 val updatedReel = if (reel.userId.isNotEmpty() && reel.userId != "unknown_user" && reel.userName.startsWith("User_")) {
                     Log.d("ReelsScreenViewModel", "🔄 Fetching user profile for userId: ${reel.userId}")
-                    // Try to fetch real user profile data
                     val userProfileResult = getUserProfileUseCase(reel.userId)
                     if (userProfileResult.isSuccess) {
                         val userProfile = userProfileResult.getOrNull()
                         if (userProfile != null) {
-                            // Try to get a meaningful username from the profile
                             val newUserName = when {
                                 userProfile.displayName.isNotBlank() -> userProfile.displayName
                                 userProfile.username.isNotBlank() -> userProfile.username
@@ -194,26 +239,21 @@ class ReelsScreenViewModel(
                         }
                     } else {
                         Log.w("ReelsScreenViewModel", "⚠️ Failed to fetch user profile for userId: ${reel.userId}")
-                        // If failed, keep the placeholder but make it more readable
                         reel.copy(userName = "User_${reel.userId.take(6)}")
                     }
                 } else {
                     Log.d("ReelsScreenViewModel", "ℹ️ Keeping reel as is - userName: '${reel.userName}', userId: '${reel.userId}'")
-                    reel // Keep as is if already has real data
+                    reel
                 }
                 updatedReels.add(updatedReel)
             }
             
             Log.d("ReelsScreenViewModel", "✅ Updated ${updatedReels.size} reels with real user data")
-            // Log the final usernames for debugging
-            updatedReels.forEach { reel ->
-                Log.d("ReelsScreenViewModel", "📱 Final reel ${reel.id}: userName='${reel.userName}', userId='${reel.userId}'")
-            }
             updatedReels
         } catch (e: Exception) {
             Log.e("ReelsScreenViewModel", "❌ Error updating reels with user data: ${e.message}")
             e.printStackTrace()
-            reels // Return original reels if update fails
+            reels
         }
     }
 
@@ -303,24 +343,8 @@ class ReelsScreenViewModel(
     override fun onLoveComment(reelsId: String, commentId: String) {
 
     }
-//        val copyState = _state.value.mapIndexed { _, reel ->
-//            if (reel.id == reelsId) {
-//                val data = reel.comments.map { comment ->
-//                    if (comment.id == commentId) {
-//                        val newData = reel.copy(
-//                            isLoved = !comment.isLoved,
-//                        )
-//                        newData
-//                        reel
-//                    } else reel
-//                }
-//            }
-//            else reel
-//        }
-//
 
     override fun onClickAddComment(videoId: String, comment: String) {
-        // Get current user's real username from Firebase Auth with safety check
         val currentUser = try {
             FirebaseAuth.getInstance().currentUser
         } catch (e: Exception) {
@@ -370,10 +394,6 @@ class ReelsScreenViewModel(
         TODO("Not yet implemented")
     }
 
-    /**
-     * Get reels from specific users (for following functionality)
-     * This method filters reels from the current state based on user IDs
-     */
     fun getReelsFromUsers(userIds: List<String>): List<Reels> {
         Log.d(
             "FollowingTabDebug",
@@ -385,7 +405,6 @@ class ReelsScreenViewModel(
             Log.d("ReelsScreenViewModel", "🔍 Current reels in state: ${currentReels.size}")
             
             if (currentReels.isNotEmpty() && userIds.isNotEmpty()) {
-                // Filter reels by user IDs
                 val filteredReels = currentReels.filter { reel ->
                     reel.userId in userIds
                 }
@@ -401,7 +420,6 @@ class ReelsScreenViewModel(
         }
     }
 
-    // NEW: Check cart status for a specific reel/product
     fun checkCartStatus(reelId: String) {
         viewModelScope.launch {
             try {
@@ -425,12 +443,10 @@ class ReelsScreenViewModel(
         }
     }
 
-    // NEW: Get cart statistics for a specific product
     fun getProductCartStats(productId: String): Flow<CartStats> {
         return cartRepository.getProductCartStats(productId)
     }
 
-    // NEW: Update reel with cart statistics
     fun updateReelCartStats(reelId: String, cartStats: CartStats) {
         viewModelScope.launch {
             val updatedState = _state.value.map { reel ->

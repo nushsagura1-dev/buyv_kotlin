@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,13 +44,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import coil3.compose.AsyncImagePainter
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.ReelsTopHeader
-import com.project.e_commerce.android.presentation.utils.CloudinaryUtils
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
+import com.project.e_commerce.android.presentation.ui.composable.composableScreen.public.VideoThumbnail
+import com.project.e_commerce.android.R
 import org.koin.androidx.compose.koinViewModel
 import android.util.Log
 
@@ -61,10 +61,8 @@ fun ExploreScreenWithHeader(
     navController: NavHostController,
     productViewModel: ProductViewModel = koinViewModel()
 ) {
-    // SIMPLE TEST MESSAGE
-    Log.d("EXPLORE_DEBUG", "🔍 EXPLORE SCREEN LOADED - DEBUG IS WORKING!")
+    Log.d("EXPLORE_DEBUG", "🔍 EXPLORE SCREEN LOADED")
     
-    // Use the same savedStateHandle approach as ReelsView for consistent tab state
     val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
     var selectedTab by remember { 
         mutableStateOf(savedStateHandle?.get("selectedTab") ?: "Explore") 
@@ -84,16 +82,6 @@ fun ExploreScreenWithHeader(
     
     // Get real product data from ProductViewModel
     val exploreItems = productViewModel.productReels.map { reel ->
-        // Debug: Log the raw reel data
-        Log.d("EXPLORE_DEBUG", "DEBUG: Raw Reel Data:")
-        Log.d("EXPLORE_DEBUG", "  - ID: ${reel.id}")
-        Log.d("EXPLORE_DEBUG", "  - Product Name: ${reel.productName}")
-        Log.d("EXPLORE_DEBUG", "  - Product Price: ${reel.productPrice}")
-        Log.d("EXPLORE_DEBUG", "  - Product Image: ${reel.productImage}")
-        Log.d("EXPLORE_DEBUG", "  - Video URI: ${reel.video}")
-        Log.d("EXPLORE_DEBUG", "  - Images List: ${reel.images}")
-        Log.d("EXPLORE_DEBUG", "  - Is Video: ${reel.video != null}")
-        
         ExploreItem(
             id = reel.id,
             productName = reel.productName,
@@ -110,70 +98,15 @@ fun ExploreScreenWithHeader(
         )
     }
     
-    // Debug: Log the final explore items
-    Log.d("EXPLORE_DEBUG", "DEBUG: Final Explore Items Count: ${exploreItems.size}")
-    exploreItems.forEachIndexed { index, item ->
-        Log.d("EXPLORE_DEBUG", "DEBUG: Explore Item $index:")
-        Log.d("EXPLORE_DEBUG", "  - ID: ${item.id}")
-        Log.d("EXPLORE_DEBUG", "  - Product Name: ${item.productName}")
-        Log.d("EXPLORE_DEBUG", "  - Price: ${item.productPrice}")
-        Log.d("EXPLORE_DEBUG", "  - Product Image: ${item.productImage}")
-        Log.d("EXPLORE_DEBUG", "  - Video URI: ${item.videoUri}")
-        Log.d("EXPLORE_DEBUG", "  - Product Image: ${item.productImage}")
-        Log.d("EXPLORE_DEBUG", "  - Image URIs: ${item.imageUris}")
-        Log.d("EXPLORE_DEBUG", "  - Is Video: ${item.isVideo}")
-    }
-    
-    // TEST: Add a test item to verify AsyncImage is working
-    val testItem = ExploreItem(
-        id = "test",
-        productName = "Test Product",
-        productPrice = "$99.99",
-        productImage = "https://picsum.photos/200/300",
-        isVideo = false,
-        videoUri = null,
-        imageUris = null,
-        userName = "User_Test",
-        loveCount = 0,
-        isLoved = false,
-        commentCount = 0,
-        rating = 5.0
-    )
-    
-    val allItems = exploreItems + testItem
+    Log.d("EXPLORE_DEBUG", "📊 Final Explore Items Count: ${exploreItems.size}")
 
     Box(Modifier.fillMaxSize()) {
-        // TEST: Simple test image at the top to verify AsyncImage is working
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = headerHeight, bottom = 40.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Test image to verify AsyncImage is working
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-                    .padding(16.dp)
-                    .background(Color.LightGray, RoundedCornerShape(8.dp))
-            ) {
-                AsyncImage(
-                    model = "https://picsum.photos/400/100",
-                    contentDescription = "Test Image",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(8.dp)),
-                    imageLoader = com.project.e_commerce.android.EcommerceApp.imageLoader
-                )
-                Text(
-                    text = "Test Image (should show above)",
-                    color = Color.Black,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            }
-            
             if (productViewModel.productReels.isEmpty()) {
                 // Loading state
                 Box(
@@ -229,7 +162,7 @@ fun ExploreScreenWithHeader(
                 }
             } else {
                 ExploreMasonryGrid(
-                    items = allItems,
+                    items = exploreItems,
                     onItemClick = { item ->
                         // Navigate to the specific reel
                         navController.navigate("${Screens.ReelsScreen.route}/${item.id}")
@@ -246,12 +179,10 @@ fun ExploreScreenWithHeader(
             onTabChange = { tab ->
                 Log.d("ExploreScreen", "🔄 Tab change requested: $selectedTab -> $tab")
                 if (tab == "For you" || tab == "Following") {
-                    // Update the shared tab state and navigate back to ReelsView
                     savedStateHandle?.set("selectedTab", tab)
                     Log.d("ExploreScreen", "✅ Tab state updated to: $tab, navigating back to ReelsView")
                     navController.popBackStack()
                 } else {
-                    // Update local tab state for Explore tab
                     selectedTab = tab
                     savedStateHandle?.set("selectedTab", tab)
                     Log.d("ExploreScreen", "✅ Local tab state updated to: $tab")
@@ -278,7 +209,6 @@ fun ExploreScreenWithHeader(
         ) {
             androidx.compose.material3.FloatingActionButton(
                 onClick = {
-                    // Refresh the product data
                     productViewModel.getAllProductsFromFirebase()
                 },
                 modifier = Modifier.size(40.dp),
@@ -305,131 +235,52 @@ fun ExploreGridItem(
         modifier = modifier
             .clickable { onItemClick() }
     ) {
-        // Main content (image or video)
-        // Determine which image to show based on priority
-        val imageToShow = when {
-            // 1. If it has product images, show first image (highest priority)
-            item.imageUris != null && item.imageUris.isNotEmpty() -> {
-                val url = item.imageUris.first().toString()
-                Log.d("EXPLORE_DEBUG", "DEBUG: Using FIRST PRODUCT IMAGE: $url")
-                CloudinaryUtils.normalizeCloudinaryUrl(url)
-            }
-            // 2. If no images but has video (which is always true), show video thumbnail
-            item.videoUri != null -> {
-                val url = item.videoUri.toString()
-                Log.d("EXPLORE_DEBUG", "DEBUG: Using VIDEO thumbnail (no images available): $url")
-                CloudinaryUtils.normalizeCloudinaryUrl(url)
-            }
-            // 3. Fallback to product image (should rarely happen since video is required)
-            item.productImage.isNotEmpty() -> {
-                Log.d("EXPLORE_DEBUG", "DEBUG: Using PRODUCT IMAGE fallback: ${item.productImage}")
-                CloudinaryUtils.normalizeCloudinaryUrl(item.productImage)
-            }
-            // 4. This should never happen since video is always required
-            else -> {
-                Log.d("EXPLORE_DEBUG", "DEBUG: ERROR - No video found for item ${item.id} (this shouldn't happen)")
-                null
-            }
-        }
-        
-        // Debug: Log the final image URL being used
-        Log.d("EXPLORE_DEBUG", "DEBUG: FINAL imageToShow for item ${item.id}: $imageToShow")
-        Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - videoUri: ${item.videoUri}")
-        Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - imageUris: ${item.imageUris}")
-        Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - productImage: ${item.productImage}")
-        Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - Post Type: ${if (item.imageUris?.isNotEmpty() == true) "IMAGE" else "VIDEO-ONLY"} post")
-        Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - Has Images: ${item.imageUris?.isNotEmpty() ?: false}")
-        Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - Has Video: ${item.videoUri != null}")
-        Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - Has Product Image: ${item.productImage.isNotEmpty()}")
-        Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - Will Show: ${if (imageToShow != null) "Image/Video" else "ERROR Placeholder"}")
-        
-        // Additional debug for Cloudinary URL handling
-        if (imageToShow != null) {
-            Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - Is Cloudinary URL: ${CloudinaryUtils.isCloudinaryUrl(imageToShow)}")
-            Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - Is Cloudinary Image: ${CloudinaryUtils.isCloudinaryImageUrl(imageToShow)}")
-            Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - Is Cloudinary Video: ${CloudinaryUtils.isCloudinaryVideoUrl(imageToShow)}")
-            Log.d("EXPLORE_DEBUG", "DEBUG: Item ${item.id} - Using Custom Cloudinary Fetcher: ${CloudinaryUtils.isCloudinaryUrl(imageToShow)}")
-        }
-        
-        // TEST: Add a simple test image to verify AsyncImage is working
-        if (item.id == "test") {
-            AsyncImage(
-                model = "https://picsum.photos/200/300",
-                contentDescription = "Test Image",
-                contentScale = ContentScale.Crop,
+        // Use VideoThumbnail for videos, AsyncImage for images
+        if (item.isVideo && item.videoUri != null) {
+            VideoThumbnail(
+                videoUri = item.videoUri,
+                fallbackImageRes = R.drawable.reelsphoto,
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(12.dp)),
-                imageLoader = com.project.e_commerce.android.EcommerceApp.imageLoader
+                showPlayIcon = false // Don't show play icon in grid view
             )
-        } else if (imageToShow != null) {
-            // Use our custom ImageLoader with Cloudinary fetcher
+        } else if (item.imageUris?.isNotEmpty() == true) {
+            // Show first image if available
             AsyncImage(
-                model = imageToShow,
+                model = item.imageUris.first(),
                 contentDescription = item.productName,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp)),
-                imageLoader = com.project.e_commerce.android.EcommerceApp.imageLoader,
-                onState = { state ->
-                    when (state) {
-                        is AsyncImagePainter.State.Loading -> {
-                            Log.d("EXPLORE_DEBUG", "DEBUG: 🟡 Image LOADING for item ${item.id} - URL: $imageToShow")
-                        }
-                        is AsyncImagePainter.State.Success -> {
-                            Log.d("EXPLORE_DEBUG", "DEBUG: 🟢 Image LOADED SUCCESSFULLY for item ${item.id} - URL: $imageToShow")
-                        }
-                        is AsyncImagePainter.State.Error -> {
-                            Log.d("EXPLORE_DEBUG", "DEBUG: 🔴 Image FAILED to load for item ${item.id}")
-                            Log.d("EXPLORE_DEBUG", "DEBUG: 🔴 Error details: ${state.result}")
-                            Log.d("EXPLORE_DEBUG", "DEBUG: 🔴 Attempted URL: $imageToShow")
-                        }
-                        is AsyncImagePainter.State.Empty -> {
-                            Log.d("EXPLORE_DEBUG", "DEBUG: ⚪ Image state is EMPTY for item ${item.id} - URL: $imageToShow")
-                        }
-                    }
-                }
+                    .clip(RoundedCornerShape(12.dp))
             )
         } else {
-            // Fallback to product image
-            if (item.productImage.isNotEmpty()) {
-                AsyncImage(
-                    model = CloudinaryUtils.normalizeCloudinaryUrl(item.productImage),
-                    contentDescription = item.productName,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(12.dp)),
-                    imageLoader = com.project.e_commerce.android.EcommerceApp.imageLoader
-                )
-            } else {
-                // No image available - show placeholder
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Gray.copy(alpha = 0.3f))
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
+            // Fallback to placeholder
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Gray.copy(alpha = 0.3f))
+                    .clip(RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = if (item.isVideo) Icons.Default.Videocam else Icons.Default.Image,
-                            contentDescription = if (item.isVideo) "Video Content" else "No Image",
-                            tint = Color.Gray,
-                            modifier = Modifier.size(32.dp)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (item.isVideo) "Video Post" else item.productName,
-                            color = Color.Gray,
-                            fontSize = 10.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            maxLines = 2
-                        )
-                    }
+                    Icon(
+                        imageVector = if (item.isVideo) Icons.Default.Videocam else Icons.Default.Image,
+                        contentDescription = if (item.isVideo) "Video Content" else "No Image",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (item.isVideo) "Video Post" else item.productName,
+                        color = Color.Gray,
+                        fontSize = 10.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 2
+                    )
                 }
             }
         }
@@ -439,14 +290,14 @@ fun ExploreGridItem(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(6.dp)
-                .background(Color.Black.copy(alpha = 0.95f), shape = RoundedCornerShape(10.dp))
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .background(Color.Black.copy(alpha = 0.6f), shape = RoundedCornerShape(10.dp))
+                .padding(horizontal = 6.dp, vertical = 3.dp)
         ) {
             Icon(
                 imageVector = if (item.isVideo) Icons.Default.Videocam else Icons.Default.Image,
                 contentDescription = if (item.isVideo) "Video" else "Image",
                 tint = Color.White,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(14.dp)
             )
         }
 
@@ -456,7 +307,7 @@ fun ExploreGridItem(
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
                 .background(
-                    Color.Black.copy(alpha = 0.7f),
+                    Color.Black.copy(alpha = 0.75f),
                     shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
                 )
                 .padding(8.dp)
@@ -488,7 +339,8 @@ fun ExploreGridItem(
                     Text(
                         text = item.userName,
                         color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 10.sp
+                        fontSize = 10.sp,
+                        maxLines = 1
                     )
                     
                     Row(
@@ -519,7 +371,7 @@ fun ExploreGridItem(
                             horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Image,
+                                imageVector = Icons.Default.Comment,
                                 contentDescription = "Comments",
                                 tint = Color.White.copy(alpha = 0.7f),
                                 modifier = Modifier.size(12.dp)
@@ -561,7 +413,7 @@ fun ExploreMasonryGrid(
                 modifier = Modifier.weight(1f)
             ) {
                 columnItems.forEach { item ->
-                    val randomHeight = listOf(130.dp, 170.dp, 120.dp).random()
+                    val randomHeight = listOf(130.dp, 170.dp, 120.dp, 150.dp).random()
                     ExploreGridItem(
                         item = item,
                         onItemClick = { onItemClick(item) },

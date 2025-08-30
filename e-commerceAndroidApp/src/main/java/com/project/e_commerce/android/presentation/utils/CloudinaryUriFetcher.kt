@@ -23,19 +23,35 @@ class CloudinaryUriFetcher(
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult {
+        android.util.Log.d("CloudinaryUriFetcher", "🔄 Fetching Cloudinary image: $url")
+
         try {
             val client = OkHttpClient()
             val request = Request.Builder()
                 .url(url)
                 .build()
 
+            android.util.Log.d("CloudinaryUriFetcher", "📡 Making HTTP request to: $url")
             val response = client.newCall(request).execute()
 
             if (!response.isSuccessful) {
+                android.util.Log.e(
+                    "CloudinaryUriFetcher",
+                    "❌ HTTP request failed: ${response.code} - ${response.message}"
+                )
                 throw IOException("Failed to fetch image: ${response.code} - ${response.message}")
             }
 
             val body = response.body
+            if (body == null) {
+                android.util.Log.e("CloudinaryUriFetcher", "❌ Response body is null")
+                throw IOException("Response body is null")
+            }
+
+            android.util.Log.d(
+                "CloudinaryUriFetcher",
+                "✅ HTTP request successful, content type: ${body.contentType()}"
+            )
 
             // Convert body to ImageSource instead of Buffer
             val imageSource = ImageSource(
@@ -43,12 +59,15 @@ class CloudinaryUriFetcher(
                 fileSystem = options.fileSystem
             )
 
+            android.util.Log.d("CloudinaryUriFetcher", "✅ ImageSource created successfully")
+
             return SourceFetchResult(
                 source = imageSource,
                 mimeType = body.contentType()?.toString(),
                 dataSource = DataSource.NETWORK
             )
         } catch (e: Exception) {
+            android.util.Log.e("CloudinaryUriFetcher", "❌ Exception during fetch: ${e.message}", e)
             throw IOException("Failed to fetch Cloudinary image: ${e.message}", e)
         }
     }
@@ -59,11 +78,18 @@ class CloudinaryUriFetcher(
             options: Options,
             imageLoader: ImageLoader
         ): Fetcher? {
+            android.util.Log.d("CloudinaryUriFetcher", "🔍 Checking URL: $data")
+
             // Only handle Cloudinary URLs - return null for others to let Coil use default behavior
             if (CloudinaryUtils.isCloudinaryUrl(data)) {
+                android.util.Log.d(
+                    "CloudinaryUriFetcher",
+                    "✅ Creating CloudinaryUriFetcher for: $data"
+                )
                 return CloudinaryUriFetcher(data, options)
             }
             // Return null for non-Cloudinary URLs to let Coil use its default fetchers
+            android.util.Log.d("CloudinaryUriFetcher", "⏭️ Not a Cloudinary URL, skipping: $data")
             return null
         }
     }

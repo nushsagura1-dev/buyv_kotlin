@@ -2,23 +2,44 @@ package com.project.e_commerce.android.di
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.project.e_commerce.android.data.remote.api.CountriesApi
-import com.project.e_commerce.android.data.remote.interceptor.Interceptor
 import com.project.e_commerce.android.data.repository.AuthRepository
-import com.project.e_commerce.android.data.repository.CountriesRepository
 import com.project.e_commerce.android.data.repository.FirebaseAuthRepository
 import com.project.e_commerce.android.data.repository.FirebaseUserProfileRepository
 import com.project.e_commerce.android.data.repository.FirebaseFollowingRepository
 import com.project.e_commerce.android.data.repository.FirebaseCartRepository
+import com.project.e_commerce.android.data.repository.FirebaseNotificationRepository
+import com.project.e_commerce.android.data.repository.FirebaseNotificationSettingsRepository
+import com.project.e_commerce.android.data.repository.CountriesRepository
 import com.project.e_commerce.android.domain.repository.UserProfileRepository
 import com.project.e_commerce.android.domain.repository.FollowingRepository
 import com.project.e_commerce.android.domain.repository.CartRepository
+import com.project.e_commerce.android.domain.repository.NotificationRepository
+import com.project.e_commerce.android.domain.repository.NotificationSettingsRepository
 import com.project.e_commerce.android.domain.usecase.CheckEmailValidation
 import com.project.e_commerce.android.domain.usecase.CheckLoginValidation
-import com.project.e_commerce.android.domain.usecase.CheckMatchedPasswordUseCase
 import com.project.e_commerce.android.domain.usecase.CheckPasswordValidation
+import com.project.e_commerce.android.domain.usecase.CheckMatchedPasswordUseCase
 import com.project.e_commerce.android.domain.usecase.LoginByEmailAndPasswordUseCase
-import com.project.e_commerce.android.domain.usecase.*
+import com.project.e_commerce.android.domain.usecase.GetUserPostsUseCase
+import com.project.e_commerce.android.domain.usecase.GetUserProductsUseCase
+import com.project.e_commerce.android.domain.usecase.GetUserProfileUseCase
+import com.project.e_commerce.android.domain.usecase.GetUserLikedPostsUseCase
+import com.project.e_commerce.android.domain.usecase.FollowUserUseCase
+import com.project.e_commerce.android.domain.usecase.UnfollowUserUseCase
+import com.project.e_commerce.android.domain.usecase.GetFollowersUseCase
+import com.project.e_commerce.android.domain.usecase.GetNotificationsUseCase
+import com.project.e_commerce.android.domain.usecase.GetUnreadCountUseCase
+import com.project.e_commerce.android.domain.usecase.MarkAsReadUseCase
+import com.project.e_commerce.android.domain.usecase.CreateNotificationUseCase
+import com.project.e_commerce.android.presentation.services.NotificationManagerService
+import com.project.e_commerce.android.data.remote.api.CountriesApi
+import com.project.e_commerce.android.data.remote.interceptor.Interceptor
+import com.project.e_commerce.android.domain.usecase.GetUserReelsUseCase
+import com.project.e_commerce.android.domain.usecase.UpdateUserProfileUseCase
+import com.project.e_commerce.android.domain.usecase.GetUserBookmarkedPostsUseCase
+import com.project.e_commerce.android.domain.usecase.GetFollowingStatusUseCase
+import com.project.e_commerce.android.domain.usecase.GetFollowingUsersUseCase
+import com.project.e_commerce.android.domain.usecase.GetUserProfilesByIdsUseCase
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
 import com.project.e_commerce.android.presentation.viewModel.loginScreenViewModel.LoginScreenViewModel
@@ -29,7 +50,10 @@ import com.project.e_commerce.android.presentation.viewModel.restPasswordViewMod
 import com.project.e_commerce.android.presentation.viewModel.followingViewModel.FollowingViewModel
 import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
 import com.project.e_commerce.android.presentation.viewModel.otherUserProfile.OtherUserProfileViewModel
+import com.project.e_commerce.android.presentation.viewModel.searchViewModel.SearchViewModel
+import com.project.e_commerce.android.presentation.viewModel.NotificationViewModel
 import okhttp3.OkHttpClient
+import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 import retrofit2.Retrofit
@@ -76,6 +100,26 @@ val viewModelModule = module {
                 "AppModule: FirebaseCartRepository constructed successfully"
             )
             repo
+        }
+
+        // Notification Repositories
+        single<NotificationRepository> {
+            val repo = FirebaseNotificationRepository(get(), get())
+            android.util.Log.d("CrashDebug", "AppModule: FirebaseNotificationRepository created")
+            repo
+        }
+
+        single<NotificationSettingsRepository> {
+            val repo = FirebaseNotificationSettingsRepository(get(), get())
+            android.util.Log.d("CrashDebug", "AppModule: FirebaseNotificationSettingsRepository created")
+            repo
+        }
+
+        // Notification Services
+        single {
+            val service = NotificationManagerService(androidContext())
+            android.util.Log.d("CrashDebug", "AppModule: NotificationManagerService created")
+            service
         }
 
         // Use cases
@@ -174,6 +218,28 @@ val viewModelModule = module {
             useCase
         }
 
+        // Notification Use Cases
+        single {
+            val useCase = GetNotificationsUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetNotificationsUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetUnreadCountUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetUnreadCountUseCase created")
+            useCase
+        }
+        single {
+            val useCase = MarkAsReadUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: MarkAsReadUseCase created")
+            useCase
+        }
+        single {
+            val useCase = CreateNotificationUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: CreateNotificationUseCase created")
+            useCase
+        }
+
         // ViewModels
         viewModel {
             android.util.Log.d("CrashDebug", "AppModule: AuthViewModel created")
@@ -259,6 +325,28 @@ val viewModelModule = module {
                 getUserProductsUseCase = get(),
                 getFollowersUseCase = get(),
                 getFollowingUsersUseCase = get()
+            )
+        }
+
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: SearchViewModel created")
+            com.project.e_commerce.android.presentation.viewModel.searchViewModel.SearchViewModel(
+                productViewModel = get(),
+                firestore = get(),
+                followUserUseCase = get(),
+                unfollowUserUseCase = get(),
+                getFollowingStatusUseCase = get()
+            )
+        }
+
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: NotificationViewModel created")
+            NotificationViewModel(
+                getNotificationsUseCase = get(),
+                getUnreadCountUseCase = get(),
+                markAsReadUseCase = get(),
+                createNotificationUseCase = get(),
+                auth = get()
             )
         }
 

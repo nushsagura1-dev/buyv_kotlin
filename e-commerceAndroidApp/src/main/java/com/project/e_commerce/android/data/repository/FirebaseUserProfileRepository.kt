@@ -68,7 +68,25 @@ class FirebaseUserProfileRepository(
         
         if (document.exists()) {
             Log.d("REPO_DEBUG", "📄 Document exists, data: ${document.data}")
-            
+
+            // Debug the specific fields we care about
+            Log.d("REPO_DEBUG", "🖼️ ===== FIREBASE PROFILE DEBUG =====")
+            Log.d("REPO_DEBUG", "🖼️ Document ID: $uid")
+            Log.d("REPO_DEBUG", "🖼️ Raw document data: ${document.data}")
+            Log.d("REPO_DEBUG", "🖼️ displayName: '${document.getString("displayName")}'")
+            Log.d("REPO_DEBUG", "🖼️ username: '${document.getString("username")}'")
+            Log.d("REPO_DEBUG", "🖼️ email: '${document.getString("email")}'")
+            Log.d("REPO_DEBUG", "🖼️ profileImageUrl: '${document.getString("profileImageUrl")}'")
+            Log.d(
+                "REPO_DEBUG",
+                "🖼️ profileImageUrl exists: ${document.contains("profileImageUrl")}"
+            )
+            Log.d(
+                "REPO_DEBUG",
+                "🖼️ profileImageUrl is null: ${document.getString("profileImageUrl") == null}"
+            )
+            Log.d("REPO_DEBUG", "🖼️ ==========================================")
+
             // Check if it's the old format (just username) or new format (full UserProfile)
             val existingUsername = document.getString("username")
             val existingProfile = document.toObject(UserProfile::class.java)
@@ -76,6 +94,10 @@ class FirebaseUserProfileRepository(
             if (existingProfile != null) {
                 // New format - return as is
                 Log.d("REPO_DEBUG", "✅ Found new format profile: ${existingProfile.username}")
+                Log.d(
+                    "REPO_DEBUG",
+                    "🖼️ New format profile - profileImageUrl: '${existingProfile.profileImageUrl}'"
+                )
                 existingProfile
             } else if (existingUsername != null) {
                 // Old format - convert to new format
@@ -207,44 +229,83 @@ class FirebaseUserProfileRepository(
         Log.d("REPO_DEBUG", "🔍 Getting reels for user: $uid")
         
         try {
-            // First, let's check what's actually in the posts collection
-            val allPostsSnapshot = firestore.collection(POSTS_COLLECTION).get().await()
-            Log.d("REPO_DEBUG", "📄 Total posts in collection: ${allPostsSnapshot.documents.size}")
-            allPostsSnapshot.documents.forEach { doc ->
-                Log.d("REPO_DEBUG", "📄 All post: userId=${doc.getString("userId")}, type=${doc.getString("type")}, title=${doc.getString("title")}")
-            }
-            
-            // Now get user's reels - removed orderBy to avoid potential issues
+            // Get user's reels with detailed filtering debug
             val snapshot = firestore.collection(POSTS_COLLECTION)
                 .whereEqualTo("userId", uid)
                 .whereEqualTo("type", "REEL")
                 .whereEqualTo("isPublished", true)
                 .get()
                 .await()
-            
-            Log.d("REPO_DEBUG", "📄 Found ${snapshot.documents.size} reel documents for user $uid")
-            snapshot.documents.forEach { doc ->
-                Log.d("REPO_DEBUG", "📄 Reel doc: ${doc.data}")
+
+            Log.d(
+                "REPO_DEBUG",
+                "📄 Query completed. Found ${snapshot.documents.size} documents matching userId=$uid, type=REEL, isPublished=true"
+            )
+
+            // Debug each document in detail
+            snapshot.documents.forEachIndexed { index, doc ->
+                Log.d("REPO_DEBUG", "📄 Document $index: ID=${doc.id}")
+                Log.d(
+                    "REPO_DEBUG",
+                    "📄 Document $index: userId='${doc.getString("userId")}' (expected: '$uid')"
+                )
+                Log.d("REPO_DEBUG", "📄 Document $index: type='${doc.getString("type")}'")
+                Log.d(
+                    "REPO_DEBUG",
+                    "📄 Document $index: isPublished=${doc.getBoolean("isPublished")}"
+                )
+                Log.d("REPO_DEBUG", "📄 Document $index: title='${doc.getString("title")}'")
+                Log.d("REPO_DEBUG", "📄 Document $index: mediaUrl='${doc.getString("mediaUrl")}'")
+
+                // Check if userId matches exactly
+                val docUserId = doc.getString("userId")
+                if (docUserId != uid) {
+                    Log.e(
+                        "REPO_DEBUG",
+                        "❌ Document $index has WRONG userId! Expected '$uid', got '$docUserId'"
+                    )
+                } else {
+                    Log.d("REPO_DEBUG", "✅ Document $index has correct userId")
+                }
             }
             
             // Try to parse each document
             val reels = mutableListOf<UserPost>()
-            snapshot.documents.forEach { doc ->
+            snapshot.documents.forEachIndexed { index, doc ->
                 try {
                     val userPost = doc.toObject(UserPost::class.java)
                     if (userPost != null) {
-                        Log.d("REPO_DEBUG", "✅ Successfully parsed reel: ${userPost.title}")
+                        Log.d(
+                            "REPO_DEBUG",
+                            "✅ Successfully parsed document $index -> UserPost: title='${userPost.title}', userId='${userPost.userId}'"
+                        )
+
+                        // Double-check userId after parsing
+                        if (userPost.userId != uid) {
+                            Log.e(
+                                "REPO_DEBUG",
+                                "❌ AFTER PARSING: UserPost has wrong userId! Expected '$uid', got '${userPost.userId}'"
+                            )
+                        } else {
+                            Log.d("REPO_DEBUG", "✅ AFTER PARSING: UserPost has correct userId")
+                        }
+
                         reels.add(userPost)
                     } else {
-                        Log.e("REPO_DEBUG", "❌ Failed to parse reel document: ${doc.id}")
+                        Log.e("REPO_DEBUG", "❌ Failed to parse document $index to UserPost")
                     }
                 } catch (e: Exception) {
-                    Log.e("REPO_DEBUG", "❌ Error parsing reel document ${doc.id}: ${e.message}")
+                    Log.e("REPO_DEBUG", "❌ Error parsing document $index: ${e.message}")
                     e.printStackTrace()
                 }
             }
-            
-            Log.d("REPO_DEBUG", "✅ Parsed ${reels.size} reels successfully")
+
+            Log.d("REPO_DEBUG", "✅ Final result: Parsed ${reels.size} reels for user $uid")
+            Log.d(
+                "REPO_DEBUG",
+                "🔍 Returning reels with IDs: ${reels.map { "${it.id}:${it.userId}" }}"
+            )
+
             reels
             
         } catch (e: Exception) {

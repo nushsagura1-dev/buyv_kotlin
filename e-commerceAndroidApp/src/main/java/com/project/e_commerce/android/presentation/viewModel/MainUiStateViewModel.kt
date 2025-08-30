@@ -15,6 +15,9 @@ class MainUiStateViewModel : ViewModel() {
     private val _selectedReelForCart = MutableStateFlow<Reels?>(null)
     val selectedReelForCart: StateFlow<Reels?> = _selectedReelForCart
 
+    private val _hideBottomBar = MutableStateFlow(false)
+    val hideBottomBar: StateFlow<Boolean> = _hideBottomBar
+
     fun showAddToCartSheet(reel: Reels) { 
         _selectedReelForCart.value = reel
         _isAddToCartSheetVisible.value = true 
@@ -27,5 +30,13 @@ class MainUiStateViewModel : ViewModel() {
 
     fun setBottomSheetVisible(visible: Boolean) {
         _isBottomSheetVisible.value = visible
+    }
+
+    fun hideBottomBar() {
+        _hideBottomBar.value = true
+    }
+
+    fun showBottomBar() {
+        _hideBottomBar.value = false
     }
 }

@@ -5,6 +5,7 @@ package com.project.e_commerce.android.presentation.ui.screens.reelsScreen
 // import com.bumptech.glide.integration.compose.GlideImage
 // import com.project.e_commerce.android.presentation.viewModel.MainUiStateViewModel
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -89,12 +90,51 @@ fun ReelsView(
     viewModel: ReelsScreenViewModel,
     cartViewModel: CartViewModel,
     isLoggedIn: Boolean = true,
-    onShowSheet: (SheetType, Reels?) -> Unit
+    onShowSheet: (SheetType, Reels?) -> Unit,
+    mainUiStateViewModel: com.project.e_commerce.android.presentation.viewModel.MainUiStateViewModel? = null
 ) {
     val showLoginPrompt = remember { mutableStateOf(false) }
-    android.util.Log.d("CrashDebug", "ReelsView: composable entry, viewModel=$viewModel")
+    Log.d("ReelsView", "ReelsView: composable entry, viewModel=$viewModel")
+
     val firebaseUser = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser }
     Log.d("REELS_DEBUG", "ReelsView: Composed with user uid=${firebaseUser?.uid}")
+
+    // Share launcher for sharing reels
+    val shareLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        // Handle share result if needed
+        Log.d("ReelsView", "Share completed with result: ${result.resultCode}")
+    }
+
+    // Helper function to create share content
+    fun createShareContent(reel: Reels): String {
+        return buildString {
+            append("Check out this amazing product: ${reel.productName}")
+            if (reel.productPrice.isNotBlank()) {
+                append(" for only ${reel.productPrice}")
+            }
+            if (reel.contentDescription.isNotBlank()) {
+                append("\n\n${reel.contentDescription}")
+            }
+            if (reel.video != null && reel.video.toString().isNotBlank()) {
+                append("\n\nWatch the video: ${reel.video}")
+            }
+            append("\n\nDownload our app to see more amazing products!")
+        }
+    }
+
+    // Helper function to share reel
+    fun shareReel(reel: Reels) {
+        val shareContent = createShareContent(reel)
+        val shareIntent = android.content.Intent().apply {
+            action = android.content.Intent.ACTION_SEND
+            putExtra(android.content.Intent.EXTRA_TEXT, shareContent)
+            type = "text/plain"
+        }
+        shareLauncher.launch(android.content.Intent.createChooser(shareIntent, "Share Reel"))
+    }
+
     // Auth null state debug/guard
     if (firebaseUser == null) {
         Log.w("REELS_DEBUG", "No authenticated user in ReelsView! Reels cannot be loaded.")
@@ -107,11 +147,17 @@ fun ReelsView(
         }
         return
     }
+
+    // NEW: Use improved state management
     val reelsList by viewModel.state.collectAsState()
-    val isLoading = reelsList.isEmpty() // crude, more robust would be a viewModel loading state
-    val loadingOrEmptyState = remember { mutableStateOf(true) }
-    val errorState = remember { mutableStateOf<String?>(null) }
-    android.util.Log.d("CrashDebug", "ReelsView: collected reels state, size=${reelsList.size}")
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+
+    Log.d(
+        "ReelsView",
+        "collected reels state, size=${reelsList.size}, isLoading=$isLoading, error=$errorMessage"
+    )
+
     val currentUserId = remember {
         runCatching {
             val auth = FirebaseAuth.getInstance()
@@ -136,48 +182,74 @@ fun ReelsView(
     Log.d("ReelsView", "🎬 Current user ID: $currentUserId")
     Log.d("ReelsView", "🎬 Reels list size: ${reelsList.size}")
 
-    // --- Robust loading/error/empty handling ---
-    if (isLoading && errorState.value == null) {
-        Log.d("CrashDebug", "ReelsView: isLoading=true, showing spinner")
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(color = Color.White)
-        }
-        loadingOrEmptyState.value = true
-        return
-    }
-    if (errorState.value != null) {
-        Log.e("CrashDebug", "ReelsView: Error loading reels: ${errorState.value}")
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Error loading reels", color = Color.Red, fontSize = 18.sp)
-                Text("${errorState.value}", color = Color.LightGray, fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { viewModel.forceRefreshFromProductViewModel(); errorState.value = null }) {
-                    Text("Retry", color = Color.White)
+    // NEW: Improved loading/error/empty handling
+    when {
+        isLoading -> {
+            Log.d("ReelsView", "isLoading=true, showing spinner")
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Color.White)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Loading reels...", color = Color.White, fontSize = 16.sp)
                 }
             }
+            return
         }
-        loadingOrEmptyState.value = false
-        return
-    }
-    if (reelsList.isEmpty()) {
-        Log.w("CrashDebug", "ReelsView: Empty data loaded, showing empty message")
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("No reels found. Create or follow users.", color = Color.White, fontSize = 18.sp)
+
+        errorMessage != null -> {
+            Log.e("ReelsView", "Error loading reels: $errorMessage")
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Error loading reels", color = Color.Red, fontSize = 18.sp)
+                    Text("$errorMessage", color = Color.LightGray, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = {
+                        viewModel.forceRefreshFromProductViewModel()
+                    }) {
+                        Text("Retry", color = Color.White)
+                    }
+                }
+            }
+            return
         }
-        loadingOrEmptyState.value = false
-        return
+
+        reelsList.isEmpty() -> {
+            Log.w("ReelsView", "Empty data loaded, showing empty message")
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.VideoLibrary,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("No reels found", color = Color.White, fontSize = 18.sp)
+                    Text(
+                        "Create or follow users to see reels",
+                        color = Color.LightGray,
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = {
+                        viewModel.forceRefreshFromProductViewModel()
+                    }) {
+                        Text("Refresh", color = Color.White)
+                    }
+                }
+            }
+            return
+        }
     }
-    // END robust loading/error/empty handling
 
     // Additional safety check for reels list
     if (reelsList.any { it.id.isBlank() }) {
@@ -190,7 +262,7 @@ fun ReelsView(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = Color.White)
+                Text("No valid reels available", color = Color.White, fontSize = 18.sp)
             }
             return
         }
@@ -265,6 +337,7 @@ fun ReelsView(
 
     val showSheet = remember { mutableStateOf(false) }
     val sheetTab = remember { mutableStateOf(SheetTab.Comments) }
+    var currentReel by remember { mutableStateOf<Reels?>(null) }
 
     // Tab change handler - only navigate to Explore, otherwise just change local selectedTab
     val onTabChange: (String) -> Unit = { newTab ->
@@ -297,26 +370,58 @@ fun ReelsView(
                     onShowSheet = { sheetType, reel ->
                         showSheet.value = true
                         currentSheet = sheetType
+                        currentReel = reel
                         // mainUiStateViewModel.setBottomSheetVisible(true)
-                    }
+                    },
+                    onShareReel = ::shareReel
                 )
             }
             "For you" -> {
                 ReelsList(
                     navController = navController,
-                    onClickCommentButton = {
-                        showSheet.value = true
-                        // mainUiStateViewModel.setBottomSheetVisible(true)
-                        sheetTab.value = SheetTab.Comments
+                    onClickCommentButton = { reel ->
+                        try {
+                            Log.d("CommentCallbackDebug", "🎬 onClickCommentButton callback called")
+                            Log.d("CommentCallbackDebug", "🎬 Received reel id: ${reel.id}")
+                            Log.d("CommentCallbackDebug", "🎬 About to set showSheet.value = true")
+                            showSheet.value = true
+                            Log.d("CommentCallbackDebug", "🎬 showSheet.value set successfully")
+                            Log.d(
+                                "CommentCallbackDebug",
+                                "🎬 About to set sheetTab.value = SheetTab.Comments"
+                            )
+                            sheetTab.value = SheetTab.Comments
+                            Log.d("CommentCallbackDebug", "🎬 sheetTab.value set successfully")
+                            Log.d("CommentCallbackDebug", "🎬 About to set currentReel = reel")
+                            currentReel = reel
+                            Log.d("CommentCallbackDebug", "🎬 currentReel set successfully")
+                            Log.d(
+                                "CommentCallbackDebug",
+                                "🎬 onClickCommentButton callback completed successfully"
+                            )
+                        } catch (e: Exception) {
+                            Log.e(
+                                "CommentCallbackDebug",
+                                "🎬 Exception in onClickCommentButton callback: ${e.message}",
+                                e
+                            )
+                            throw e
+                        }
                     },
                     viewModel = viewModel,
                     cartViewModel = cartViewModel,
-                    onClickCartButton = {
+                    onClickCartButton = { reel ->
                         if (!isLoggedIn) showLoginPrompt.value = true
                         showSheet.value = true
                         sheetTab.value = SheetTab.Ratings
+                        currentReel = reel
                     },
-                    onClickMoreButton = { /* no-op */ },
+                    onClickMoreButton = { reel ->
+                        // Improved sharing implementation with product info
+                        if (reel != null) {
+                            shareReel(reel)
+                        }
+                    },
                     reelsList = reelsList,
                     isLoggedIn = isLoggedIn,
                     showLoginPrompt = showLoginPrompt,
@@ -335,7 +440,8 @@ fun ReelsView(
                                 }
                             }
                         }
-                    }
+                    },
+                    onShareReel = ::shareReel
                 )
             }
             else -> {
@@ -346,28 +452,51 @@ fun ReelsView(
 
         // Overlay Custom BottomSheet
         if (showSheet.value) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .clickable {
+            Log.d("ReelsViewDebug", "🎬 showSheet is true, attempting to render bottom sheet")
+            Log.d("ReelsViewDebug", "🎬 currentReel is null: ${currentReel == null}")
+            Log.d("ReelsViewDebug", "🎬 currentReel id: ${currentReel?.id}")
+
+            // Hide bottom bar when comment sheet is open
+            mainUiStateViewModel?.hideBottomBar()
+
+            if (currentReel == null) {
+                Log.e(
+                    "ReelsViewDebug",
+                    "🎬 ERROR: currentReel is null when trying to show bottom sheet!"
+                )
+                showSheet.value = false
+                // Show bottom bar when sheet is closed
+                mainUiStateViewModel?.showBottomBar()
+            } else {
+                Log.d("ReelsViewDebug", "🎬 About to render ModernBottomSheetContent")
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .clickable {
+                            showSheet.value = false
+                            // Show bottom bar when sheet is closed
+                            mainUiStateViewModel?.showBottomBar()
+                        }
+                )
+                ModernBottomSheetContent(
+                    reel = currentReel,
+                    isSelectedComments = isSelectedComments,
+                    isSelectedRatings = isSelectedRatings,
+                    onCommentTabClick = onCommentTabClick,
+                    onRatingTabClick = onRatingTabClick,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    onCloseClick = {
                         showSheet.value = false
-                        // mainUiStateViewModel.setBottomSheetVisible(false)
-                    }
-            )
-            ModernBottomSheetContent(
-                state = reelsList,
-                isSelectedComments = isSelectedComments,
-                isSelectedRatings = isSelectedRatings,
-                onCommentTabClick = onCommentTabClick,
-                onRatingTabClick = onRatingTabClick,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                onCloseClick = {
-                    showSheet.value = false
-                    // mainUiStateViewModel.setBottomSheetVisible(false)
-                },
-                viewModel = viewModel
-            )
+                        // Show bottom bar when sheet is closed
+                        mainUiStateViewModel?.showBottomBar()
+                    },
+                    viewModel = viewModel
+                )
+            }
+        } else {
+            // Show bottom bar when sheet is not visible
+            mainUiStateViewModel?.showBottomBar()
         }
 
         if (showLoginPrompt.value) {
@@ -552,7 +681,8 @@ fun ReelsList(
     showLoginPrompt: androidx.compose.runtime.MutableState<Boolean>,
     initialPage: Int = 0,
     publisherNames: MutableMap<String, String> = mutableMapOf(),
-    publisherNameFetcher: ((String, String) -> Unit)? = null
+    publisherNameFetcher: ((String, String) -> Unit)? = null,
+    onShareReel: (Reels) -> Unit = {}
 ) {
     val pagerState = rememberPagerState(
         initialPage = if (reelsList.isNotEmpty()) {
@@ -788,12 +918,42 @@ fun ReelsList(
                     tint = Color.White,
                     modifier = Modifier
                         .size(34.dp)
-                        .clickable { /* Comment action */ }
+                        .clickable {
+                            try {
+                                Log.d(
+                                    "CommentButtonDebug",
+                                    "🎬 Comment button clicked for reel: ${reel.id}"
+                                )
+                                Log.d(
+                                    "CommentButtonDebug",
+                                    "🎬 Reel data: userName=${reel.userName}, productName=${reel.productName}"
+                                )
+                                Log.d(
+                                    "CommentButtonDebug",
+                                    "🎬 Comments count: ${reel.comments.size}"
+                                )
+                                Log.d("CommentButtonDebug", "🎬 Reel object: $reel")
+                                Log.d("CommentButtonDebug", "🎬 About to call onClickCommentButton")
+                                onClickCommentButton(reel)
+                                Log.d(
+                                    "CommentButtonDebug",
+                                    "🎬 onClickCommentButton completed successfully"
+                                )
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "CommentButtonDebug",
+                                    "🎬 Exception in comment button click: ${e.message}",
+                                    e
+                                )
+                                throw e
+                            }
+                        }
                 )
                 Text(text = "${reel.numberOfComments}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(14.dp))
                 // Cart Icon - PATCHED TO BE INTERACTIVE!
-                val isInCart = currentUserId != null && cartViewModel.state.value.items.any { it.productId == reel.id }
+                val cartState by cartViewModel.state.collectAsState()
+                val isInCart = currentUserId != null && cartState.items.any { it.productId == reel.id }
                 Icon(
                     painter = painterResource(id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart),
                     contentDescription = "Add to Cart",
@@ -823,7 +983,7 @@ fun ReelsList(
                 )
                 Text(
                     text = if (isInCart) {
-                        val cartItem = cartViewModel.state.value.items.find { it.productId == reel.id }
+                        val cartItem = cartState.items.find { it.productId == reel.id }
                         cartItem?.quantity?.toString() ?: "1"
                     } else {
                         "0"
@@ -839,7 +999,10 @@ fun ReelsList(
                     tint = Color.White,
                     modifier = Modifier
                         .size(34.dp)
-                        .clickable { }
+                        .clickable {
+                            // Improved sharing implementation with product info
+                            onShareReel(reel)
+                        }
                 )
                 Spacer(modifier = Modifier.height(17.dp))
                 Icon(
@@ -1386,7 +1549,10 @@ fun InteractionButtons(
         InteractionButton(
             painter = painterResource(id = R.drawable.ic_share),
             count = "Share",
-            onClick = { onClickMoreButton(reel) }
+            onClick = {
+                // Improved sharing implementation with product info
+                onClickMoreButton(reel)
+            }
         )
         InteractionButton(
             painter = painterResource(id = R.drawable.ic_music),
@@ -1430,7 +1596,7 @@ fun InteractionButton(
 // Modern Bottom Sheet Content
 @Composable
 fun ModernBottomSheetContent(
-    state: List<Reels>,
+    reel: Reels?,
     isSelectedComments: Boolean,
     isSelectedRatings: Boolean,
     onCommentTabClick: () -> Unit,
@@ -1439,28 +1605,76 @@ fun ModernBottomSheetContent(
     viewModel: ReelsScreenViewModel,
     modifier: Modifier = Modifier
 ) {
-    val commentsList = state.firstOrNull()?.comments ?: emptyList()
-    val ratesList = state.firstOrNull()?.ratings ?: emptyList()
-    val newComment = state.firstOrNull()?.newComment?.comment ?: ""
+    Log.d("BottomSheetDebug", "🎬 ModernBottomSheetContent called")
+    Log.d("BottomSheetDebug", "🎬 Reel is null: ${reel == null}")
+
+    if (reel != null) {
+        Log.d("BottomSheetDebug", "🎬 Reel id: ${reel.id}")
+        Log.d("BottomSheetDebug", "🎬 Reel newComment: ${reel.newComment}")
+        Log.d("BottomSheetDebug", "🎬 Reel newComment.comment: ${reel.newComment.comment}")
+        Log.d("BottomSheetDebug", "🎬 Reel comments: ${reel.comments}")
+        Log.d("BottomSheetDebug", "🎬 Reel ratings: ${reel.ratings}")
+    }
+
+    Log.d("BottomSheetDebug", "🎬 isSelectedComments: $isSelectedComments")
+    Log.d("BottomSheetDebug", "🎬 isSelectedRatings: $isSelectedRatings")
+
+    val commentsList = try {
+        reel?.comments ?: emptyList()
+    } catch (e: Exception) {
+        Log.e("BottomSheetDebug", "🎬 Error accessing comments list: ${e.message}")
+        emptyList()
+    }
+    Log.d("BottomSheetDebug", "🎬 Comments list size: ${commentsList.size}")
+
+    val ratesList = try {
+        reel?.ratings ?: emptyList()
+    } catch (e: Exception) {
+        Log.e("BottomSheetDebug", "🎬 Error accessing ratings list: ${e.message}")
+        emptyList()
+    }
+    Log.d("BottomSheetDebug", "🎬 Ratings list size: ${ratesList.size}")
+
+    val newComment = try {
+        reel?.newComment?.comment ?: ""
+    } catch (e: Exception) {
+        Log.e("BottomSheetDebug", "🎬 Error accessing newComment: ${e.message}")
+        ""
+    }
+    Log.d("BottomSheetDebug", "🎬 New comment: '$newComment'")
+
     val onCommentChange: (String) -> Unit = { viewModel.onWriteNewComment(it) }
     val onClickSend: () -> Unit = {
-        viewModel.onClickAddComment(state.firstOrNull()?.id ?: "", newComment)
+        val reelId = try {
+            reel?.id ?: ""
+        } catch (e: Exception) {
+            Log.e("BottomSheetDebug", "🎬 Error accessing reel id: ${e.message}")
+            ""
+        }
+        viewModel.onClickAddComment(reelId, newComment)
     }
+
+    Log.d("BottomSheetDebug", "🎬 About to render bottom sheet UI")
 
     val minHeightDp = 300.dp  // أقل ارتفاع (400dp)
     val maxHeightFraction = 0.92f   // أقصى نسبة للشاشة
 
+    Log.d("BottomSheetDebug", "🎬 Getting screen configuration...")
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     val density = LocalDensity.current
+    Log.d("BottomSheetDebug", "🎬 Screen height: $screenHeight, density: $density")
 
     // احسب نسبة الارتفاع الأدنى (400dp / ارتفاع الشاشة)
     val minHeightFraction = with(density) {
         minHeightDp.toPx() / screenHeight.toPx()
     }
+    Log.d("BottomSheetDebug", "🎬 Min height fraction calculated: $minHeightFraction")
 
     var sheetHeightFraction by remember { mutableStateOf(0.5f) }
     var lastDragPosition by remember { mutableStateOf(0f) }
+    Log.d("BottomSheetDebug", "🎬 State variables initialized")
 
+    Log.d("BottomSheetDebug", "🎬 About to render Column composable...")
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -1480,7 +1694,8 @@ fun ModernBottomSheetContent(
                 )
             }
             .imePadding()
-    )   {
+    ) {
+        Log.d("BottomSheetDebug", "🎬 Inside Column, about to render handle bar...")
         // Handle bar for dragging
         Box(
             modifier = Modifier
@@ -1492,6 +1707,7 @@ fun ModernBottomSheetContent(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+        Log.d("BottomSheetDebug", "🎬 Handle bar rendered, about to render header row...")
 
         // Header with tabs and close button
         Row(
@@ -1501,12 +1717,13 @@ fun ModernBottomSheetContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Log.d("BottomSheetDebug", "🎬 Inside header Row, about to render tab buttons...")
             Row(
                 horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 ModernTabButton(
                     text = "Comments",
-                    icon = painterResource(id = R.drawable.comment),
+                    icon = painterResource(id = R.drawable.ic_comment),
                     isSelected = isSelectedComments,
                     iconSize = 24,
                     onClick = onCommentTabClick
@@ -1514,13 +1731,15 @@ fun ModernBottomSheetContent(
 
                 ModernTabButton(
                     text = "Rates",
-                    icon = painterResource(id = R.drawable.rating),
+                    icon = painterResource(id = R.drawable.ic_star),
                     isSelected = isSelectedRatings,
                     onClick = onRatingTabClick
                 )
             }
+            Log.d("BottomSheetDebug", "🎬 Tab buttons rendered, about to render close button...")
 
-            IconButton(onClick = onCloseClick,
+            IconButton(
+                onClick = onCloseClick,
                 modifier = Modifier.offset(x = 8.dp, y = (-8f).dp)
             ) {
                 Icon(
@@ -1530,11 +1749,14 @@ fun ModernBottomSheetContent(
                 )
             }
         }
+        Log.d("BottomSheetDebug", "🎬 Header row rendered, about to render spacer...")
 
         Spacer(modifier = Modifier.height(12.dp))
+        Log.d("BottomSheetDebug", "🎬 About to render content section...")
 
         // المحتوى المتغير حسب التبويب المختار
         if (isSelectedComments) {
+            Log.d("BottomSheetDebug", "🎬 About to render CommentsSection...")
             CommentsSection(
                 comments = commentsList,
                 newComment = newComment,
@@ -1543,6 +1765,7 @@ fun ModernBottomSheetContent(
                 modifier = Modifier.weight(1f)
             )
         } else {
+            Log.d("BottomSheetDebug", "🎬 About to render RatingsSection...")
             RatingsSection(
                 ratings = ratesList,
                 newComment = newComment,
@@ -1551,6 +1774,7 @@ fun ModernBottomSheetContent(
                 modifier = Modifier.weight(1f)
             )
         }
+        Log.d("BottomSheetDebug", "🎬 Content section rendered successfully!")
     }
 }
 
@@ -2641,7 +2865,8 @@ fun FollowingReelsContent(
     followingViewModel: FollowingViewModel,
     reelsViewModel: ReelsScreenViewModel,
     cartViewModel: CartViewModel,
-    onShowSheet: (SheetType, Reels?) -> Unit
+    onShowSheet: (SheetType, Reels?) -> Unit,
+    onShareReel: (Reels) -> Unit
 ) {
     Log.d("FollowingTabDebug", "Entered FollowingReelsContent")
     val followingState by followingViewModel.uiState.collectAsState()
@@ -2740,7 +2965,8 @@ fun FollowingReelsContent(
                 followingUserIds = followingUserIds,
                 reelsViewModel = reelsViewModel,
                 cartViewModel = cartViewModel,
-                onShowSheet = onShowSheet
+                onShowSheet = onShowSheet,
+                onShareReel = onShareReel
             )
         }
     }
@@ -2752,7 +2978,8 @@ fun FollowingReelsList(
     followingUserIds: List<String>,
     reelsViewModel: ReelsScreenViewModel,
     cartViewModel: CartViewModel,
-    onShowSheet: (SheetType, Reels?) -> Unit
+    onShowSheet: (SheetType, Reels?) -> Unit,
+    onShareReel: (Reels) -> Unit
 ) {
     val reelsState by reelsViewModel.state.collectAsState()
 
@@ -2800,11 +3027,14 @@ fun FollowingReelsList(
             viewModel = reelsViewModel,
             cartViewModel = cartViewModel,
             onClickCartButton = { onShowSheet(SheetType.AddToCart, reelsState.firstOrNull()) },
-            onClickMoreButton = { /* TODO: Handle more options */ },
+            onClickMoreButton = { reel ->
+                if (reel != null) onShareReel(reel)
+            },
             reelsList = followingReels,
             isLoggedIn = true, // Since we're in the following tab, user is logged in
             showLoginPrompt = remember { mutableStateOf(false) },
-            initialPage = 0
+            initialPage = 0,
+            onShareReel = onShareReel
         )
     }
 }

@@ -12,6 +12,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+import com.cloudinary.android.MediaManager
+import com.cloudinary.android.callback.UploadCallback
+import com.cloudinary.android.callback.ErrorInfo
+import com.project.e_commerce.android.data.remote.CloudinaryConfig
+
 data class EditProfileUiState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
@@ -99,8 +104,112 @@ class EditProfileViewModel(
         _uiState.value = _uiState.value.copy(phone = phone)
     }
 
-    fun updateProfileImage(imageUrl: String?) {
-        _uiState.value = _uiState.value.copy(profileImageUrl = imageUrl)
+    fun updateProfileImage(imageUri: String?) {
+        Log.d("EditProfileViewModel", "🖼️ ===== PROFILE IMAGE UPDATE =====")
+        Log.d("EditProfileViewModel", "🖼️ New image URI: '$imageUri'")
+        Log.d(
+            "EditProfileViewModel",
+            "🖼️ Is local URI: ${imageUri?.startsWith("content://") == true}"
+        )
+        Log.d("EditProfileViewModel", "🖼️ Is http URL: ${imageUri?.startsWith("http") == true}")
+
+        if (imageUri?.startsWith("content://") == true) {
+            Log.d("EditProfileViewModel", "🖼️ Starting Cloudinary upload for local URI")
+            uploadProfileImageToCloudinary(imageUri)
+        } else {
+            // It's already a URL, just update the state
+            _uiState.value = _uiState.value.copy(profileImageUrl = imageUri)
+            Log.d("EditProfileViewModel", "🖼️ Using existing URL without upload")
+        }
+
+        Log.d("EditProfileViewModel", "🖼️ ===================================")
+    }
+
+    private fun uploadProfileImageToCloudinary(localUri: String) {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Log.e("EditProfileViewModel", "❌ No authenticated user for image upload")
+            _uiState.value = _uiState.value.copy(error = "User not authenticated")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                Log.d("EditProfileViewModel", "🚀 Starting profile image upload to Cloudinary")
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+                // Set up Cloudinary upload options for profile images
+                val imageOptions = com.cloudinary.utils.ObjectUtils.asMap(
+                    "public_id",
+                    "profile_${currentUser.uid}_${System.currentTimeMillis()}",
+                    "upload_preset",
+                    com.project.e_commerce.android.data.remote.CloudinaryConfig.UPLOAD_PRESET,
+                    "folder",
+                    com.project.e_commerce.android.data.remote.CloudinaryConfig.Folders.USERS,
+                    "transformation",
+                    "w_400,h_400,c_fill,g_face,q_auto"
+                )
+
+                Log.d("EditProfileViewModel", " Upload options: $imageOptions")
+
+                // Upload using MediaManager
+                com.cloudinary.android.MediaManager.get().upload(android.net.Uri.parse(localUri))
+                    .options(imageOptions)
+                    .callback(object : com.cloudinary.android.callback.UploadCallback {
+                        override fun onStart(requestId: String) {
+                            Log.d("EditProfileViewModel", "🚀 Upload started: $requestId")
+                        }
+
+                        override fun onSuccess(requestId: String, resultData: Map<Any?, Any?>) {
+                            val cloudinaryUrl = resultData["secure_url"] as? String
+                            Log.d("EditProfileViewModel", "✅ Upload successful!")
+                            Log.d("EditProfileViewModel", "🖼️ Cloudinary URL: $cloudinaryUrl")
+
+                            // Update UI state with new URL
+                            _uiState.value = _uiState.value.copy(
+                                profileImageUrl = cloudinaryUrl,
+                                isLoading = false,
+                                error = null
+                            )
+
+                            Log.d("EditProfileViewModel", "✅ Profile image URL updated in UI state")
+                        }
+
+                        override fun onError(
+                            requestId: String,
+                            error: com.cloudinary.android.callback.ErrorInfo
+                        ) {
+                            Log.e("EditProfileViewModel", "❌ Upload failed: ${error.description}")
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                error = "Failed to upload image: ${error.description}"
+                            )
+                        }
+
+                        override fun onReschedule(
+                            requestId: String,
+                            error: com.cloudinary.android.callback.ErrorInfo
+                        ) {
+                            Log.w(
+                                "EditProfileViewModel",
+                                "⚠️ Upload rescheduled: ${error.description}"
+                            )
+                        }
+
+                        override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {
+                            val progress = (bytes * 100 / totalBytes).toInt()
+                            Log.d("EditProfileViewModel", "📊 Upload progress: $progress%")
+                        }
+                    }).dispatch()
+
+            } catch (e: Exception) {
+                Log.e("EditProfileViewModel", "❌ Exception during upload: ${e.message}")
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Upload failed: ${e.message}"
+                )
+            }
+        }
     }
 
     fun saveProfile() {
@@ -123,7 +232,22 @@ class EditProfileViewModel(
                 Log.d("EditProfileViewModel", "🔄 Current profile state: ${_uiState.value.profile}")
                 Log.d("EditProfileViewModel", "🔄 Display name: '${_uiState.value.displayName}'")
                 Log.d("EditProfileViewModel", "🔄 Username: '${_uiState.value.username}'")
-                
+
+                Log.d("EditProfileViewModel", "🖼️ ===== SAVE PROFILE IMAGE DEBUG =====")
+                Log.d(
+                    "EditProfileViewModel",
+                    "🖼️ Current profileImageUrl in UI state: '${_uiState.value.profileImageUrl}'"
+                )
+                Log.d(
+                    "EditProfileViewModel",
+                    "🖼️ Original profile profileImageUrl: '${_uiState.value.profile?.profileImageUrl}'"
+                )
+                Log.d(
+                    "EditProfileViewModel",
+                    "🖼️ Will save profileImageUrl: '${_uiState.value.profileImageUrl}'"
+                )
+                Log.d("EditProfileViewModel", "🖼️ ========================================")
+
                 // Always ensure the UID is set correctly
                 val updatedProfile = if (_uiState.value.profile != null) {
                     _uiState.value.profile!!.copy(
@@ -155,12 +279,20 @@ class EditProfileViewModel(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isSuccess = true,
-                        profile = profile
+                        profile = profile,
+                        // Update the current state to match the saved profile
+                        profileImageUrl = profile.profileImageUrl,
+                        displayName = profile.displayName,
+                        username = profile.username,
+                        bio = profile.bio,
+                        phone = profile.phone ?: ""
                     )
-                    Log.d("EditProfileViewModel", "✅ Profile updated successfully")
+                    Log.d("EditProfileViewModel", " Profile updated successfully")
+                    Log.d(
+                        "EditProfileViewModel",
+                        " Updated profile image URL: '${profile.profileImageUrl}'"
+                    )
                     
-                    // Refresh the profile data to ensure UI is up to date
-                    loadCurrentUserProfile()
                 }.onFailure { error ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,

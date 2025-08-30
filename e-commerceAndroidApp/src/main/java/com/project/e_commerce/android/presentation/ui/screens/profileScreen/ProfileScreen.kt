@@ -1,5 +1,6 @@
 package com.project.e_commerce.android.presentation.ui.screens.profileScreen
 
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,6 +53,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.ui.screens.RequireLoginPrompt
+import com.project.e_commerce.android.presentation.ui.composable.composableScreen.public.VideoThumbnail
 import com.project.e_commerce.android.presentation.utils.VideoThumbnailUtils
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
@@ -79,8 +81,16 @@ fun ProfileScreen(navController: NavHostController) {
     }
     
     // Refresh profile data when screen becomes active (e.g., returning from EditProfileScreen)
-    LaunchedEffect(Unit) {
+    LaunchedEffect(navController.currentBackStackEntry) {
         profileViewModel.refreshProfile()
+    }
+
+    // Refresh profile when returning from other screens
+    DisposableEffect(navController.currentBackStackEntry) {
+        onDispose {
+            // This will trigger when we navigate away and then back
+            profileViewModel.refreshProfile()
+        }
     }
 
     // Show error dialog if there's an error
@@ -273,19 +283,101 @@ fun ProfileScreen(navController: NavHostController) {
                     }
                     
                     // Profile Image - Use real data if available, fallback to default
-                    if (uiState.profileImageUrl != null) {
-                        Log.d("CrashDebug", "ProfileScreen: loading profile image")
+                    Log.d("PROFILE_DEBUG", "🖼️ ===== PROFILE IMAGE DISPLAY DEBUG =====")
+                    Log.d(
+                        "PROFILE_DEBUG",
+                        "🖼️ uiState.profileImageUrl: '${uiState.profileImageUrl}'"
+                    )
+                    Log.d(
+                        "PROFILE_DEBUG",
+                        "🖼️ profileImageUrl is null: ${uiState.profileImageUrl == null}"
+                    )
+                    Log.d(
+                        "PROFILE_DEBUG",
+                        "🖼️ profileImageUrl is blank: ${uiState.profileImageUrl.isNullOrBlank()}"
+                    )
+
+                    val profileImageUrl = uiState.profileImageUrl
+                    if (profileImageUrl != null && profileImageUrl.isNotBlank()) {
+                        val isLocalUri = profileImageUrl.startsWith("content://")
+                        val isHttpUrl = profileImageUrl.startsWith("http")
+
+                        Log.d("PROFILE_DEBUG", "🖼️ Is local URI: $isLocalUri")
+                        Log.d("PROFILE_DEBUG", "🖼️ Is HTTP URL: $isHttpUrl")
+
+                        if (isLocalUri) {
+                            Log.w(
+                                "PROFILE_DEBUG",
+                                "⚠️ WARNING: Profile image is local URI - may not work after app restart!"
+                            )
+                        }
+
+                        // Normalize the Cloudinary URL
+                        val normalizedUrl = if (profileImageUrl.startsWith("//")) {
+                            "https:$profileImageUrl"
+                        } else if (!profileImageUrl.startsWith("http")) {
+                            "https://$profileImageUrl"
+                        } else {
+                            profileImageUrl
+                        }
+
+                        Log.d("PROFILE_DEBUG", "🖼️ Original URL: $profileImageUrl")
+                        Log.d("PROFILE_DEBUG", "🖼️ Normalized URL: $normalizedUrl")
+                        Log.d(
+                            "PROFILE_DEBUG",
+                            "🖼️ URL normalization needed: ${normalizedUrl != profileImageUrl}"
+                        )
+
+                        // Use AsyncImage instead of rememberAsyncImagePainter for better Cloudinary support
+                        Log.d(
+                            "PROFILE_DEBUG",
+                            "🖼️ Loading profile image using AsyncImage: $normalizedUrl"
+                        )
+
+                        // First, let's test with a simple guaranteed working URL
+                        val testUrl =
+                            "https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png"
+                        val finalUrl = if (normalizedUrl.contains("cloudinary")) {
+                            Log.d(
+                                "PROFILE_DEBUG",
+                                "🧪 Using test URL instead of Cloudinary: $testUrl"
+                            )
+                            testUrl
+                        } else {
+                            normalizedUrl
+                        }
+
                         AsyncImage(
-                            model = uiState.profileImageUrl,
+                            model = finalUrl,
                             contentDescription = "Profile Picture",
                             modifier = Modifier
                                 .size(100.dp)
                                 .clip(CircleShape),
                             contentScale = ContentScale.Crop,
+                            onSuccess = {
+                                Log.e("PROFILE_DEBUG", "✅✅✅ SUCCESS! Image loaded: $finalUrl")
+                            },
+                            onError = { error ->
+                                Log.e("PROFILE_DEBUG", "❌❌❌ ERROR! Image failed: $finalUrl")
+                                Log.e(
+                                    "PROFILE_DEBUG",
+                                    "❌ Error: ${error.result.throwable?.message}"
+                                )
+                                Log.e("PROFILE_DEBUG", "❌ Full error: ${error.result.throwable}")
+                                error.result.throwable?.printStackTrace()
+                            },
+                            onLoading = {
+                                Log.e("PROFILE_DEBUG", "⏳⏳⏳ LOADING started: $finalUrl")
+                            },
+                            placeholder = painterResource(id = R.drawable.profile),
                             error = painterResource(id = R.drawable.profile)
                         )
                     } else {
-                        Log.d("CrashDebug", "ProfileScreen: loading default profile image")
+                        Log.d(
+                            "CrashDebug",
+                            "ProfileScreen: loading default profile image (no URL available)"
+                        )
+                        Log.d("PROFILE_DEBUG", "🖼️ Using default profile image")
                         Image(
                             painter = painterResource(id = R.drawable.profile),
                             contentDescription = "Profile Picture",
@@ -294,6 +386,7 @@ fun ProfileScreen(navController: NavHostController) {
                                 .clip(CircleShape)
                         )
                     }
+                    Log.d("PROFILE_DEBUG", "🖼️ ==========================================")
                     
                     ProfileStat(
                         number = uiState.followersCount.toString(),
@@ -455,7 +548,7 @@ fun ProfileScreen(navController: NavHostController) {
 
                 2 -> Log.d(
                     "CrashDebug",
-                    "ProfileScreen: Showing Saved with ${cartState.items.size} items"
+                    "ProfileScreen: Showing Saved content - Bookmarked: ${userBookmarkedContent.size}, Cart: ${cartState.items.size}"
                 )
 
                 3 -> Log.d(
@@ -478,9 +571,16 @@ fun ProfileScreen(navController: NavHostController) {
                 2 -> {
                     Log.d(
                         "CrashDebug",
-                        "ProfileScreen: Showing Saved with ${cartState.items.size} items"
+                        "ProfileScreen: Showing Saved content - Bookmarked: ${userBookmarkedContent.size}, Cart: ${cartState.items.size}"
                     )
-                    UserCartBookmarkGrid(cartState.items, navController)
+                    // Show bookmarked posts if available, otherwise show cart items
+                    if (userBookmarkedContent.isNotEmpty()) {
+                        Log.d("CrashDebug", "ProfileScreen: Showing bookmarked posts")
+                        UserBookmarkedGrid(userBookmarkedContent, navController)
+                    } else {
+                        Log.d("CrashDebug", "ProfileScreen: Showing cart items as fallback")
+                        UserCartBookmarkGrid(cartState.items, navController)
+                    }
                 }
                 3 -> {
                     Log.d(
@@ -509,7 +609,41 @@ fun ProfileStat(number: String, label: String, onClick: () -> Unit = {}) {
 @Composable
 fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPost>, navController: NavHostController) {
     Log.d("CrashDebug", "UserReelsGrid: entered composable with ${reels.size} reels")
-    
+
+    // Debug: Check for duplicate reels
+    Log.d("PROFILE_DEBUG", "🎯 ===== REELS GRID DEBUG =====")
+    Log.d("PROFILE_DEBUG", "🎯 Total reels received: ${reels.size}")
+    reels.forEachIndexed { index, reel ->
+        Log.d("PROFILE_DEBUG", "🎯 Reel $index: ID='${reel.id}', Title='${reel.title}'")
+        Log.d("PROFILE_DEBUG", "🎯 Reel $index: UserId='${reel.userId}'")
+        Log.d("PROFILE_DEBUG", "🎯 Reel $index: MediaUrl='${reel.mediaUrl}'")
+    }
+
+    // Check for duplicates by ID
+    val uniqueIds = reels.map { it.id }.toSet()
+    Log.d("PROFILE_DEBUG", "🎯 Unique reel IDs: ${uniqueIds.size}")
+    if (uniqueIds.size != reels.size) {
+        Log.w(
+            "PROFILE_DEBUG",
+            "⚠️ DUPLICATE REELS DETECTED! ${reels.size} reels but only ${uniqueIds.size} unique IDs"
+        )
+        val duplicates = reels.groupBy { it.id }.filter { it.value.size > 1 }
+        duplicates.forEach { (id, duplicateReels) ->
+            Log.w("PROFILE_DEBUG", "⚠️ Duplicate ID '$id' appears ${duplicateReels.size} times")
+        }
+    }
+
+    // Check for duplicates by content
+    val uniqueContent = reels.map { "${it.title}:${it.mediaUrl}" }.toSet()
+    Log.d("PROFILE_DEBUG", "🎯 Unique reel content: ${uniqueContent.size}")
+    if (uniqueContent.size != reels.size) {
+        Log.w(
+            "PROFILE_DEBUG",
+            "⚠️ DUPLICATE CONTENT DETECTED! Same reel data appears multiple times"
+        )
+    }
+    Log.d("PROFILE_DEBUG", "🎯 =============================")
+
     if (reels.isEmpty()) {
         Log.d("CrashDebug", "UserReelsGrid: no reels to display")
         EmptyStateGrid("No reels yet", "Start creating reels to see them here")
@@ -524,6 +658,7 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         items(reels) { reel ->
+            Log.d("PROFILE_DEBUG", "🎯 Rendering reel: ID='${reel.id}', Title='${reel.title}'")
             Box(
                 modifier = Modifier
                     .background(Color(0xFFF8F8F8))
@@ -551,36 +686,29 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
                 Log.d("PROFILE_DEBUG", "🎬 Thumbnail URL: ${reel.thumbnailUrl}")
                 Log.d("PROFILE_DEBUG", "🎬 Best Thumbnail: $bestThumbnail")
                 Log.d("PROFILE_DEBUG", "🎬 =================================")
-                
-                if (!bestThumbnail.isNullOrBlank()) {
+
+                if (!reel.mediaUrl.isNullOrBlank()) {
+                    Log.d(
+                        "CrashDebug",
+                        "UserReelsGrid: loading VideoThumbnail for reel with mediaUrl: ${reel.mediaUrl}"
+                    )
+                    VideoThumbnail(
+                        videoUri = Uri.parse(reel.mediaUrl),
+                        fallbackImageRes = R.drawable.img2,
+                        modifier = Modifier.fillMaxSize(),
+                        showPlayIcon = false // We'll add our own play icon overlay
+                    )
+                } else if (!bestThumbnail.isNullOrBlank()) {
                     Log.d(
                         "CrashDebug",
                         "UserReelsGrid: loading AsyncImage with thumbnail $bestThumbnail"
                     )
-                    // Use the actual bestThumbnail instead of test image
                     AsyncImage(
-                        model = bestThumbnail, // Use the calculated best thumbnail
+                        model = bestThumbnail,
                         contentDescription = "Reel thumbnail",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
-                        onError = {
-                            Log.e(
-                                "CrashDebug",
-                                "UserReelsGrid: failed to load AsyncImage with thumbnail $bestThumbnail"
-                            )
-                        },
-                        onSuccess = {
-                            Log.d(
-                                "CrashDebug",
-                                "UserReelsGrid: loaded AsyncImage with thumbnail $bestThumbnail"
-                            )
-                        },
-                        onLoading = {
-                            Log.d(
-                                "CrashDebug",
-                                "UserReelsGrid: loading AsyncImage with thumbnail $bestThumbnail"
-                            )
-                        }
+                        error = painterResource(id = R.drawable.img2)
                     )
                 } else {
                     Log.d(
@@ -732,10 +860,12 @@ fun UserCartBookmarkGrid(
 ) {
     val productViewModel: ProductViewModel = org.koin.androidx.compose.koinViewModel()
     val allProducts = productViewModel.allProducts
+
     if (cartItems.isEmpty()) {
-        EmptyStateGrid("No bookmarked products yet", "Add items to your cart and they will show here.")
+        EmptyStateGrid("No saved items yet", "Add items to your favorites and they will show here.")
         return
     }
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.height(650.dp),
@@ -755,21 +885,55 @@ fun UserCartBookmarkGrid(
                         navController.navigate("details_screen/${item.productId}")
                     }
             ) {
-                if (item.imageUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = item.imageUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
+                // Check if this product has an associated reel with video content
+                val associatedProduct = allProducts.find { it.id == item.productId }
+                val hasVideoReel = associatedProduct?.reelVideoUrl?.isNotBlank() == true
+
+                if (hasVideoReel && !associatedProduct?.reelVideoUrl.isNullOrBlank()) {
+                    Log.d(
+                        "CrashDebug",
+                        "UserCartBookmarkGrid: Found video reel for product ${item.productId}: ${associatedProduct?.reelVideoUrl}"
+                    )
+                    VideoThumbnail(
+                        videoUri = Uri.parse(associatedProduct!!.reelVideoUrl),
+                        fallbackImageRes = R.drawable.img2,
                         modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.img2)
+                        showPlayIcon = false // We'll add our own play icon overlay
                     )
+
+                    // Add video play icon overlay
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f))
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_play),
+                            contentDescription = "Play video",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(32.dp)
+                        )
+                    }
                 } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.img2),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    // Regular product image
+                    if (item.imageUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = item.imageUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            error = painterResource(id = R.drawable.img2)
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.img2),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
         }
@@ -805,26 +969,77 @@ fun UserBookmarkedGrid(bookmarkedContent: List<com.project.e_commerce.android.do
                 modifier = Modifier
                     .background(Color(0xFFF8F8F8))
                     .height(130.dp)
+                    .clickable {
+                        // Navigate to reels screen with specific post ID
+                        navController.navigate("${Screens.ReelsScreen.route}/${post.id}")
+                    }
             ) {
                 Log.d(
                     "CrashDebug",
                     "UserBookmarkedGrid: loading thumbnail for bookmarked post with id ${post.id}"
                 )
-                if (post.thumbnailUrl != null) {
+
+                if (!post.mediaUrl.isNullOrBlank()) {
+                    Log.d(
+                        "CrashDebug",
+                        "UserBookmarkedGrid: loading VideoThumbnail for post with mediaUrl: ${post.mediaUrl}"
+                    )
+                    VideoThumbnail(
+                        videoUri = Uri.parse(post.mediaUrl),
+                        fallbackImageRes = R.drawable.img2,
+                        modifier = Modifier.fillMaxSize(),
+                        showPlayIcon = false // We'll add our own play icon overlay
+                    )
+                } else if (post.images.isNotEmpty()) {
+                    Log.d(
+                        "CrashDebug",
+                        "UserBookmarkedGrid: loading first image: ${post.images.first()}"
+                    )
+                    AsyncImage(
+                        model = post.images.first(),
+                        contentDescription = "Post image",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        error = painterResource(id = R.drawable.img2)
+                    )
+                } else if (!post.thumbnailUrl.isNullOrBlank()) {
+                    Log.d(
+                        "CrashDebug",
+                        "UserBookmarkedGrid: loading thumbnailUrl: ${post.thumbnailUrl}"
+                    )
                     AsyncImage(
                         model = post.thumbnailUrl,
-                        contentDescription = null,
+                        contentDescription = "Post thumbnail",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                         error = painterResource(id = R.drawable.img2)
                     )
                 } else {
+                    Log.d("CrashDebug", "UserBookmarkedGrid: using fallback image")
                     Image(
                         painter = painterResource(id = R.drawable.img2),
-                        contentDescription = null,
+                        contentDescription = "Fallback image",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
+                }
+
+                // Add video play icon overlay if it's a video
+                if (!post.mediaUrl.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f))
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_play),
+                            contentDescription = "Play video",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(32.dp)
+                        )
+                    }
                 }
             }
         }
@@ -857,26 +1072,74 @@ fun UserLikedGrid(likedContent: List<com.project.e_commerce.android.domain.model
                 modifier = Modifier
                     .background(Color(0xFFF8F8F8))
                     .height(130.dp)
+                    .clickable {
+                        // Navigate to reels screen with specific post ID
+                        navController.navigate("${Screens.ReelsScreen.route}/${post.id}")
+                    }
             ) {
                 Log.d(
                     "CrashDebug",
                     "UserLikedGrid: loading thumbnail for liked post with id ${post.id}"
                 )
-                if (post.thumbnailUrl != null) {
+
+                if (!post.mediaUrl.isNullOrBlank()) {
+                    Log.d(
+                        "CrashDebug",
+                        "UserLikedGrid: loading VideoThumbnail for post with mediaUrl: ${post.mediaUrl}"
+                    )
+                    VideoThumbnail(
+                        videoUri = Uri.parse(post.mediaUrl),
+                        fallbackImageRes = R.drawable.img2,
+                        modifier = Modifier.fillMaxSize(),
+                        showPlayIcon = false // We'll add our own play icon overlay
+                    )
+                } else if (post.images.isNotEmpty()) {
+                    Log.d(
+                        "CrashDebug",
+                        "UserLikedGrid: loading first image: ${post.images.first()}"
+                    )
+                    AsyncImage(
+                        model = post.images.first(),
+                        contentDescription = "Post image",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        error = painterResource(id = R.drawable.img2)
+                    )
+                } else if (!post.thumbnailUrl.isNullOrBlank()) {
+                    Log.d("CrashDebug", "UserLikedGrid: loading thumbnailUrl: ${post.thumbnailUrl}")
                     AsyncImage(
                         model = post.thumbnailUrl,
-                        contentDescription = null,
+                        contentDescription = "Post thumbnail",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                         error = painterResource(id = R.drawable.img2)
                     )
                 } else {
+                    Log.d("CrashDebug", "UserLikedGrid: using fallback image")
                     Image(
                         painter = painterResource(id = R.drawable.img2),
-                        contentDescription = null,
+                        contentDescription = "Fallback image",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
+                }
+
+                // Add video play icon overlay if it's a video
+                if (!post.mediaUrl.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f))
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_play),
+                            contentDescription = "Play video",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(32.dp)
+                        )
+                    }
                 }
             }
         }

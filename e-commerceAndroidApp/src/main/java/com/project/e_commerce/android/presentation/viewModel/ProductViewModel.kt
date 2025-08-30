@@ -52,12 +52,18 @@ class ProductViewModel : ViewModel() {
                 try {
                     Log.d("PRODUCT_DEBUG", "🔄 Starting Firebase operations in viewModelScope")
                     checkFirebaseCollections()
+
+                    // Load data in sequence to ensure dependencies are met
                     getCategoriesFromFirebase()
+                    getAllProductsFromFirebase()
                     getFeaturedProductsFromFirebase()
                     getBestSellerProductsFromFirebase()
-                    getAllProductsFromFirebase()
-                    fetchReelsFromFirestore() // NEW: actually query a 'reels' collection
+
                     Log.d("PRODUCT_DEBUG", "✅ All Firebase operations completed")
+                    Log.d(
+                        "PRODUCT_DEBUG",
+                        "📊 Final state - Products: ${allProducts.size}, Reels: ${productReels.size}"
+                    )
                 } catch (e: Exception) {
                     Log.e("PRODUCT_DEBUG", "Error in init LaunchedEffect", e)
                 }
@@ -210,26 +216,20 @@ class ProductViewModel : ViewModel() {
                 }
                 Log.d("PRODUCT_DEBUG", "✅ Successfully processed ${products.size} products")
                 Log.d("PRODUCT_DEBUG", "📱 Product IDs: ${products.map { it.id }}")
-                // Commented out since we now load reels from posts collection
-                // Log.d("PRODUCT_DEBUG", "🎬 Calling generateReelsFromProducts with ${products.size} products")
-                allProducts = products
-                // generateReelsFromProducts(products)
-                
-                // Now load reels (will fall back to products if posts collection is empty)
-                Log.d("PRODUCT_DEBUG", "🔄 Products loaded, now loading reels...")
-                loadReelsFromPostsCollection()
-                Log.d("PRODUCT_DEBUG", "✅ Reels loading completed. Final productReels count: ${productReels.size}")
 
-                // Always populate productReels from products as fallback if none are loaded
-                if (productReels.isEmpty() && products.isNotEmpty()) {
-                    productReels = generateReelsFromProducts(products)
-                    Log.d(
-                        "PRODUCT_DEBUG",
-                        "Used products-to-reels fallback: now ${productReels.size} reels"
-                    )
-                    // Notify possible listeners/state flows of the new data (if needed)
-                    refreshReels() // This will notify/emit if needed in ReelsScreenViewModel
+                // Update products state
+                allProducts = products
+
+                // Generate reels from products immediately
+                if (products.isNotEmpty()) {
+                    Log.d("PRODUCT_DEBUG", "🎬 Generating reels from ${products.size} products")
+                    val generatedReels = generateReelsFromProducts(products)
+                    productReels = generatedReels
+                    Log.d("PRODUCT_DEBUG", "✅ Generated ${generatedReels.size} reels from products")
+                } else {
+                    Log.w("PRODUCT_DEBUG", "⚠️ No products loaded, cannot generate reels")
                 }
+
             } catch (e: Exception) {
                 Log.d("PRODUCT_DEBUG", "DEBUG: Error in getAllProductsFromFirebase: ${e.message}")
                 e.printStackTrace()
@@ -272,8 +272,6 @@ class ProductViewModel : ViewModel() {
                     )
                 }
                 bestSellerProducts = products
-                // Commented out since we now load reels from posts collection
-                // generateReelsFromProducts(products)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -316,8 +314,6 @@ class ProductViewModel : ViewModel() {
                     )
                 }
                 featuredProducts = products
-                // Commented out since we now load reels from posts collection
-                // generateReelsFromProducts(products)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -490,16 +486,26 @@ class ProductViewModel : ViewModel() {
     fun refreshProducts() {
         Log.d("PRODUCT_DEBUG", "🔄 refreshProducts called manually")
         viewModelScope.launch {
+            // Clear existing data first
+            allProducts = emptyList()
+            productReels = emptyList()
+
+            // Reload everything
             getAllProductsFromFirebase()
-            // Reload reels from posts collection to ensure consistency
-            loadReelsFromPostsCollection()
         }
     }
     
     fun refreshReels() {
         Log.d("PRODUCT_DEBUG", "🎬 refreshReels called manually")
         viewModelScope.launch {
-            loadReelsFromPostsCollection()
+            if (allProducts.isNotEmpty()) {
+                Log.d("PRODUCT_DEBUG", "🎬 Regenerating reels from existing products")
+                productReels = generateReelsFromProducts(allProducts)
+                Log.d("PRODUCT_DEBUG", "✅ Regenerated ${productReels.size} reels")
+            } else {
+                Log.w("PRODUCT_DEBUG", "⚠️ No products available to generate reels from")
+                getAllProductsFromFirebase() // Reload products first
+            }
         }
     }
 

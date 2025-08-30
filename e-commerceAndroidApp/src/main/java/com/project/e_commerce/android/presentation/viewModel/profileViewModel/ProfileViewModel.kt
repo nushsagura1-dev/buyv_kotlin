@@ -60,18 +60,54 @@ class ProfileViewModel(
                     // Load user profile
                     getUserProfileUseCase(currentUser.uid).onSuccess { profile ->
                         _userProfile.value = profile
+
+                        // Debug profile data loading
+                        Log.d("PROFILE_DEBUG", "🖼️ ===== PROFILE IMAGE DEBUG =====")
+                        Log.d("PROFILE_DEBUG", "🖼️ Profile loaded for user: ${currentUser.uid}")
+                        Log.d("PROFILE_DEBUG", "🖼️ Profile displayName: '${profile.displayName}'")
+                        Log.d("PROFILE_DEBUG", "🖼️ Profile username: '${profile.username}'")
+                        Log.d("PROFILE_DEBUG", "🖼️ Profile email: '${profile.email}'")
+                        Log.d(
+                            "PROFILE_DEBUG",
+                            "🖼️ Profile profileImageUrl: '${profile.profileImageUrl}'"
+                        )
+                        Log.d(
+                            "PROFILE_DEBUG",
+                            "🖼️ Profile profileImageUrl is null: ${profile.profileImageUrl == null}"
+                        )
+                        Log.d(
+                            "PROFILE_DEBUG",
+                            "🖼️ Profile profileImageUrl is blank: ${profile.profileImageUrl.isNullOrBlank()}"
+                        )
+                        Log.d("PROFILE_DEBUG", "🖼️ =================================")
+
                         _uiState.value = _uiState.value.copy(
                             displayName = profile.displayName,
                             username = profile.username,
                             profileImageUrl = profile.profileImageUrl,
                             likesCount = profile.likesCount
                         )
-                        
+
+                        // Debug UI state after update
+                        Log.d("PROFILE_DEBUG", "🖼️ UI State updated:")
+                        Log.d(
+                            "PROFILE_DEBUG",
+                            "🖼️ uiState.profileImageUrl: '${_uiState.value.profileImageUrl}'"
+                        )
+                        Log.d(
+                            "PROFILE_DEBUG",
+                            "🖼️ uiState.profileImageUrl is null: ${_uiState.value.profileImageUrl == null}"
+                        )
+
                         // Debug logging
                         Log.d("PROFILE_DEBUG", "🔥 Profile loaded: displayName='${profile.displayName}', username='${profile.username}'")
                     }.onFailure { error ->
                         _uiState.value = _uiState.value.copy(error = error.message)
                         Log.e("PROFILE_DEBUG", "❌ Failed to load profile: ${error.message}")
+                        Log.e(
+                            "PROFILE_DEBUG",
+                            "🖼️ Profile loading failed - profileImageUrl will remain null"
+                        )
                     }
 
                     // Load REAL following/followers data from following system
@@ -100,12 +136,58 @@ class ProfileViewModel(
                     // Load user reels
                     getUserReelsUseCase(currentUser.uid).onSuccess { reels ->
                         _userReels.value = reels
-                        Log.d("PROFILE_DEBUG", "🔥 Loaded ${reels.size} reels for user")
+                        Log.d(
+                            "PROFILE_DEBUG",
+                            "🔥 Loaded ${reels.size} reels for user ${currentUser.uid}"
+                        )
                         reels.forEach { reel ->
-                            Log.d("PROFILE_DEBUG", "🔥 Reel: ${reel.title} - ${reel.mediaUrl}")
-                            Log.d("PROFILE_DEBUG", "🔥 Reel Images: ${reel.images}")
-                            Log.d("PROFILE_DEBUG", "🔥 Reel Thumbnail: ${reel.thumbnailUrl}")
+                            Log.d("PROFILE_DEBUG", "🔥 Reel: ${reel.title} - ID: ${reel.id}")
+                            Log.d(
+                                "PROFILE_DEBUG",
+                                "🔥 Reel userId: ${reel.userId} (current user: ${currentUser.uid})"
+                            )
+                            Log.d("PROFILE_DEBUG", "🔥 Reel type: ${reel.type}")
+                            Log.d("PROFILE_DEBUG", "🔥 Reel isPublished: ${reel.isPublished}")
+                            Log.d("PROFILE_DEBUG", "🔥 Reel mediaUrl: ${reel.mediaUrl}")
+                            Log.d("PROFILE_DEBUG", "🔥 Reel images: ${reel.images}")
+                            Log.d("PROFILE_DEBUG", "🔥 Reel thumbnail: ${reel.thumbnailUrl}")
+                            Log.d("PROFILE_DEBUG", "🔥 =====================================")
                         }
+
+                        // Additional validation - filter out any reels that don't belong to current user
+                        val validUserReels = reels.filter { reel ->
+                            val belongsToUser = reel.userId == currentUser.uid
+                            if (!belongsToUser) {
+                                Log.w(
+                                    "PROFILE_DEBUG",
+                                    "⚠️ Found reel that doesn't belong to current user: ${reel.id} belongs to ${reel.userId}"
+                                )
+                            }
+                            belongsToUser
+                        }
+
+                        // Deduplicate reels by ID to prevent showing the same reel twice
+                        val uniqueReels = validUserReels.distinctBy { it.id }
+
+                        if (uniqueReels.size != validUserReels.size) {
+                            Log.w(
+                                "PROFILE_DEBUG",
+                                "⚠️ DUPLICATES REMOVED: Had ${validUserReels.size} reels, removed ${validUserReels.size - uniqueReels.size} duplicates"
+                            )
+                            val duplicateIds =
+                                validUserReels.groupBy { it.id }.filter { it.value.size > 1 }.keys
+                            Log.w("PROFILE_DEBUG", "⚠️ Duplicate reel IDs: $duplicateIds")
+                        }
+
+                        if (validUserReels.size != reels.size) {
+                            Log.w(
+                                "PROFILE_DEBUG",
+                                "⚠️ Filtered out ${reels.size - validUserReels.size} reels that didn't belong to current user"
+                            )
+                        }
+
+                        _userReels.value = uniqueReels
+                        Log.d("PROFILE_DEBUG", "✅ Final user reels count: ${uniqueReels.size}")
                     }.onFailure { error ->
                         Log.e("PROFILE_DEBUG", "❌ Failed to load reels: ${error.message}")
                     }

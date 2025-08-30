@@ -107,7 +107,8 @@ fun MyNavHost(
                             // Handle comments sheet if needed
                         }
                     }
-                }
+                },
+                mainUiStateViewModel = mainUiStateViewModel
             )
             Log.d("MyNavHost", "🎬 ReelsView rendered successfully")
         }
@@ -144,7 +145,8 @@ fun MyNavHost(
                             // Handle comments sheet if needed
                         }
                     }
-                }
+                },
+                mainUiStateViewModel = mainUiStateViewModel
             )
             // Set the reelId in the savedStateHandle for ReelsView to use
             LaunchedEffect(Unit) {

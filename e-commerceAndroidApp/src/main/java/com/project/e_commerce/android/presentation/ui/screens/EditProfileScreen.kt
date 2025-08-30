@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import android.util.Log
 
 @Composable
 fun EditProfileScreen(navController: NavHostController) {
@@ -148,7 +149,20 @@ fun EditProfileScreen(navController: NavHostController) {
                     model = uiState.profileImageUrl,
                     contentDescription = "Profile Picture",
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    onSuccess = {
+                        Log.d(
+                            "EDIT_PROFILE_DEBUG",
+                            "✅ Profile image loaded successfully: ${uiState.profileImageUrl}"
+                        )
+                    },
+                    onError = { error ->
+                        Log.e(
+                            "EDIT_PROFILE_DEBUG",
+                            "❌ Profile image load failed: ${error.result.throwable?.message}"
+                        )
+                        Log.e("EDIT_PROFILE_DEBUG", "❌ Failed URL: ${uiState.profileImageUrl}")
+                    }
                 )
             } else {
                 Image(
@@ -167,20 +181,43 @@ fun EditProfileScreen(navController: NavHostController) {
                     .background(Color(0xFF0066CC), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.CameraAlt,
-                    contentDescription = "Change Photo",
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp)
-                )
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = "Change Photo",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // Loading overlay for the entire image
+            if (uiState.isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
         }
         
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Tap to change photo",
+            text = if (uiState.isLoading) "Uploading..." else "Tap to change photo",
             fontSize = 12.sp,
-            color = Color.Gray
+            color = if (uiState.isLoading) Color(0xFFFF6F00) else Color.Gray
         )
 
         Spacer(modifier = Modifier.height(24.dp))
