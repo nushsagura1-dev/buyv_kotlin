@@ -16,6 +16,8 @@ import com.cloudinary.android.MediaManager
 import com.cloudinary.android.callback.UploadCallback
 import com.cloudinary.android.callback.ErrorInfo
 import com.project.e_commerce.android.data.remote.CloudinaryConfig
+import com.project.e_commerce.android.presentation.utils.ProfileImageCache
+import com.project.e_commerce.android.presentation.utils.UserInfoCache
 
 data class EditProfileUiState(
     val isLoading: Boolean = false,
@@ -165,6 +167,16 @@ class EditProfileViewModel(
                             Log.d("EditProfileViewModel", "✅ Upload successful!")
                             Log.d("EditProfileViewModel", "🖼️ Cloudinary URL: $cloudinaryUrl")
 
+                            // Clear profile image cache so new image shows up immediately
+                            currentUser.uid?.let { userId ->
+                                ProfileImageCache.clearUserCache(userId)
+                                UserInfoCache.clearUserCache(userId)
+                                Log.d(
+                                    "EditProfileViewModel",
+                                    "🧹 Cleared profile image and user info cache for user: $userId"
+                                )
+                            }
+
                             // Update UI state with new URL
                             _uiState.value = _uiState.value.copy(
                                 profileImageUrl = cloudinaryUrl,
@@ -276,6 +288,10 @@ class EditProfileViewModel(
 
                 Log.d("EditProfileViewModel", "🔄 Calling updateUserProfileUseCase with UID: ${updatedProfile.uid}")
                 updateUserProfileUseCase(updatedProfile).onSuccess { profile ->
+                    // Clear profile caches after successful profile update
+                    ProfileImageCache.clearUserCache(updatedProfile.uid)
+                    UserInfoCache.clearUserCache(updatedProfile.uid)
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isSuccess = true,
@@ -292,7 +308,7 @@ class EditProfileViewModel(
                         "EditProfileViewModel",
                         " Updated profile image URL: '${profile.profileImageUrl}'"
                     )
-                    
+
                 }.onFailure { error ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,

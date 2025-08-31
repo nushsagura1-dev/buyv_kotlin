@@ -117,6 +117,7 @@ data class NewComment(
 
 data class Comment(
     val id: String = "",
+    val userId: String = "", // Add userId to identify comment author
     val userName: String = "",
     val comment: String = "",
     val time: String = "",
@@ -128,6 +129,7 @@ data class Comment(
 )
 
 data class Ratings(
+    val userId: String = "", // Add userId to identify rating author
     val userName: String = "",
     val review: String = "",
     val rate: Int = 0,

@@ -12,19 +12,58 @@ object VideoThumbnailUtils {
         if (videoUrl.isNullOrBlank()) return null
 
         return try {
-            if (videoUrl.contains("cloudinary.com")) {
-                if (videoUrl.contains("/video/upload/")) {
-                    // Replace the exact path segment to avoid double slashes
-                    videoUrl.replace("/video/upload/", "/video/upload/so_0/") + ".jpg"
-                } else if (videoUrl.contains("/upload/")) {
-                    // Fallback for other upload paths
-                    val baseUrl = videoUrl.substringBefore("upload/")
-                    val restOfUrl = videoUrl.substringAfter("upload/")
-                    "$baseUrl/upload/so_0/$restOfUrl.jpg"
-                } else {
-                    videoUrl
+            if (videoUrl.contains("cloudinary.com") && videoUrl.contains(".mp4")) {
+                Log.d("VideoThumbnailUtils", "🎬 Processing Cloudinary video URL: $videoUrl")
+
+                // Handle different Cloudinary URL formats
+                when {
+                    videoUrl.contains("/video/upload/") -> {
+                        // Standard video upload path: /video/upload/v123456/path/file.mp4
+                        val thumbnailUrl = videoUrl
+                            .replace("/video/upload/", "/video/upload/so_0/")
+                            .replace(".mp4", ".jpg")
+                        Log.d("VideoThumbnailUtils", "✅ Generated thumbnail URL: $thumbnailUrl")
+                        thumbnailUrl
+                    }
+
+                    videoUrl.contains("/upload/") -> {
+                        // Generic upload path: /upload/v123456/path/file.mp4  
+                        val thumbnailUrl = videoUrl
+                            .replace("/upload/", "/upload/so_0/")
+                            .replace(".mp4", ".jpg")
+                        Log.d(
+                            "VideoThumbnailUtils",
+                            "✅ Generated thumbnail URL (generic): $thumbnailUrl"
+                        )
+                        thumbnailUrl
+                    }
+
+                    else -> {
+                        // Try to insert so_0 before the filename
+                        val lastSlashIndex = videoUrl.lastIndexOf('/')
+                        if (lastSlashIndex != -1) {
+                            val basePath = videoUrl.substring(0, lastSlashIndex + 1)
+                            val fileName = videoUrl.substring(lastSlashIndex + 1)
+                            val thumbnailUrl = "${basePath}so_0/$fileName".replace(".mp4", ".jpg")
+                            Log.d(
+                                "VideoThumbnailUtils",
+                                "✅ Generated thumbnail URL (filename): $thumbnailUrl"
+                            )
+                            thumbnailUrl
+                        } else {
+                            Log.w(
+                                "VideoThumbnailUtils",
+                                "⚠️ Cannot process Cloudinary URL format: $videoUrl"
+                            )
+                            videoUrl
+                        }
+                    }
                 }
             } else {
+                Log.d(
+                    "VideoThumbnailUtils",
+                    "ℹ️ Not a Cloudinary video URL, returning as-is: $videoUrl"
+                )
                 videoUrl
             }
         } catch (e: Exception) {
@@ -36,8 +75,8 @@ object VideoThumbnailUtils {
     /**
      * Get the best thumbnail with priority:
      * 1. First image from images array (if available)
-     * 2. Existing thumbnail URL (fallback - these are product images that work)
-     * 3. Generated video thumbnail (temporarily disabled for testing)
+     * 2. Generated video thumbnail from Cloudinary (re-enabled)
+     * 3. Existing thumbnail URL (fallback)
      */
     fun getBestThumbnail(
         images: List<String>?,
@@ -55,18 +94,18 @@ object VideoThumbnailUtils {
             return images.first()
         }
 
-        // Priority 2: Use existing thumbnail URL (these are product images that work)
+        // Priority 2: Generate video thumbnail from Cloudinary (re-enabled!)
+        val videoThumbnail = generateVideoThumbnail(videoUrl)
+        if (!videoThumbnail.isNullOrBlank()) {
+            Log.d("VideoThumbnailUtils", "✅ Using generated video thumbnail: $videoThumbnail")
+            return videoThumbnail
+        }
+
+        // Priority 3: Use existing thumbnail URL (fallback)
         if (!fallbackUrl.isNullOrBlank()) {
             Log.d("VideoThumbnailUtils", "✅ Using existing thumbnail URL: $fallbackUrl")
             return fallbackUrl
         }
-
-        // Priority 3: Generate video thumbnail (temporarily disabled for testing)
-        // val videoThumbnail = generateVideoThumbnail(videoUrl)
-        // if (!videoThumbnail.isNullOrBlank()) {
-        //     Log.d("VideoThumbnailUtils", "✅ Using generated video thumbnail: $videoThumbnail")
-        //     return videoThumbnail
-        // }
 
         Log.d("VideoThumbnailUtils", "❌ No thumbnail available")
         return null

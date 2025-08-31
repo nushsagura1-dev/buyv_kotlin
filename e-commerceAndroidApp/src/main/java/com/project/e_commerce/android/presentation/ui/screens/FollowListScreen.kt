@@ -53,6 +53,10 @@ import com.project.e_commerce.android.presentation.viewModel.followingViewModel.
 import org.koin.androidx.compose.koinViewModel
 import android.util.Log
 import androidx.compose.foundation.background
+import coil3.compose.AsyncImage
+import com.project.e_commerce.android.presentation.utils.UserDisplayName
+import com.project.e_commerce.android.presentation.utils.UserFollowStats
+import com.project.e_commerce.android.presentation.utils.UserDisplayType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -328,22 +332,25 @@ fun UserFollowItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Profile Image
-        if (user.profileImageUrl != null) {
-            // TODO: Use AsyncImage for real profile images
-            Image(
-                painter = painterResource(id = R.drawable.profile),
+        if (user.profileImageUrl != null && user.profileImageUrl!!.isNotBlank()) {
+            AsyncImage(
+                model = user.profileImageUrl,
                 contentDescription = "Profile",
                 modifier = Modifier
                     .size(50.dp)
-                    .clip(CircleShape)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(id = R.drawable.profile),
+                error = painterResource(id = R.drawable.profile)
             )
         } else {
-            Image(
-                painter = painterResource(id = R.drawable.profile),
+            AsyncImage(
+                model = R.drawable.profile,
                 contentDescription = "Profile",
                 modifier = Modifier
                     .size(50.dp)
-                    .clip(CircleShape)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
             )
         }
 
@@ -351,14 +358,17 @@ fun UserFollowItem(
 
         // User Info
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = user.name,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = Color.Black
+            UserDisplayName(
+                userId = user.id,
+                displayType = UserDisplayType.DISPLAY_NAME_ONLY,
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color.Black
+                )
             )
             Text(
-                text = user.username,
+                text = "@${user.username}",
                 fontSize = 14.sp,
                 color = Color.Gray
             )

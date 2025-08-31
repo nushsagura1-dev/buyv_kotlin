@@ -83,6 +83,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import androidx.compose.runtime.mutableStateMapOf
 import kotlinx.coroutines.tasks.await
+import com.project.e_commerce.android.presentation.utils.UserInfoCache
+import com.project.e_commerce.android.presentation.utils.UserDisplayName
+import com.project.e_commerce.android.presentation.utils.UserDisplayType
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -181,11 +184,9 @@ fun ReelsView(
         }
     }
 
-    // --- BEGIN PUBLISHER DISPLAY NAME SUPPORT ---
-    val publisherNames = remember { mutableStateMapOf<String, String>() }
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    // --- END PUBLISHER DISPLAY NAME SUPPORT ---
+    // --- BEGIN USER INFO CACHE (FOR DISPLAY NAME SUPPORT) ---
+    // UserInfoCache is now a singleton object, no need to instantiate
+    // --- END USER INFO CACHE ---
 
     Log.d("ReelsView", "🎬 Current user ID: $currentUserId")
     Log.d("ReelsView", "🎬 Reels list size: ${reelsList.size}")
@@ -454,21 +455,6 @@ fun ReelsView(
                     isLoggedIn = isLoggedIn,
                     showLoginPrompt = showLoginPrompt,
                     initialPage = initialPage,
-                    publisherNames = publisherNames,
-                    publisherNameFetcher = { userId, reelUserName ->
-                        if (userId.isNotEmpty() && publisherNames[userId] == null) {
-                            scope.launch {
-                                try {
-                                    val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                    val doc = db.collection("users").document(userId).get().await()
-                                    val displayName = doc.getString("displayName") ?: reelUserName
-                                    publisherNames[userId] = displayName
-                                } catch (e: Exception) {
-                                    Log.e("ReelsView", "Failed to get displayName for $userId", e)
-                                }
-                            }
-                        }
-                    },
                     onShareReel = ::shareReel,
                     recentlyViewedViewModel = recentlyViewedViewModel
                 )
@@ -718,8 +704,6 @@ fun ReelsList(
     isLoggedIn: Boolean,
     showLoginPrompt: androidx.compose.runtime.MutableState<Boolean>,
     initialPage: Int = 0,
-    publisherNames: MutableMap<String, String> = mutableMapOf(),
-    publisherNameFetcher: ((String, String) -> Unit)? = null,
     onShareReel: (Reels) -> Unit = {},
     recentlyViewedViewModel: com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel
 ) {
@@ -752,21 +736,11 @@ fun ReelsList(
         count = reelsList.size
     ) { page ->
         val reel = reelsList[page]
-        // Track viewed reel each time it's viewed - REMOVED: This was causing duplicate tracking
-        // recentlyViewedViewModel.addReelToRecentlyViewed(reel)
+
         Log.d(
             "ReelsCrash",
             "Rendering reel at page=$page: id=${reel.id}, video=${reel.video}, userName=${reel.userName}, productName=${reel.productName}, images=${reel.images}, price=${reel.productPrice}, image placeholder?=${reel.productImage}"
         )
-
-        // --- BEGIN DISPLAY NAME FETCH LOGIC ---
-        val publisherDisplayName = publisherNames[reel.userId] ?: reel.userName
-        if (publisherNameFetcher != null && publisherNames[reel.userId] == null && reel.userId.isNotEmpty()) {
-            LaunchedEffect(reel.userId) {
-                publisherNameFetcher(reel.userId, reel.userName)
-            }
-        }
-        // --- END DISPLAY NAME FETCH LOGIC ---
 
         // New guards and data logging as requested:
         if ((reel.video == null || "${reel.video}".isBlank() || !(reel.video.toString()
@@ -899,27 +873,72 @@ fun ReelsList(
                 val auth = FirebaseAuth.getInstance()
                 val currentUserId = auth.currentUser?.uid
                 val isOwner = currentUserId == reel.userId
-                AsyncImage(
-                    model = if (reel.userImage != 0) reel.userImage else R.drawable.profile,
-                    contentDescription = "User Avatar",
-                    modifier = Modifier
-                        .size(43.dp)
-                        .clip(CircleShape)
-                        .border(2.dp, Color.White, CircleShape)
-                        .shadow(6.dp, CircleShape, clip = false)
-                        .clickable {
-                            val auth = FirebaseAuth.getInstance()
-                            val currentUserId = auth.currentUser?.uid
-                            val isOwner = currentUserId == reel.userId
-                            if (isOwner) navController.navigate(Screens.ProfileScreen.route)
-                            else navController.navigate(
-                                Screens.OtherUserProfileScreen.createRoute(
-                                    reel.userId
+
+                // Get user profile for this reel to fetch profile image
+                val userProfileImageUrl = remember { mutableStateOf<String?>(null) }
+
+                // Fetch user profile image
+                LaunchedEffect(reel.userId) {
+                    if (reel.userId.isNotBlank()) {
+                        try {
+                            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            val doc = db.collection("users").document(reel.userId).get().await()
+                            val profileImageUrl = doc.getString("profileImageUrl")
+                            userProfileImageUrl.value = profileImageUrl
+                            Log.d("ReelsView", "✅ Fetched profile image for ${reel.userId}: $profileImageUrl")
+                        } catch (e: Exception) {
+                            Log.e("ReelsView", "❌ Failed to fetch profile image for ${reel.userId}: ${e.message}")
+                        }
+                    }
+                }
+                
+                if (userProfileImageUrl.value != null && userProfileImageUrl.value!!.isNotBlank()) {
+                    AsyncImage(
+                        model = userProfileImageUrl.value,
+                        contentDescription = "User Avatar",
+                        modifier = Modifier
+                            .size(43.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, Color.White, CircleShape)
+                            .shadow(6.dp, CircleShape, clip = false)
+                            .clickable {
+                                val auth = FirebaseAuth.getInstance()
+                                val currentUserId = auth.currentUser?.uid
+                                val isOwner = currentUserId == reel.userId
+                                if (isOwner) navController.navigate(Screens.ProfileScreen.route)
+                                else navController.navigate(
+                                    Screens.OtherUserProfileScreen.createRoute(
+                                        reel.userId
+                                    )
                                 )
-                            )
-                        },
-                    contentScale = ContentScale.Crop
-                )
+                            },
+                        contentScale = ContentScale.Crop,
+                        placeholder = painterResource(id = R.drawable.profile),
+                        error = painterResource(id = R.drawable.profile)
+                    )
+                } else {
+                    AsyncImage(
+                        model = R.drawable.profile,
+                        contentDescription = "User Avatar",
+                        modifier = Modifier
+                            .size(43.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, Color.White, CircleShape)
+                            .shadow(6.dp, CircleShape, clip = false)
+                            .clickable {
+                                val auth = FirebaseAuth.getInstance()
+                                val currentUserId = auth.currentUser?.uid
+                                val isOwner = currentUserId == reel.userId
+                                if (isOwner) navController.navigate(Screens.ProfileScreen.route)
+                                else navController.navigate(
+                                    Screens.OtherUserProfileScreen.createRoute(
+                                        reel.userId
+                                    )
+                                )
+                            },
+                        contentScale = ContentScale.Crop
+                    )
+                }
                 Spacer(modifier = Modifier.height(15.dp))
                 Icon(
                     painter = painterResource(id = if (reel.love.isLoved) R.drawable.ic_love_checked else R.drawable.ic_love),
@@ -1047,8 +1066,7 @@ fun ReelsList(
                     reel = reel,
                     navController = navController,
                     isLoggedIn = isLoggedIn,
-                    showLoginPrompt = showLoginPrompt,
-                    publisherName = publisherDisplayName
+                    showLoginPrompt = showLoginPrompt
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 if (reel.contentDescription.isNotBlank()) {
@@ -1159,8 +1177,7 @@ fun UserInfo(
     reel: Reels,
     navController: NavController,
     isLoggedIn: Boolean,
-    showLoginPrompt: androidx.compose.runtime.MutableState<Boolean>,
-    publisherName: String? = null
+    showLoginPrompt: androidx.compose.runtime.MutableState<Boolean>
 ) {
     // Get current user ID to check if they own this reel
     val auth = remember { FirebaseAuth.getInstance() }
@@ -1209,11 +1226,15 @@ fun UserInfo(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = publisherName ?: reel.userName,
+        // Use the new UserDisplayName composable for consistent display
+        UserDisplayName(
+            userId = reel.userId,
+            displayType = UserDisplayType.DISPLAY_NAME_ONLY,
             color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
+            textStyle = androidx.compose.ui.text.TextStyle(
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            ),
             modifier = Modifier.clickable {
                 // Navigate to appropriate profile based on ownership
                 if (isOwner) {
@@ -1233,7 +1254,7 @@ fun UserInfo(
         )
 
         // Debug logging for username
-        Log.d("UserInfo", "🔍 Displaying username: '${publisherName ?: reel.userName}' for reel ID: ${reel.id}")
+        Log.d("UserInfo", "🔍 Using UserDisplayName composable for reel ID: ${reel.id}")
 
         // Only show follow button if user is NOT the owner
         Log.d("UserInfo", "🔍 Follow button visibility check - isOwner: $isOwner, showing button: ${!isOwner}")
@@ -1269,6 +1290,9 @@ fun UserInfo(
                                         currentUser?.displayName ?: currentUser?.email?.split("@")
                                             ?.firstOrNull() ?: "user"
                                     followingViewModel.loadUserData(userId, username)
+                                    
+                                    // Clear user info cache so follower counts update
+                                    UserInfoCache.clearUserCache(reel.userId)
                                 }
                             }
                         }
@@ -1472,40 +1496,101 @@ fun InteractionButtons(
             modifier = Modifier
                 .size(46.dp) // مساحة أكبر لتضمين التوثيق
         ) {
-            // NEW COIL CODE:
-            AsyncImage(
-                model = reel.userImage,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(40.dp)
-                    .align(Alignment.TopCenter)
-                    .clip(CircleShape)
-                    .clickable {
-                        // Navigate to appropriate profile based on ownership
-                        if (isOwner) {
-                            Log.d("UserInfo", "🔄 Avatar click: Navigating to my profile")
-                            navController.navigate(Screens.ProfileScreen.route)
-                        } else {
-                            if (reel.userId.isNotBlank()) {
-                                Log.d(
-                                    "UserInfo",
-                                    "🔄 Avatar click: Navigating to other user profile: ${reel.userId}"
-                                )
-                                navController.navigate(
-                                    Screens.OtherUserProfileScreen.createRoute(
-                                        reel.userId
-                                    )
-                                )
+            // Get user profile for this reel to fetch profile image
+            val userProfileImageUrl = remember { mutableStateOf<String?>(null) }
+
+            // Fetch user profile image
+            LaunchedEffect(reel.userId) {
+                if (reel.userId.isNotBlank()) {
+                    try {
+                        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        val doc = db.collection("users").document(reel.userId).get().await()
+                        val profileImageUrl = doc.getString("profileImageUrl")
+                        userProfileImageUrl.value = profileImageUrl
+                        Log.d(
+                            "InteractionButtons",
+                            "✅ Fetched profile image for ${reel.userId}: $profileImageUrl"
+                        )
+                    } catch (e: Exception) {
+                        Log.e(
+                            "InteractionButtons",
+                            "❌ Failed to fetch profile image for ${reel.userId}: ${e.message}"
+                        )
+                    }
+                }
+            }
+
+            if (userProfileImageUrl.value != null && userProfileImageUrl.value!!.isNotBlank()) {
+                AsyncImage(
+                    model = userProfileImageUrl.value,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .align(Alignment.TopCenter)
+                        .clip(CircleShape)
+                        .clickable {
+                            // Navigate to appropriate profile based on ownership
+                            if (isOwner) {
+                                Log.d("UserInfo", "🔄 Avatar click: Navigating to my profile")
+                                navController.navigate(Screens.ProfileScreen.route)
                             } else {
-                                Log.e(
-                                    "UserInfo",
-                                    "❌ Avatar click: Cannot navigate: reel.userId is blank or null"
-                                )
+                                if (reel.userId.isNotBlank()) {
+                                    Log.d(
+                                        "UserInfo",
+                                        "🔄 Avatar click: Navigating to other user profile: ${reel.userId}"
+                                    )
+                                    navController.navigate(
+                                        Screens.OtherUserProfileScreen.createRoute(
+                                            reel.userId
+                                        )
+                                    )
+                                } else {
+                                    Log.e(
+                                        "UserInfo",
+                                        "❌ Avatar click: Cannot navigate: reel.userId is blank or null"
+                                    )
+                                }
                             }
-                        }
-                    },
-                contentDescription = "User Avatar"
-            )
+                        },
+                    contentDescription = "User Avatar",
+                    placeholder = painterResource(id = R.drawable.profile),
+                    error = painterResource(id = R.drawable.profile)
+                )
+            } else {
+                AsyncImage(
+                    model = R.drawable.profile,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .align(Alignment.TopCenter)
+                        .clip(CircleShape)
+                        .clickable {
+                            // Navigate to appropriate profile based on ownership
+                            if (isOwner) {
+                                Log.d("UserInfo", "🔄 Avatar click: Navigating to my profile")
+                                navController.navigate(Screens.ProfileScreen.route)
+                            } else {
+                                if (reel.userId.isNotBlank()) {
+                                    Log.d(
+                                        "UserInfo",
+                                        "🔄 Avatar click: Navigating to other user profile: ${reel.userId}"
+                                    )
+                                    navController.navigate(
+                                        Screens.OtherUserProfileScreen.createRoute(
+                                            reel.userId
+                                        )
+                                    )
+                                } else {
+                                    Log.e(
+                                        "UserInfo",
+                                        "❌ Avatar click: Cannot navigate: reel.userId is blank or null"
+                                    )
+                                }
+                            }
+                        },
+                    contentDescription = "User Avatar"
+                )
+            }
 
             Image(
                 painter = painterResource(id = R.drawable.verified_badge),
@@ -2242,6 +2327,23 @@ fun ModernCommentItem(
     var isLoved by remember { mutableStateOf(comment.isLoved) }
     var likesCount by remember { mutableStateOf(800) }
     var dislikesCount by remember { mutableStateOf(2) }
+    
+    // Fetch commenter's profile image
+    val commenterProfileImageUrl = remember { mutableStateOf<String?>(null) }
+    
+    LaunchedEffect(comment.userId) {
+        if (comment.userId.isNotBlank()) {
+            try {
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val doc = db.collection("users").document(comment.userId).get().await()
+                val profileImageUrl = doc.getString("profileImageUrl")
+                commenterProfileImageUrl.value = profileImageUrl
+                Log.d("ModernCommentItem", "✅ Fetched profile image for commenter ${comment.userId}: $profileImageUrl")
+            } catch (e: Exception) {
+                Log.e("ModernCommentItem", "❌ Failed to fetch profile image for commenter ${comment.userId}: ${e.message}")
+            }
+        }
+    }
 
     Row(
         modifier = modifier
@@ -2249,25 +2351,28 @@ fun ModernCommentItem(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.Top
     ) {
-        // ORIGINAL GLIDE CODE (COMMENTED OUT):
-        // GlideImage(
-        //     model = R.drawable.profile,
-        //     contentDescription = "User Avatar",
-        //     contentScale = ContentScale.Crop,
-        //     modifier = Modifier
-        //         .size(40.dp)
-        //         .clip(CircleShape)
-        // )
-        
-        // NEW COIL CODE:
-        AsyncImage(
-            model = R.drawable.profile,
-            contentDescription = "User Avatar",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-        )
+        // User avatar with real profile image
+        if (commenterProfileImageUrl.value != null && commenterProfileImageUrl.value!!.isNotBlank()) {
+            AsyncImage(
+                model = commenterProfileImageUrl.value,
+                contentDescription = "User Avatar",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                placeholder = painterResource(id = R.drawable.profile),
+                error = painterResource(id = R.drawable.profile)
+            )
+        } else {
+            AsyncImage(
+                model = R.drawable.profile,
+                contentDescription = "User Avatar",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+            )
+        }
 
         Spacer(modifier = Modifier.width(12.dp))
 
@@ -2374,33 +2479,57 @@ fun ModernRatingItem(
 ) {
     var isFavorite by remember { mutableStateOf(false) }
 
+    // Fetch rater's profile image
+    val raterProfileImageUrl = remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(rating.userId) {
+        if (rating.userId.isNotBlank()) {
+            try {
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val doc = db.collection("users").document(rating.userId).get().await()
+                val profileImageUrl = doc.getString("profileImageUrl")
+                raterProfileImageUrl.value = profileImageUrl
+                Log.d(
+                    "ModernRatingItem",
+                    "✅ Fetched profile image for rater ${rating.userId}: $profileImageUrl"
+                )
+            } catch (e: Exception) {
+                Log.e(
+                    "ModernRatingItem",
+                    "❌ Failed to fetch profile image for rater ${rating.userId}: ${e.message}"
+                )
+            }
+        }
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // صورة المستخدم
-        
-        // ORIGINAL GLIDE CODE (COMMENTED OUT):
-        // GlideImage(
-        //     model = R.drawable.profile,
-        //     contentDescription = "User Avatar",
-        //     contentScale = ContentScale.Crop,
-        //     modifier = Modifier
-        //         .size(40.dp)
-        //         .clip(CircleShape)
-        // )
-        
-        // NEW COIL CODE:
-        AsyncImage(
-            model = R.drawable.profile,
-            contentDescription = "User Avatar",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-        )
+        // User avatar with real profile image
+        if (raterProfileImageUrl.value != null && raterProfileImageUrl.value!!.isNotBlank()) {
+            AsyncImage(
+                model = raterProfileImageUrl.value,
+                contentDescription = "User Avatar",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                placeholder = painterResource(id = R.drawable.profile),
+                error = painterResource(id = R.drawable.profile)
+            )
+        } else {
+            AsyncImage(
+                model = R.drawable.profile,
+                contentDescription = "User Avatar",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+            )
+        }
 
         Spacer(modifier = Modifier.width(8.dp))
 

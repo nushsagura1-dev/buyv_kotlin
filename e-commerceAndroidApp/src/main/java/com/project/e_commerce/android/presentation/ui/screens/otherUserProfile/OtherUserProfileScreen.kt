@@ -33,6 +33,8 @@ import com.project.e_commerce.android.presentation.viewModel.otherUserProfile.Ot
 import org.koin.androidx.compose.koinViewModel
 import android.util.Log
 import com.project.e_commerce.android.presentation.utils.VideoThumbnailUtils
+import com.project.e_commerce.android.presentation.ui.composable.composableScreen.public.VideoThumbnail
+import android.net.Uri
 
 @Composable
 fun OtherUserProfileScreen(
@@ -363,15 +365,38 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
                     fallbackUrl = reel.thumbnailUrl
                 )
                 
+                Log.d("OtherUserProfile", "🎬 Processing reel ${reel.id}:")
+                Log.d("OtherUserProfile", "  - MediaUrl: ${reel.mediaUrl}")
+                Log.d("OtherUserProfile", "  - Images: ${reel.images}")
+                Log.d("OtherUserProfile", "  - ThumbnailUrl: ${reel.thumbnailUrl}")
+                Log.d("OtherUserProfile", "  - BestThumbnail: $bestThumbnail")
+                
                 if (!bestThumbnail.isNullOrBlank()) {
+                    Log.d("OtherUserProfile", "✅ Using thumbnail: $bestThumbnail")
                     AsyncImage(
                         model = bestThumbnail,
                         contentDescription = "Reel thumbnail",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.ic_play)
+                        error = painterResource(id = R.drawable.img2),
+                        onSuccess = { 
+                            Log.d("OtherUserProfile", "✅ Thumbnail loaded successfully: $bestThumbnail")
+                        },
+                        onError = { error ->
+                            Log.e("OtherUserProfile", "❌ Thumbnail failed to load: $bestThumbnail")
+                            Log.e("OtherUserProfile", "❌ Error: ${error.result.throwable?.message}")
+                        }
+                    )
+                } else if (!reel.mediaUrl.isNullOrBlank()) {
+                    Log.d("OtherUserProfile", "🎬 Using VideoThumbnail component for: ${reel.mediaUrl}")
+                    VideoThumbnail(
+                        videoUri = Uri.parse(reel.mediaUrl),
+                        fallbackImageRes = R.drawable.img2,
+                        modifier = Modifier.fillMaxSize(),
+                        showPlayIcon = false
                     )
                 } else {
+                    Log.d("OtherUserProfile", "⚠️ No thumbnail available, showing fallback")
                     Box(
                         modifier = Modifier
                             .fillMaxSize()

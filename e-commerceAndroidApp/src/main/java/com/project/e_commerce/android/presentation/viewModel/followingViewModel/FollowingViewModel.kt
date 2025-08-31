@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import android.util.Log
+import com.project.e_commerce.android.presentation.utils.UserInfoCache
 
 class FollowingViewModel(
     private val followUserUseCase: FollowUserUseCase,
@@ -115,6 +116,9 @@ class FollowingViewModel(
         val unfollowResult = unfollowUserUseCase(currentUserId, targetUserId)
         if (unfollowResult.isSuccess) {
             Log.d(TAG, "✅ Unfollow result: $unfollowResult")
+            // Clear user info cache for both users so follower counts update
+            UserInfoCache.clearUserCache(currentUserId)
+            UserInfoCache.clearUserCache(targetUserId)
         } else {
             Log.e(TAG, "❌ Unfollow failed: ${unfollowResult.exceptionOrNull()?.message}")
             setErrorState(
@@ -128,6 +132,9 @@ class FollowingViewModel(
         val followResult = followUserUseCase(currentUserId, targetUserId)
         if (followResult.isSuccess) {
             Log.d(TAG, "✅ Follow result: $followResult")
+            // Clear user info cache for both users so follower counts update
+            UserInfoCache.clearUserCache(currentUserId)
+            UserInfoCache.clearUserCache(targetUserId)
         } else {
             Log.e(TAG, "❌ Follow failed: ${followResult.exceptionOrNull()?.message}")
             setErrorState(true, "Failed to follow user: ${followResult.exceptionOrNull()?.message}")

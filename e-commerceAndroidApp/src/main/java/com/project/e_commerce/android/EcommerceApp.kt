@@ -11,8 +11,6 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.project.e_commerce.android.data.remote.CloudinaryConfig
 import com.project.e_commerce.android.di.viewModelModule
 import com.project.e_commerce.android.domain.repository.NotificationRepository
-import okhttp3.OkHttpClient
-import com.project.e_commerce.android.presentation.utils.CloudinaryUriFetcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,7 +40,8 @@ class EcommerceApp : Application() {
             android.util.Log.e("ECOMMERCE_APP", "✅ CloudinaryConfig initialized")
 
             // Manually set up Coil ImageLoader
-            android.util.Log.e("ECOMMERCE_APP", "🖼️ Setting up Coil ImageLoader")
+            android.util.Log.e("ECOMMERCE_APP", "🖼️ Setting up Coil ImageLoader for Coil 3.x")
+
             val imageLoader = ImageLoader.Builder(this)
                 .logger(DebugLogger())
                 .crossfade(true)

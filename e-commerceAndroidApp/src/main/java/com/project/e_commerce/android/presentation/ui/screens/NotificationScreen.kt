@@ -35,6 +35,8 @@ import com.project.e_commerce.android.presentation.viewModel.NotificationViewMod
 import org.koin.androidx.compose.koinViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 
 @Composable
 fun NotificationScreen(
@@ -315,15 +317,15 @@ fun FirebaseNotificationCard(
     ) {
         // Notification icon/image
         if (!notification.isSystemNotification && notification.senderImageUrl != null) {
-            // User notification with profile image (can be implemented with Coil)
-            Icon(
-                painter = painterResource(id = R.drawable.profile),
+            // User notification with profile image (using Coil AsyncImage)
+            AsyncImage(
+                model = notification.senderImageUrl,
                 contentDescription = null,
                 modifier = Modifier
                     .size(42.dp)
                     .clip(CircleShape)
                     .padding(end = 6.dp),
-                tint = Color.Unspecified
+                contentScale = ContentScale.Crop
             )
         } else {
             // System notification with app logo or category icon

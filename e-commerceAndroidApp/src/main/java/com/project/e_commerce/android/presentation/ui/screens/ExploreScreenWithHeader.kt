@@ -52,6 +52,9 @@ import com.project.e_commerce.android.presentation.ui.composable.composableScree
 import com.project.e_commerce.android.R
 import org.koin.androidx.compose.koinViewModel
 import android.util.Log
+import com.project.e_commerce.android.presentation.utils.UserInfoCache
+import com.project.e_commerce.android.presentation.utils.UserDisplayName
+import com.project.e_commerce.android.presentation.utils.UserDisplayType
 
 
 
@@ -82,15 +85,21 @@ fun ExploreScreenWithHeader(
     
     // Get real product data from ProductViewModel
     val exploreItems = productViewModel.productReels.map { reel ->
+        Log.d("EXPLORE_DEBUG", "🎬 Processing reel: ${reel.id}")
+        Log.d("EXPLORE_DEBUG", "  - UserId: '${reel.userId}'")
+        Log.d("EXPLORE_DEBUG", "  - UserName: '${reel.userName}' (fallback)")
+        Log.d("EXPLORE_DEBUG", "  - ProductName: '${reel.productName}'")
+
         ExploreItem(
             id = reel.id,
+            userId = reel.userId, // Add userId for proper name resolution
             productName = reel.productName,
             productPrice = reel.productPrice,
             productImage = reel.productImage,
             isVideo = reel.video != null,
             videoUri = reel.video,
             imageUris = reel.images,
-            userName = reel.userName,
+            userName = reel.userName, // Keep as fallback
             loveCount = reel.love.number,
             isLoved = reel.love.isLoved,
             commentCount = reel.numberOfComments,
@@ -336,12 +345,30 @@ fun ExploreGridItem(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = item.userName,
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 10.sp,
-                        maxLines = 1
-                    )
+                    // Use UserDisplayName for real user names instead of hardcoded userName
+                    Box(
+                        modifier = Modifier.weight(1f, false)
+                    ) {
+                        if (item.userId.isNotBlank()) {
+                            UserDisplayName(
+                                userId = item.userId,
+                                displayType = UserDisplayType.DISPLAY_NAME_ONLY,
+                                color = Color.White.copy(alpha = 0.8f),
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    fontSize = 10.sp
+                                ),
+                                maxLines = 1
+                            )
+                        } else {
+                            // Fallback to original userName if userId is blank
+                            Text(
+                                text = item.userName,
+                                color = Color.White.copy(alpha = 0.8f),
+                                fontSize = 10.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
                     
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -434,6 +461,7 @@ enum class HeaderStyle {
 
 data class ExploreItem(
     val id: String,
+    val userId: String, // Add userId for proper name resolution
     val productName: String,
     val productPrice: String,
     val productImage: String,

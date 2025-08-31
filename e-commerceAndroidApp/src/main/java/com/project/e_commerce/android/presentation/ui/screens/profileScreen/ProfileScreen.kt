@@ -49,16 +49,23 @@ import androidx.navigation.NavHostController
 import android.util.Log
 import androidx.compose.runtime.LaunchedEffect
 import coil3.compose.AsyncImage
+import com.project.e_commerce.android.presentation.viewModel.editProfileViewModel.EditProfileViewModel
+import com.project.e_commerce.android.presentation.viewModel.followingViewModel.FollowingViewModel
+import com.project.e_commerce.android.presentation.utils.UserFollowStats
 import com.google.firebase.auth.FirebaseAuth
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.ui.screens.RequireLoginPrompt
 import com.project.e_commerce.android.presentation.ui.composable.composableScreen.public.VideoThumbnail
+import com.project.e_commerce.android.presentation.ui.screens.otherUserProfile.ProfileStat
+import com.project.e_commerce.android.presentation.ui.screens.otherUserProfile.UserProductsGrid
 import com.project.e_commerce.android.presentation.utils.VideoThumbnailUtils
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
 import com.project.e_commerce.android.presentation.viewModel.profileViewModel.ProfileViewModel
 import org.koin.androidx.compose.koinViewModel
+import com.project.e_commerce.android.presentation.utils.UserInfoCache
+import com.project.e_commerce.android.presentation.ui.screens.otherUserProfile.UserProductsGrid
 
 @Composable
 fun ProfileScreen(navController: NavHostController) {
@@ -83,6 +90,8 @@ fun ProfileScreen(navController: NavHostController) {
     // Refresh profile data when screen becomes active (e.g., returning from EditProfileScreen)
     LaunchedEffect(navController.currentBackStackEntry) {
         profileViewModel.refreshProfile()
+        // Clear user info cache so latest info will be fetched after editing
+        UserInfoCache.clearAllCache()
     }
 
     // Refresh profile when returning from other screens
@@ -90,6 +99,8 @@ fun ProfileScreen(navController: NavHostController) {
         onDispose {
             // This will trigger when we navigate away and then back
             profileViewModel.refreshProfile()
+            // Clear cached user info when coming back from other screens
+            UserInfoCache.clearAllCache()
         }
     }
 
@@ -281,7 +292,7 @@ fun ProfileScreen(navController: NavHostController) {
                             e.printStackTrace()
                         }
                     }
-                    
+
                     // Profile Image - Use real data if available, fallback to default
                     Log.d("PROFILE_DEBUG", "🖼️ ===== PROFILE IMAGE DISPLAY DEBUG =====")
                     Log.d(
@@ -312,71 +323,23 @@ fun ProfileScreen(navController: NavHostController) {
                             )
                         }
 
-                        // Normalize the Cloudinary URL
-                        val normalizedUrl = if (profileImageUrl.startsWith("//")) {
-                            "https:$profileImageUrl"
-                        } else if (!profileImageUrl.startsWith("http")) {
-                            "https://$profileImageUrl"
-                        } else {
-                            profileImageUrl
-                        }
-
-                        Log.d("PROFILE_DEBUG", "🖼️ Original URL: $profileImageUrl")
-                        Log.d("PROFILE_DEBUG", "🖼️ Normalized URL: $normalizedUrl")
-                        Log.d(
-                            "PROFILE_DEBUG",
-                            "🖼️ URL normalization needed: ${normalizedUrl != profileImageUrl}"
-                        )
-
-                        // Use AsyncImage instead of rememberAsyncImagePainter for better Cloudinary support
-                        Log.d(
-                            "PROFILE_DEBUG",
-                            "🖼️ Loading profile image using AsyncImage: $normalizedUrl"
-                        )
-
-                        // First, let's test with a simple guaranteed working URL
-                        val testUrl =
-                            "https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png"
-                        val finalUrl = if (normalizedUrl.contains("cloudinary")) {
-                            Log.d(
-                                "PROFILE_DEBUG",
-                                "🧪 Using test URL instead of Cloudinary: $testUrl"
+                        // Use CloudinaryUtils for proper URL normalization
+                        val normalizedUrl =
+                            com.project.e_commerce.android.presentation.utils.CloudinaryUtils.normalizeCloudinaryUrl(
+                                profileImageUrl
                             )
-                            testUrl
-                        } else {
-                            normalizedUrl
-                        }
 
                         AsyncImage(
-                            model = finalUrl,
+                            model = normalizedUrl,
                             contentDescription = "Profile Picture",
                             modifier = Modifier
                                 .size(100.dp)
                                 .clip(CircleShape),
                             contentScale = ContentScale.Crop,
-                            onSuccess = {
-                                Log.e("PROFILE_DEBUG", "✅✅✅ SUCCESS! Image loaded: $finalUrl")
-                            },
-                            onError = { error ->
-                                Log.e("PROFILE_DEBUG", "❌❌❌ ERROR! Image failed: $finalUrl")
-                                Log.e(
-                                    "PROFILE_DEBUG",
-                                    "❌ Error: ${error.result.throwable?.message}"
-                                )
-                                Log.e("PROFILE_DEBUG", "❌ Full error: ${error.result.throwable}")
-                                error.result.throwable?.printStackTrace()
-                            },
-                            onLoading = {
-                                Log.e("PROFILE_DEBUG", "⏳⏳⏳ LOADING started: $finalUrl")
-                            },
                             placeholder = painterResource(id = R.drawable.profile),
                             error = painterResource(id = R.drawable.profile)
                         )
                     } else {
-                        Log.d(
-                            "CrashDebug",
-                            "ProfileScreen: loading default profile image (no URL available)"
-                        )
                         Log.d("PROFILE_DEBUG", "🖼️ Using default profile image")
                         Image(
                             painter = painterResource(id = R.drawable.profile),
@@ -387,7 +350,7 @@ fun ProfileScreen(navController: NavHostController) {
                         )
                     }
                     Log.d("PROFILE_DEBUG", "🖼️ ==========================================")
-                    
+
                     ProfileStat(
                         number = uiState.followersCount.toString(),
                         label = "Followers"
@@ -559,7 +522,7 @@ fun ProfileScreen(navController: NavHostController) {
             when (selectedTabIndex) {
                 0 -> {
                     Log.d("CrashDebug", "ProfileScreen: Showing Reels with ${userReels.size} reels")
-                    UserReelsGrid(userReels, navController)
+                    ProfileReelsGrid(userReels, navController)
                 }
                 1 -> {
                     Log.d(
@@ -607,8 +570,11 @@ fun ProfileStat(number: String, label: String, onClick: () -> Unit = {}) {
 }
 
 @Composable
-fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPost>, navController: NavHostController) {
-    Log.d("CrashDebug", "UserReelsGrid: entered composable with ${reels.size} reels")
+fun ProfileReelsGrid(
+    reels: List<com.project.e_commerce.android.domain.model.UserPost>,
+    navController: NavHostController
+) {
+    Log.d("CrashDebug", "ProfileReelsGrid: entered composable with ${reels.size} reels")
 
     // Debug: Check for duplicate reels
     Log.d("PROFILE_DEBUG", "🎯 ===== REELS GRID DEBUG =====")
@@ -645,12 +611,12 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
     Log.d("PROFILE_DEBUG", "🎯 =============================")
 
     if (reels.isEmpty()) {
-        Log.d("CrashDebug", "UserReelsGrid: no reels to display")
+        Log.d("CrashDebug", "ProfileReelsGrid: no reels to display")
         EmptyStateGrid("No reels yet", "Start creating reels to see them here")
         return
     }
 
-    Log.d("CrashDebug", "UserReelsGrid: displaying ${reels.size} reels")
+    Log.d("CrashDebug", "ProfileReelsGrid: displaying ${reels.size} reels")
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.height(650.dp),
@@ -675,7 +641,10 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
                     fallbackUrl = reel.thumbnailUrl
                 )
 
-                Log.d("CrashDebug", "UserReelsGrid: loading thumbnail for reel with id ${reel.id}")
+                Log.d(
+                    "CrashDebug",
+                    "ProfileReelsGrid: loading thumbnail for reel with id ${reel.id}"
+                )
                 // Debug logging - make it more visible
                 Log.d("PROFILE_DEBUG", "🎯 ===== REEL THUMBNAIL DEBUG =====")
                 Log.d("PROFILE_DEBUG", "🎬 Reel Title: ${reel.title}")
@@ -687,51 +656,63 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
                 Log.d("PROFILE_DEBUG", "🎬 Best Thumbnail: $bestThumbnail")
                 Log.d("PROFILE_DEBUG", "🎬 =================================")
 
-                if (!reel.mediaUrl.isNullOrBlank()) {
-                    Log.d(
-                        "CrashDebug",
-                        "UserReelsGrid: loading VideoThumbnail for reel with mediaUrl: ${reel.mediaUrl}"
-                    )
-                    VideoThumbnail(
-                        videoUri = Uri.parse(reel.mediaUrl),
-                        fallbackImageRes = R.drawable.img2,
-                        modifier = Modifier.fillMaxSize(),
-                        showPlayIcon = false // We'll add our own play icon overlay
-                    )
-                } else if (!bestThumbnail.isNullOrBlank()) {
-                    Log.d(
-                        "CrashDebug",
-                        "UserReelsGrid: loading AsyncImage with thumbnail $bestThumbnail"
-                    )
-                    AsyncImage(
-                        model = bestThumbnail,
-                        contentDescription = "Reel thumbnail",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.img2)
-                    )
-                } else {
-                    Log.d(
-                        "CrashDebug",
-                        "UserReelsGrid: no thumbnail available for reel with id ${reel.id}"
-                    )
-                    // Show clean background instead of hardcoded image
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFFE0E0E0))
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_play),
-                            contentDescription = "No thumbnail",
-                            tint = Color.Gray,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .size(48.dp)
+                // Enhanced thumbnail loading with better priority logic
+                when {
+                    !bestThumbnail.isNullOrBlank() -> {
+                        Log.d("PROFILE_DEBUG", "✅ Using best thumbnail: $bestThumbnail")
+                        AsyncImage(
+                            model = bestThumbnail,
+                            contentDescription = "Reel thumbnail",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            error = painterResource(id = R.drawable.img2),
+                            onSuccess = {
+                                Log.d(
+                                    "PROFILE_DEBUG",
+                                    "✅ Thumbnail loaded successfully: $bestThumbnail"
+                                )
+                            },
+                            onError = { error ->
+                                Log.e("PROFILE_DEBUG", "❌ Thumbnail failed to load: $bestThumbnail")
+                                Log.e(
+                                    "PROFILE_DEBUG",
+                                    "❌ Error: ${error.result.throwable?.message}"
+                                )
+                            }
                         )
                     }
+                    !reel.mediaUrl.isNullOrBlank() -> {
+                        Log.d(
+                            "PROFILE_DEBUG",
+                            "🎬 Using VideoThumbnail component for: ${reel.mediaUrl}"
+                        )
+                        VideoThumbnail(
+                            videoUri = Uri.parse(reel.mediaUrl),
+                            fallbackImageRes = R.drawable.img2,
+                            modifier = Modifier.fillMaxSize(),
+                            showPlayIcon = false
+                        )
+                    }
+
+                    else -> {
+                        Log.d("PROFILE_DEBUG", "⚠️ No media available, showing empty state")
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0xFFE0E0E0))
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_play),
+                                contentDescription = "No thumbnail",
+                                tint = Color.Gray,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .size(48.dp)
+                            )
+                        }
+                    }
                 }
-                
+
                 // Play icon overlay
                 Box(
                     modifier = Modifier

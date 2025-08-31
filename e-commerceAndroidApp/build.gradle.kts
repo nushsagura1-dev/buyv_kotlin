@@ -101,6 +101,7 @@ dependencies {
     // ORIGINAL GLIDE DEPENDENCY (COMMENTED OUT):
     // implementation("com.github.bumptech.glide:compose:1.0.0-beta01")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("com.tbuonomo:dotsindicator:5.1.0")
     implementation("com.google.accompanist:accompanist-pager:0.36.0")
     implementation("com.google.accompanist:accompanist-pager-indicators:0.36.0")

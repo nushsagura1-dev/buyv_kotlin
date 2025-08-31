@@ -53,6 +53,8 @@ import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
 import com.project.e_commerce.android.domain.model.UserProfile
 import coil3.compose.AsyncImage
 import com.project.e_commerce.android.presentation.ui.composable.composableScreen.public.VideoThumbnail
+import com.project.e_commerce.android.presentation.utils.UserDisplayName
+import com.project.e_commerce.android.presentation.utils.UserDisplayType
 
 @Composable
 fun SearchReelsAndUsersScreen(navController: NavHostController) {
@@ -373,16 +375,20 @@ fun UsersListContent(
                                 modifier = Modifier
                                     .size(50.dp)
                                     .clip(CircleShape)
-                                    .border(2.dp, Color(0xFFFF6F00), CircleShape)
+                                    .border(2.dp, Color(0xFFFF6F00), CircleShape),
+                                contentScale = ContentScale.Crop,
+                                placeholder = painterResource(id = R.drawable.profile),
+                                error = painterResource(id = R.drawable.profile)
                             )
                         } else {
-                            Image(
-                                painter = painterResource(id = R.drawable.profile),
+                            AsyncImage(
+                                model = R.drawable.profile,
                                 contentDescription = "Profile",
                                 modifier = Modifier
                                     .size(50.dp)
                                     .clip(CircleShape)
-                                    .border(2.dp, Color(0xFFFF6F00), CircleShape)
+                                    .border(2.dp, Color(0xFFFF6F00), CircleShape),
+                                contentScale = ContentScale.Crop
                             )
                         }
 
@@ -390,10 +396,13 @@ fun UsersListContent(
 
                         Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    user.displayName.ifEmpty { user.username },
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
+                                UserDisplayName(
+                                    userId = user.uid,
+                                    displayType = UserDisplayType.DISPLAY_NAME_ONLY,
+                                    textStyle = androidx.compose.ui.text.TextStyle(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
                                 )
                                 // Add "You" indicator for current user
                                 if (userResult.isCurrentUser) {
