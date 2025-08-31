@@ -1,10 +1,13 @@
 package com.project.e_commerce.android
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
@@ -31,29 +34,61 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.messaging.FirebaseMessaging
+import com.project.e_commerce.android.domain.repository.CartRepository
+import com.project.e_commerce.android.domain.repository.NotificationRepository
 import com.project.e_commerce.android.presentation.ui.navigation.AppBottomBar
 import com.project.e_commerce.android.presentation.ui.navigation.MyNavHost
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.MainUiStateViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.java.KoinJavaComponent
 
 class MainActivity : ComponentActivity() {
     private val mainUiStateViewModel: MainUiStateViewModel by viewModels()
+    private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // Permission launcher for notifications
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.d("MainActivity", "✅ Notification permission granted")
+            // Permission granted, FCM token will be registered automatically
+        } else {
+            Log.w("MainActivity", "❌ Notification permission denied")
+            // Handle permission denial if needed
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d("CrashDebug", "MainActivity: onCreate started")
         try {
+            // Request notification permission for Android 13+
+            requestNotificationPermission()
+
+            // Set up FCM token registration on auth state changes
+            setupFCMTokenRegistration()
+
             Log.d("CrashDebug", "MainActivity: ViewModels initializing")
 
-            val testRepo: com.project.e_commerce.android.domain.repository.CartRepository =
-                org.koin.java.KoinJavaComponent.getKoin().get()
-            val testAuth: com.google.firebase.auth.FirebaseAuth =
-                org.koin.java.KoinJavaComponent.getKoin().get()
+            val testRepo: CartRepository =
+                KoinJavaComponent.getKoin().get()
+            val testAuth: FirebaseAuth =
+                KoinJavaComponent.getKoin().get()
             Log.d("CrashDebug", "Koin test fetch: repo=$testRepo, auth=$testAuth")
             // Existing ViewModel initialization
             Log.d("CrashDebug", "MainActivity: ViewModels initialized")
@@ -304,5 +339,79 @@ class MainActivity : ComponentActivity() {
             Log.e("CrashDebug", "MainActivity: Exception in onCreate: ${e.message}", e)
         }
         Log.d("CrashDebug", "MainActivity: onCreate exit")
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            when (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)) {
+                PackageManager.PERMISSION_GRANTED -> {
+                    Log.d("MainActivity", "✅ Notification permission already granted")
+                }
+
+                PackageManager.PERMISSION_DENIED -> {
+                    Log.d("MainActivity", "🔔 Requesting notification permission")
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        } else {
+            Log.d("MainActivity", "📱 Android version < 13, notification permission not required")
+        }
+    }
+
+    private fun setupFCMTokenRegistration() {
+        // Listen for authentication state changes
+        FirebaseAuth.getInstance().addAuthStateListener { auth ->
+            val user = auth.currentUser
+            if (user != null) {
+                Log.d("MainActivity", "👤 User authenticated, registering FCM token")
+                registerFCMToken(user.uid)
+            } else {
+                Log.d("MainActivity", "👤 User not authenticated")
+            }
+        }
+    }
+
+    private fun registerFCMToken(userId: String) {
+        activityScope.launch {
+            try {
+                FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                    if (!task.isSuccessful) {
+                        Log.w("MainActivity", "❌ FCM token fetch failed", task.exception)
+                        return@addOnCompleteListener
+                    }
+
+                    val token = task.result
+                    Log.d("MainActivity", "🔔 FCM token retrieved for user $userId: $token")
+
+                    // Update token in repository
+                    activityScope.launch {
+                        try {
+                            val notificationRepository =
+                                KoinJavaComponent.getKoin().get<NotificationRepository>()
+                            val result = notificationRepository.updateFCMToken(userId, token)
+
+                            if (result.isSuccess) {
+                                Log.d("MainActivity", "✅ FCM token registered successfully")
+                            } else {
+                                Log.e(
+                                    "MainActivity",
+                                    "❌ Failed to register FCM token: ${result.exceptionOrNull()}"
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "❌ Error registering FCM token", e)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "❌ Error in FCM token registration", e)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Clean up coroutine scope
+        activityScope.coroutineContext.cancel()
     }
 }

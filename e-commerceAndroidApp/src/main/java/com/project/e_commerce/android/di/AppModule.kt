@@ -58,6 +58,7 @@ import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import com.project.e_commerce.android.domain.usecase.FCMTokenUseCase
 
 val viewModelModule = module {
     try {
@@ -237,6 +238,11 @@ val viewModelModule = module {
         single {
             val useCase = CreateNotificationUseCase(get())
             android.util.Log.d("CrashDebug", "AppModule: CreateNotificationUseCase created")
+            useCase
+        }
+        single {
+            val useCase = FCMTokenUseCase(get(), get())
+            android.util.Log.d("CrashDebug", "AppModule: FCMTokenUseCase created")
             useCase
         }
 
