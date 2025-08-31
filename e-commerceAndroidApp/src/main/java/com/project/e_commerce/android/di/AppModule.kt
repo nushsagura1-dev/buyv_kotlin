@@ -10,11 +10,13 @@ import com.project.e_commerce.android.data.repository.FirebaseCartRepository
 import com.project.e_commerce.android.data.repository.FirebaseNotificationRepository
 import com.project.e_commerce.android.data.repository.FirebaseNotificationSettingsRepository
 import com.project.e_commerce.android.data.repository.CountriesRepository
+import com.project.e_commerce.android.data.repository.RecentlyViewedRepository
 import com.project.e_commerce.android.domain.repository.UserProfileRepository
 import com.project.e_commerce.android.domain.repository.FollowingRepository
 import com.project.e_commerce.android.domain.repository.CartRepository
 import com.project.e_commerce.android.domain.repository.NotificationRepository
 import com.project.e_commerce.android.domain.repository.NotificationSettingsRepository
+import com.project.e_commerce.android.domain.repository.OrderRepository
 import com.project.e_commerce.android.domain.usecase.CheckEmailValidation
 import com.project.e_commerce.android.domain.usecase.CheckLoginValidation
 import com.project.e_commerce.android.domain.usecase.CheckPasswordValidation
@@ -52,6 +54,8 @@ import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
 import com.project.e_commerce.android.presentation.viewModel.otherUserProfile.OtherUserProfileViewModel
 import com.project.e_commerce.android.presentation.viewModel.searchViewModel.SearchViewModel
 import com.project.e_commerce.android.presentation.viewModel.NotificationViewModel
+import com.project.e_commerce.android.presentation.viewModel.OrderHistoryViewModel
+import com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -59,6 +63,11 @@ import org.koin.dsl.module
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import com.project.e_commerce.android.domain.usecase.FCMTokenUseCase
+import com.project.e_commerce.android.domain.usecase.CreateOrderUseCase
+import com.project.e_commerce.android.domain.usecase.GetUserOrdersUseCase
+import com.project.e_commerce.android.domain.usecase.UpdateOrderStatusUseCase
+import com.project.e_commerce.android.domain.usecase.CancelOrderUseCase
+import com.project.e_commerce.android.data.repository.FirebaseOrderRepository
 
 val viewModelModule = module {
     try {
@@ -100,6 +109,13 @@ val viewModelModule = module {
                 "CrashDebug",
                 "AppModule: FirebaseCartRepository constructed successfully"
             )
+            repo
+        }
+
+        // Order Repository
+        single<OrderRepository> {
+            val repo = FirebaseOrderRepository(get(), get())
+            android.util.Log.d("CrashDebug", "AppModule: FirebaseOrderRepository created")
             repo
         }
 
@@ -216,6 +232,28 @@ val viewModelModule = module {
         single {
             val useCase = GetFollowersUseCase(get())
             android.util.Log.d("CrashDebug", "AppModule: GetFollowersUseCase created")
+            useCase
+        }
+
+        // Order Use Cases
+        single {
+            val useCase = CreateOrderUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: CreateOrderUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetUserOrdersUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetUserOrdersUseCase created")
+            useCase
+        }
+        single {
+            val useCase = UpdateOrderStatusUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: UpdateOrderStatusUseCase created")
+            useCase
+        }
+        single {
+            val useCase = CancelOrderUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: CancelOrderUseCase created")
             useCase
         }
 
@@ -353,6 +391,28 @@ val viewModelModule = module {
                 markAsReadUseCase = get(),
                 createNotificationUseCase = get(),
                 auth = get()
+            )
+        }
+
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: OrderHistoryViewModel created")
+            OrderHistoryViewModel(
+                getUserOrdersUseCase = get(),
+                cancelOrderUseCase = get(),
+                auth = get()
+            )
+        }
+
+        // RecentlyViewedRepository
+        single {
+            val repo = RecentlyViewedRepository(get(), get())
+            android.util.Log.d("CrashDebug", "AppModule: RecentlyViewedRepository created")
+            repo
+        }
+        viewModel {
+            android.util.Log.d("CrashDebug", "AppModule: RecentlyViewedViewModel created")
+            RecentlyViewedViewModel(
+                recentlyViewedRepository = get()
             )
         }
 

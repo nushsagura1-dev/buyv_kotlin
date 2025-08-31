@@ -2,7 +2,6 @@ package com.project.e_commerce.android.presentation.ui.screens
 
 import android.R.attr.fontWeight
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,6 +52,7 @@ import com.project.e_commerce.android.domain.model.UserFollowModel
 import com.project.e_commerce.android.presentation.viewModel.followingViewModel.FollowingViewModel
 import org.koin.androidx.compose.koinViewModel
 import android.util.Log
+import androidx.compose.foundation.background
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,9 +66,8 @@ fun FollowListScreen(
     val followingViewModel: FollowingViewModel = koinViewModel()
     val auth = remember { FirebaseAuth.getInstance() }
     val currentUserId = auth.currentUser?.uid
-    
-    val allTabs = listOf("Followers", "Following", "Friends", "Suggested")
-    val tabs = if (showFriendsTab) allTabs else listOf("Followers", "Following", "Suggested")
+
+    val tabs = listOf("Followers", "Following")
 
     val pagerState = rememberPagerState(initialPage = startTabIndex)
     val coroutineScope = rememberCoroutineScope()
@@ -112,11 +111,10 @@ fun FollowListScreen(
             )
         )
 
-        ScrollableTabRow(
+        TabRow(
             backgroundColor = Color.White,
             modifier = Modifier.fillMaxWidth(),
             selectedTabIndex = pagerState.currentPage,
-            edgePadding = if (showFriendsTab) 0.dp else 22.dp,
             contentColor = Color(0xFF0066CC),
             indicator = { tabPositions ->
                 TabRowDefaults.Indicator(
@@ -131,7 +129,6 @@ fun FollowListScreen(
                 val labelWithCount = when (title) {
                     "Followers" -> "Followers (${uiState.followersCount})"
                     "Following" -> "Following (${uiState.followingCount})"
-                    "Friends" -> "Friends"
                     else -> title
                 }
 
@@ -175,36 +172,6 @@ fun FollowListScreen(
                 )
                 "Following" -> FollowingTab(
                     users = uiState.following,
-                    currentUserId = currentUserId,
-                    onFollowClick = { targetUserId ->
-                        currentUserId?.let { userId ->
-                            coroutineScope.launch {
-                                followingViewModel.toggleFollow(
-                                    userId,
-                                    targetUserId
-                                )
-                            }
-                        }
-                    },
-                    isLoading = uiState.isLoading
-                )
-                "Friends" -> FriendsTab(
-                    users = uiState.friends,
-                    currentUserId = currentUserId,
-                    onFollowClick = { targetUserId ->
-                        currentUserId?.let { userId ->
-                            coroutineScope.launch {
-                                followingViewModel.toggleFollow(
-                                    userId,
-                                    targetUserId
-                                )
-                            }
-                        }
-                    },
-                    isLoading = uiState.isLoading
-                )
-                else -> SuggestedTab(
-                    users = uiState.suggestedUsers,
                     currentUserId = currentUserId,
                     onFollowClick = { targetUserId ->
                         currentUserId?.let { userId ->
@@ -298,93 +265,61 @@ fun FollowingTab(
 }
 
 @Composable
-fun FriendsTab(
-    users: List<UserFollowModel>,
-    currentUserId: String?,
-    onFollowClick: (String) -> Unit,
-    isLoading: Boolean
-) {
-    if (isLoading) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(color = Color(0xFFFF6F00))
-        }
-    } else if (users.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("No mutual friends yet", color = Color.Gray)
-        }
-    } else {
-        LazyColumn(modifier = Modifier
-            .fillMaxSize()
-            .background(color = Color.White)) {
-            items(users.size) { index ->
-                val user = users[index]
-                UserFollowItem(
-                    user = user,
-                    currentUserId = currentUserId,
-                    onFollowClick = { onFollowClick(user.id) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SuggestedTab(
-    users: List<UserFollowModel>,
-    currentUserId: String?,
-    onFollowClick: (String) -> Unit,
-    isLoading: Boolean
-) {
-    if (isLoading) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(color = Color(0xFFFF6F00))
-        }
-    } else if (users.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("No suggestions available", color = Color.Gray)
-        }
-    } else {
-        LazyColumn(modifier = Modifier
-            .fillMaxSize()
-            .background(color = Color.White)) {
-            items(users.size) { index ->
-                val user = users[index]
-                UserFollowItem(
-                    user = user,
-                    currentUserId = currentUserId,
-                    onFollowClick = { onFollowClick(user.id) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
 fun UserFollowItem(
     user: UserFollowModel,
     currentUserId: String?,
     onFollowClick: () -> Unit
 ) {
-    var buttonState by remember { mutableStateOf(
-        when {
-            user.isFollowingMe && user.isIFollow -> "Friends"
-            user.isFollowingMe -> "Follow back"
-            user.isIFollow -> "Following"
-            else -> "Follow"
-        }
-    ) }
+    // State for confirmation dialog
+    var showUnfollowDialog by remember { mutableStateOf(false) }
+
+    // Determine button state based on follow relationship
+    val buttonState = when {
+        user.isFollowingMe && user.isIFollow -> "Following" // Mutual following
+        user.isIFollow -> "Following" // Current user follows them
+        user.isFollowingMe -> "Follow back" // They follow current user
+        else -> "Follow" // No relationship
+    }
+
+    // Show confirmation dialog
+    if (showUnfollowDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showUnfollowDialog = false },
+            title = {
+                Text(
+                    text = "Unfollow ${user.name}?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text("Are you sure you want to unfollow ${user.name}?")
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showUnfollowDialog = false
+                        onFollowClick()
+                    }
+                ) {
+                    Text(
+                        "Unfollow",
+                        color = Color.Red,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { showUnfollowDialog = false }
+                ) {
+                    Text(
+                        "Cancel",
+                        color = Color(0xFF0066CC)
+                    )
+                }
+            }
+        )
+    }
 
     Row(
         modifier = Modifier
@@ -433,13 +368,11 @@ fun UserFollowItem(
         Button(
             modifier = Modifier.width(110.dp),
             onClick = {
-                onFollowClick()
-                buttonState = when (buttonState) {
-                    "Follow" -> "Following"
-                    "Follow back" -> "Friends"
-                    "Following" -> "Follow"
-                    "Friends" -> "Follow back"
-                    else -> "Follow"
+                // Show confirmation dialog for unfollow actions
+                if (buttonState == "Following") {
+                    showUnfollowDialog = true
+                } else {
+                    onFollowClick()
                 }
             },
             shape = RoundedCornerShape(24.dp),
@@ -447,15 +380,15 @@ fun UserFollowItem(
                 backgroundColor = when (buttonState) {
                     "Follow" -> Color(0xFFFF6600)
                     "Follow back" -> Color(0xFFFF6600)
-                    "Friends" -> Color(0xFFF2F2F2)
+                    "Following" -> Color(0xFFF2F2F2)
                     else -> Color(0xFFF2F2F2)
                 },
-                contentColor = if (buttonState == "Friends") Color.Black else Color.White
+                contentColor = if (buttonState == "Following") Color.Black else Color.White
             )
         ) {
             Text(
                 buttonState,
-                color = if (buttonState == "Friends" || buttonState == "Following") Color.Black else Color.White,
+                color = if (buttonState == "Following") Color.Black else Color.White,
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
                 modifier = Modifier.padding(vertical = 2.dp)

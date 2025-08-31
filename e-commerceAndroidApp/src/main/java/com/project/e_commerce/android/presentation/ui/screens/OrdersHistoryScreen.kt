@@ -20,10 +20,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.ButtonDefaults
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.OutlinedButton
 import androidx.compose.material.ScrollableTabRow
 import androidx.compose.material.Tab
@@ -34,6 +37,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,36 +57,34 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import coil3.compose.rememberAsyncImagePainter
 import com.project.e_commerce.android.R
+import com.project.e_commerce.android.domain.model.Order
+import com.project.e_commerce.android.domain.model.OrderStatus
+import com.project.e_commerce.android.presentation.viewModel.OrderHistoryViewModel
+import org.koin.androidx.compose.koinViewModel
+import java.text.SimpleDateFormat
+import java.util.*
 
-
-// OrdersHistoryScreen.kt
 @Composable
-fun OrdersHistoryScreen(navController: NavHostController) {
-    var selectedTabIndex by remember { mutableStateOf(0) }
-    val tabs = listOf(
-        "All" to 12,
-        "Completed" to 6,
-        "Pending" to 4,
-        "Canceled" to 2
-    )
-
+fun OrdersHistoryScreen(
+    navController: NavHostController,
+    orderHistoryViewModel: OrderHistoryViewModel = koinViewModel()
+) {
+    val state by orderHistoryViewModel.state.collectAsState()
 
     Column(
         modifier = Modifier
-        .fillMaxSize()
-        .background(Color.White)
-        .verticalScroll(rememberScrollState())
-        .padding(16.dp)
+            .fillMaxSize()
+            .background(Color.White)
     ) {
-
         // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(42.dp)
+                .padding(horizontal = 16.dp)
         ) {
-
             androidx.compose.material3.IconButton(
                 onClick = { navController.popBackStack() },
                 modifier = Modifier
@@ -106,176 +109,217 @@ fun OrdersHistoryScreen(navController: NavHostController) {
             )
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Tab Row
         OrdersTabRow(
-            tabs = tabs,
-            selectedTabIndex = selectedTabIndex,
-            onTabSelected = { selectedTabIndex = it }
+            tabs = orderHistoryViewModel.getTabsWithCounts(),
+            selectedTabIndex = state.selectedTabIndex,
+            onTabSelected = { orderHistoryViewModel.onTabSelected(it) }
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "",
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.width(50.dp)
-            )
-            Text(
-                text = "Item",
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.width(100.dp),
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Status",
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.width(125.dp),
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Total",
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.width(100.dp),
-                textAlign = TextAlign.Center
-            )
-
+        // Error Message
+        state.error?.let { error ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .background(Color(0xFFFFEBEE), RoundedCornerShape(8.dp))
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = error,
+                    color = Color(0xFFD32F2F),
+                    fontSize = 14.sp
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-
-
-        Column {
-            repeat(10) {
-                OrderItem(status = when (it % 4) {
-                    0 -> "Pending" to Color.Yellow
-                    1 -> "Delivered" to Color.Green
-                    2 -> "Canceled" to Color.Red
-                    else -> "Delivered" to Color.Green
-                })
+        // Content
+        if (state.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color(0xFF0066CC))
             }
+        } else if (state.filteredOrders.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_cart),
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No orders found",
+                        color = Color.Gray,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(state.filteredOrders) { order ->
+                    OrderItemCard(
+                        order = order,
+                        onCancelOrder = { orderHistoryViewModel.cancelOrder(order.id) },
+                        onUploadVideo = { /* Navigate to video upload */ }
+                    )
+                }
+            }
+        }
+    }
+
+    // Handle error dismissal
+    LaunchedEffect(state.error) {
+        if (state.error != null) {
+            // Auto-dismiss error after 5 seconds
+            kotlinx.coroutines.delay(5000)
+            orderHistoryViewModel.clearError()
         }
     }
 }
 
-/*
 @Composable
-fun OrderItem(
-    orderId: String = "NEGE0054632456",
-    productImage: Int = R.drawable.perfume4,
-    title: String = "Tom Ford Black Orchid",
-    description: String = "Black Orchid Eau de Parfum opens with aphrodisiac black truffle and sparkling pr...",
-    status: Pair<String, Color>,
-    date: String = "on Tuesday, 13th Dec, 2025",
-    price: String = "100 $",
-    onUploadVideo: () -> Unit = {},
-    onReviewProduct: () -> Unit = {},
+fun OrderItemCard(
+    order: Order,
+    onCancelOrder: () -> Unit = {},
+    onUploadVideo: () -> Unit = {}
 ) {
+    val dateFormatter = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+    val statusColor = when (order.status) {
+        OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PROCESSING -> Color(0xFFFF9800)
+        OrderStatus.SHIPPED, OrderStatus.OUT_FOR_DELIVERY -> Color(0xFF2196F3)
+        OrderStatus.DELIVERED -> Color(0xFF4CAF50)
+        OrderStatus.CANCELED, OrderStatus.RETURNED, OrderStatus.REFUNDED -> Color(0xFFFF5722)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .shadow(4.dp, RoundedCornerShape(18.dp))
-            .clip(RoundedCornerShape(18.dp))
+            .shadow(4.dp, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
-            .border(1.dp, Color(0xFFE9E9E9), RoundedCornerShape(18.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .border(1.dp, Color(0xFFE9E9E9), RoundedCornerShape(12.dp))
+            .padding(16.dp)
     ) {
         Column {
-            // Order ID
-            Text(
-                buildString {
-                    append("Order ID ")
-                    append(orderId)
-                },
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp,
-                color = Color(0xFFB0B5C0)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-
+            // Order Header
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.height(IntrinsicSize.Min)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // صورة المنتج (على اليسار)
-                Image(
-                    painter = painterResource(id = productImage),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(64.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
+                Text(
+                    text = "Order #${order.orderNumber}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color(0xFF0066CC)
                 )
+                Text(
+                    text = order.status.displayName,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = statusColor
+                )
+            }
 
-                Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-                // الأعمدة على اليمين
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.SpaceBetween
+            // Order Date and Total
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = order.createdAt?.let { dateFormatter.format(it.toDate()) } ?: "",
+                    color = Color.Gray,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "$${String.format("%.2f", order.total)}",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF6F00),
+                    fontSize = 16.sp
+                )
+            }
+
+            if (order.items.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Show first item (or all items if needed)
+                val firstItem = order.items.first()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = title,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF181D23),
-                        fontSize = 14.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = description,
-                        fontWeight = FontWeight.Normal,
-                        color = Color(0xFFB0B5C0),
-                        fontSize = 13.sp,
-                        maxLines = 2
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    // Product Image
+                    if (firstItem.productImage.isNotEmpty()) {
+                        Image(
+                            painter = rememberAsyncImagePainter(firstItem.productImage),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        // Fallback image
+                        Image(
+                            painter = painterResource(id = R.drawable.perfume3),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
 
-                    // الحالة/التاريخ/السعر
-                    Row(
-                        verticalAlignment = Alignment.Top,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column {
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = firstItem.productName,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp,
+                            color = Color(0xFF181D23)
+                        )
+
+                        if (order.items.size > 1) {
                             Text(
-                                text = status.first,
-                                color = status.second,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = date,
-                                color = Color(0xFF181D23),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
+                                text = "+${order.items.size - 1} more items",
+                                color = Color.Gray,
+                                fontSize = 12.sp
                             )
                         }
-                        Spacer(modifier = Modifier.weight(1f))
+
                         Text(
-                            text = price,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFF6F00),
-                            fontSize = 16.sp
+                            text = "Qty: ${firstItem.quantity}",
+                            color = Color.Gray,
+                            fontSize = 12.sp
                         )
                     }
                 }
             }
 
-            // الأزرار فقط عند Delivered
-            if (status.first == "Delivered") {
-                Spacer(modifier = Modifier.height(8.dp))
+            // Action buttons for delivered orders
+            if (order.status == OrderStatus.DELIVERED) {
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     "Share your experience",
                     color = Color(0xFF181D23),
@@ -283,12 +327,13 @@ fun OrderItem(
                     fontSize = 13.sp
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedButton(
-                        onClick = onReviewProduct,
+                        onClick = { /* Navigate to review */ },
                         shape = RoundedCornerShape(10.dp),
                         border = BorderStroke(1.dp, Color(0xFFFF6F00)),
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -297,24 +342,20 @@ fun OrderItem(
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(45.dp),
-                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp), // Padding للزر نفسه
-                        elevation = ButtonDefaults.elevation(
-                            defaultElevation = 3.dp,
-                            pressedElevation = 2.dp
-                        )
+                            .height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_star),
                             contentDescription = "Review Product",
                             tint = Color(0xFFFF6F00),
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            "Review Product",
+                            "Review",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontSize = 12.sp
                         )
                     }
 
@@ -328,115 +369,50 @@ fun OrderItem(
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(45.dp),
-                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
-                        elevation = ButtonDefaults.elevation(
-                            defaultElevation = 3.dp,
-                            pressedElevation = 2.dp
-                        )
-                    )  {
+                            .height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_video_camera),
                             contentDescription = "Upload Video",
                             tint = Color(0xFF176DBA),
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            "Upload Video",
+                            "Video",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontSize = 12.sp
                         )
                     }
                 }
             }
-        }
-    }
-}*/
 
-
-
-@Composable
-fun OrderItem(status: Pair<String, Color>, onUploadVideo: () -> Unit = {}) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(4.dp)
-            .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // صورة المنتج
-        Image(
-            painter = painterResource(id = R.drawable.perfume3),
-            contentDescription = null,
-            modifier = Modifier
-                .size(64.dp)
-                .clip(RoundedCornerShape(8.dp)),
-            contentScale = ContentScale.Crop
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        // اسم المنتج + زر الفيديو إن وجد
-        Column(
-            modifier = Modifier.width(130.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "Hanger Shirt",
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
-            )
-            // زر رفع فيديو يظهر فقط مع Delivered
-            if (status.first == "Delivered") {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+            // Cancel button for pending orders
+            if (order.status in listOf(OrderStatus.PENDING, OrderStatus.CONFIRMED)) {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onCancelOrder,
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFF5722)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        backgroundColor = Color.White,
+                        contentColor = Color(0xFFFF5722)
+                    ),
                     modifier = Modifier
-                        .border(1.dp, Color(0xFF176DBA), RoundedCornerShape(26))
-                        .clip(RoundedCornerShape(16))
-                        .clickable { onUploadVideo() }
-                        .background(Color(0xFFEFF6FA))
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .fillMaxWidth()
+                        .height(36.dp)
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_video_camera),
-                        contentDescription = "Upload Video",
-                        tint = Color(0xFF176DBA),
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(5.dp))
                     Text(
-                        text = "Upload video",
-                        color = Color(0xFF176DBA),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp
+                        "Cancel Order",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
                     )
                 }
             }
-
         }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = status.first, color = status.second, fontWeight = FontWeight.Bold)
-            Text("5 days left", fontSize = 12.sp)
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Text(
-            text = "100 $",
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-        )
-        Spacer(modifier = Modifier.width(8.dp))
     }
 }
-
-
 
 @Composable
 fun OrdersTabRow(
@@ -470,9 +446,6 @@ fun OrdersTabRow(
         }
     }
 }
-
-
-
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable

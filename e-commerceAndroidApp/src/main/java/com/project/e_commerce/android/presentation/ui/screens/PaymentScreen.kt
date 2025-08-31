@@ -30,21 +30,33 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
+import com.project.e_commerce.android.domain.model.Order
+import com.project.e_commerce.android.domain.model.OrderItem
+import com.project.e_commerce.android.domain.model.OrderStatus
+import com.project.e_commerce.android.domain.model.Address
+import com.project.e_commerce.android.domain.usecase.CreateOrderUseCase
+import com.google.firebase.auth.FirebaseAuth
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
+import kotlinx.coroutines.launch
 
 @Composable
 fun PaymentScreen(
     navController: NavController,
-    cartViewModel: CartViewModel = koinViewModel()
+    cartViewModel: CartViewModel = koinViewModel(),
+    createOrderUseCase: CreateOrderUseCase = koinInject(),
+    auth: FirebaseAuth = koinInject()
 ) {
-    // نفس أسلوب القديم: ناخد الحالة من الـ ViewModel
     val cartState by cartViewModel.state.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
 
     var cardHolder by remember { mutableStateOf("") }
     var cardNumber by remember { mutableStateOf("") }
     var cvv by remember { mutableStateOf("") }
     var expiryDate by remember { mutableStateOf("") }
     var selectedMethod by remember { mutableStateOf("Mastercard") }
+    var isProcessing by remember { mutableStateOf(false) }
+    var showError by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -83,6 +95,23 @@ fun PaymentScreen(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        // Error Message
+        showError?.let { error ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFFFEBEE), RoundedCornerShape(8.dp))
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = error,
+                    color = Color(0xFFD32F2F),
+                    fontSize = 14.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         // Payment Methods
         Row(
@@ -130,13 +159,168 @@ fun PaymentScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // زي القديم بالظبط: ملخص التكلفة من cartState
-        CostSummary(cartState)
+        // Cost Summary
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFFF8F9FA), RoundedCornerShape(8.dp))
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Order Summary",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = Color(0xFF174378)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Items count
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Items (${cartState.items.size})", color = Color.Gray)
+                Text("$${String.format("%.2f", cartState.subtotal)}")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Shipping
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Shipping", color = Color.Gray)
+                Text("$${String.format("%.2f", cartState.shipping)}")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Tax
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Tax", color = Color.Gray)
+                Text("$${String.format("%.2f", cartState.tax)}")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Divider(color = Color.Gray.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Total
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Total",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color(0xFF174378)
+                )
+                Text(
+                    text = "$${String.format("%.2f", cartState.total)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color(0xFFFF6F00)
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = { /* Confirm payment */ },
+            onClick = {
+                if (cartState.items.isEmpty()) {
+                    showError = "Cart is empty"
+                    return@Button
+                }
+
+                val userId = auth.currentUser?.uid
+                if (userId == null) {
+                    showError = "User not authenticated"
+                    return@Button
+                }
+
+                // Basic validation
+                if (cardHolder.isBlank() || cardNumber.isBlank() || cvv.isBlank() || expiryDate.isBlank()) {
+                    showError = "Please fill all payment fields"
+                    return@Button
+                }
+
+                isProcessing = true
+                showError = null
+
+                coroutineScope.launch {
+                    try {
+                        // Create order from cart
+                        val orderItems = cartState.items.map { cartItem ->
+                            OrderItem(
+                                id = cartItem.lineId,
+                                productId = cartItem.productId,
+                                productName = cartItem.name,
+                                productImage = cartItem.imageUrl,
+                                price = cartItem.price,
+                                quantity = cartItem.quantity,
+                                size = cartItem.size,
+                                color = cartItem.color,
+                                attributes = cartItem.attributes
+                            )
+                        }
+
+                        // Create sample address (in real app, this would come from user input)
+                        val shippingAddress = Address(
+                            id = "addr1",
+                            name = cardHolder,
+                            street = "123 Main St",
+                            city = "Sample City",
+                            state = "Sample State",
+                            zipCode = "12345",
+                            country = "Sample Country",
+                            phone = "123-456-7890"
+                        )
+
+                        val order = Order(
+                            userId = userId,
+                            items = orderItems,
+                            status = OrderStatus.PENDING,
+                            subtotal = cartState.subtotal,
+                            shipping = cartState.shipping,
+                            tax = cartState.tax,
+                            total = cartState.total,
+                            shippingAddress = shippingAddress,
+                            paymentMethod = selectedMethod,
+                            createdAt = com.google.firebase.Timestamp.now()
+                        )
+
+                        // Create the order
+                        createOrderUseCase(order)
+                            .onSuccess { orderId ->
+                                // Clear the cart after successful order creation
+                                cartViewModel.clearCart()
+
+                                // Navigate back or to order confirmation
+                                navController.popBackStack()
+
+                                // You could navigate to order tracking or confirmation screen here
+                                // navController.navigate("order_confirmation/$orderId")
+                            }
+                            .onFailure { error ->
+                                showError = "Failed to create order: ${error.message}"
+                            }
+                    } catch (e: Exception) {
+                        showError = "Payment failed: ${e.message}"
+                    } finally {
+                        isProcessing = false
+                    }
+                }
+            },
+            enabled = !isProcessing && cartState.items.isNotEmpty(),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -144,7 +328,21 @@ fun PaymentScreen(
             shape = RoundedCornerShape(10.dp),
             elevation = ButtonDefaults.elevation(6.dp)
         ) {
-            Text("Pay Now", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            if (isProcessing) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Processing...",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            } else {
+                Text("Pay Now", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -216,6 +414,5 @@ fun PaymentMethodButton(
 @Preview(showBackground = true)
 @Composable
 fun PreviewPaymentScreen() {
-    // هيشتغل في التطبيق مع Koin؛ الـ Preview ممكن ما يشتغلش لو Koin مش متضبط للـ Preview.
     PaymentScreen(navController = rememberNavController())
 }

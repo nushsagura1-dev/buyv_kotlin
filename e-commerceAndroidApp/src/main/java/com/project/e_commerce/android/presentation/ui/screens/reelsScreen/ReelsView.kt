@@ -74,6 +74,7 @@ import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.CartItem
 import com.project.e_commerce.android.presentation.viewModel.followingViewModel.FollowingViewModel
 import com.project.e_commerce.android.presentation.viewModel.reelsScreenViewModel.ReelsScreenViewModel
+import com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel
 
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -94,10 +95,17 @@ fun ReelsView(
     mainUiStateViewModel: com.project.e_commerce.android.presentation.viewModel.MainUiStateViewModel? = null
 ) {
     val showLoginPrompt = remember { mutableStateOf(false) }
+    val recentlyViewedViewModel: RecentlyViewedViewModel = koinViewModel()
     Log.d("ReelsView", "ReelsView: composable entry, viewModel=$viewModel")
 
     val firebaseUser = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser }
     Log.d("REELS_DEBUG", "ReelsView: Composed with user uid=${firebaseUser?.uid}")
+
+    // Check if we need to navigate to a specific reel
+    val navBackStackEntry = navController.currentBackStackEntry
+    val targetReelId = navBackStackEntry?.savedStateHandle?.get<String>("reelId")
+
+    Log.d("ReelsView", "Target reel ID from navigation: $targetReelId")
 
     // Share launcher for sharing reels
     val shareLauncher = rememberLauncherForActivityResult(
@@ -269,7 +277,10 @@ fun ReelsView(
     }
 
     // Initialize pager state with safety bounds - only when reels are available
-    val initialPage = if (reelsList.isNotEmpty()) {
+    // If a targetReelId is provided, find its index in the list
+    val initialPage = if (!targetReelId.isNullOrBlank() && reelsList.isNotEmpty()) {
+        reelsList.indexOfFirst { it.id == targetReelId }.takeIf { it >= 0 } ?: 0
+    } else if (reelsList.isNotEmpty()) {
         minOf(0, maxOf(0, reelsList.size - 1))
     } else {
         0
@@ -279,6 +290,22 @@ fun ReelsView(
     val pagerState = rememberPagerState(
         initialPage = initialPage
     )
+
+    // If a targetReelId is provided, reset the pager to show that reel
+    LaunchedEffect(targetReelId, reelsList) {
+        if (!targetReelId.isNullOrBlank() && reelsList.isNotEmpty()) {
+            val idx = reelsList.indexOfFirst { it.id == targetReelId }
+            if (idx >= 0) {
+                Log.d(
+                    "ReelsView",
+                    "Navigating to target reel index: $idx for reelId: $targetReelId"
+                )
+                pagerState.scrollToPage(idx)
+                // Clear the target reel ID so it doesn't interfere with normal navigation
+                navBackStackEntry?.savedStateHandle?.remove<String>("reelId")
+            }
+        }
+    }
 
     Log.d("ReelsView", "🎬 Pager state initialized successfully")
 
@@ -373,7 +400,8 @@ fun ReelsView(
                         currentReel = reel
                         // mainUiStateViewModel.setBottomSheetVisible(true)
                     },
-                    onShareReel = ::shareReel
+                    onShareReel = ::shareReel,
+                    recentlyViewedViewModel = recentlyViewedViewModel
                 )
             }
             "For you" -> {
@@ -441,7 +469,8 @@ fun ReelsView(
                             }
                         }
                     },
-                    onShareReel = ::shareReel
+                    onShareReel = ::shareReel,
+                    recentlyViewedViewModel = recentlyViewedViewModel
                 )
             }
             else -> {
@@ -549,6 +578,15 @@ fun ReelsView(
         if (currentReel != null && currentReel.id.isNotBlank()) {
             Log.d("ReelsView", "🎬 Current reel updated: ${currentReel.id}")
             viewModel.checkCartStatus(currentReel.id)
+            
+            // Wait a bit to make sure user is actually viewing this reel, then track it
+            kotlinx.coroutines.delay(1000) // Wait 1 second before tracking as viewed
+            
+            // Double check the page hasn't changed during the delay
+            if (pagerState.currentPage == pageIndex) {
+                Log.d("ReelsView", "🎬 Tracking reel as viewed: ${currentReel.id}")
+                recentlyViewedViewModel.addReelToRecentlyViewed(currentReel)
+            }
         } else {
             Log.w("ReelsView", "🎬 No valid current reel available")
         }
@@ -682,7 +720,8 @@ fun ReelsList(
     initialPage: Int = 0,
     publisherNames: MutableMap<String, String> = mutableMapOf(),
     publisherNameFetcher: ((String, String) -> Unit)? = null,
-    onShareReel: (Reels) -> Unit = {}
+    onShareReel: (Reels) -> Unit = {},
+    recentlyViewedViewModel: com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel
 ) {
     val pagerState = rememberPagerState(
         initialPage = if (reelsList.isNotEmpty()) {
@@ -713,6 +752,8 @@ fun ReelsList(
         count = reelsList.size
     ) { page ->
         val reel = reelsList[page]
+        // Track viewed reel each time it's viewed - REMOVED: This was causing duplicate tracking
+        // recentlyViewedViewModel.addReelToRecentlyViewed(reel)
         Log.d(
             "ReelsCrash",
             "Rendering reel at page=$page: id=${reel.id}, video=${reel.video}, userName=${reel.userName}, productName=${reel.productName}, images=${reel.images}, price=${reel.productPrice}, image placeholder?=${reel.productImage}"
@@ -754,26 +795,6 @@ fun ReelsList(
             modifier = Modifier
                 .fillMaxSize()
         ) {
-            val branchLabel: String =
-                if (reel.video != null && !reel.isError && reel.video.toString()
-                        .isNotEmpty() && reel.video.toString().startsWith("http")
-                ) {
-                    "VIDEO"
-                } else if (reel.images != null && reel.images.isNotEmpty() && reel.images.all {
-                        it != null && it.toString().isNotBlank()
-                    }) {
-                    "IMAGES"
-                } else {
-                    "FALLBACK"
-                }
-            Text(
-                branchLabel,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .padding(6.dp)
-            )
 
             val videoUriToUse = reel.video
             Log.d("ReelsCrash", "[DEBUG] Using videoUri: $videoUriToUse for reel.id=${reel.id}")
@@ -2866,7 +2887,8 @@ fun FollowingReelsContent(
     reelsViewModel: ReelsScreenViewModel,
     cartViewModel: CartViewModel,
     onShowSheet: (SheetType, Reels?) -> Unit,
-    onShareReel: (Reels) -> Unit
+    onShareReel: (Reels) -> Unit,
+    recentlyViewedViewModel: com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel
 ) {
     Log.d("FollowingTabDebug", "Entered FollowingReelsContent")
     val followingState by followingViewModel.uiState.collectAsState()
@@ -2966,7 +2988,8 @@ fun FollowingReelsContent(
                 reelsViewModel = reelsViewModel,
                 cartViewModel = cartViewModel,
                 onShowSheet = onShowSheet,
-                onShareReel = onShareReel
+                onShareReel = onShareReel,
+                recentlyViewedViewModel = recentlyViewedViewModel
             )
         }
     }
@@ -2979,7 +3002,8 @@ fun FollowingReelsList(
     reelsViewModel: ReelsScreenViewModel,
     cartViewModel: CartViewModel,
     onShowSheet: (SheetType, Reels?) -> Unit,
-    onShareReel: (Reels) -> Unit
+    onShareReel: (Reels) -> Unit,
+    recentlyViewedViewModel: com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel
 ) {
     val reelsState by reelsViewModel.state.collectAsState()
 
@@ -3034,7 +3058,8 @@ fun FollowingReelsList(
             isLoggedIn = true, // Since we're in the following tab, user is logged in
             showLoginPrompt = remember { mutableStateOf(false) },
             initialPage = 0,
-            onShareReel = onShareReel
+            onShareReel = onShareReel,
+            recentlyViewedViewModel = recentlyViewedViewModel
         )
     }
 }

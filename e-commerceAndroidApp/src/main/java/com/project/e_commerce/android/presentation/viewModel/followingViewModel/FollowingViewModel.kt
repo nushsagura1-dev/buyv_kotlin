@@ -173,7 +173,7 @@ class FollowingViewModel(
                     name = profile.displayName.ifEmpty { profile.username },
                     username = profile.username,
                     profileImageUrl = profile.profileImageUrl,
-                    isFollowingMe = false, // TODO: Check if they follow current user
+                    isFollowingMe = followersUserIds.contains(profile.uid), // Check if they follow current user
                     isIFollow = true
                 )
             }
@@ -185,7 +185,7 @@ class FollowingViewModel(
                     username = profile.username,
                     profileImageUrl = profile.profileImageUrl,
                     isFollowingMe = true,
-                    isIFollow = false // TODO: Check if current user follows them
+                    isIFollow = followingUserIds.contains(profile.uid) // Check if current user follows them
                 )
             }
             
