@@ -71,5 +71,6 @@ sealed class Screens(val route: String, val title : String? = null, val icon : I
             "follow_list_screen/$username?startTab=$startTab&showFriendsTab=$showFriendsTab"
     }
 
+    object BuyScreen : Screens(route = "buy_screen")
 
 }

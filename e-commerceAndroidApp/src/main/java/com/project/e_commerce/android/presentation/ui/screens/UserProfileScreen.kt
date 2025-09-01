@@ -54,46 +54,64 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import android.util.Log
 import coil3.compose.AsyncImage
+import com.project.e_commerce.android.presentation.viewModel.otherUserProfile.OtherUserProfileViewModel
 
 @Composable
-fun UserProfileScreen(navController: NavHostController) {
+fun UserProfileScreen(
+    navController: NavHostController,
+    userId: String? = null
+) {
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf(
         Pair(R.drawable.ic_reels, R.drawable.ic_reels),
         Pair(R.drawable.ic_products_filled, R.drawable.ic_products)
     )
 
-    var isFollowing by remember { mutableStateOf(false) }
-    
-    // Get current user ID from navigation arguments or use current logged-in user
+    // Get current user ID from Firebase Auth or use provided userId
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    val targetUserId = userId ?: currentUserId
+
+    // Determine if this is the current user's profile or another user's profile
+    val isOwnProfile = targetUserId == currentUserId
+
     val getUserProfileUseCase: GetUserProfileUseCase = koinViewModel()
+    val otherUserProfileViewModel: OtherUserProfileViewModel = koinViewModel()
     val scope = rememberCoroutineScope()
     
     // State for user profile data
     var userProfile by remember { mutableStateOf<UserProfile?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-    
+
+    // Get following status from ViewModel if viewing another user's profile
+    val otherUserState by otherUserProfileViewModel.uiState.collectAsState()
+
     // Load user profile data
-    LaunchedEffect(currentUserId) {
-        if (currentUserId != null) {
+    LaunchedEffect(targetUserId) {
+        if (targetUserId != null) {
             isLoading = true
-            scope.launch {
-                try {
-                    getUserProfileUseCase(currentUserId).onSuccess { profile ->
-                        userProfile = profile
+
+            if (!isOwnProfile) {
+                // Load other user's profile using ViewModel
+                otherUserProfileViewModel.loadUserProfile(targetUserId)
+            } else {
+                // Load current user's profile
+                scope.launch {
+                    try {
+                        getUserProfileUseCase(targetUserId).onSuccess { profile ->
+                            userProfile = profile
+                            isLoading = false
+                            Log.d("UserProfileScreen", "✅ Profile loaded: ${profile.displayName}")
+                        }.onFailure {
+                            error = "Failed to load profile"
+                            isLoading = false
+                            Log.e("UserProfileScreen", "❌ Failed to load profile")
+                        }
+                    } catch (e: Exception) {
+                        error = "Error loading profile: ${e.message}"
                         isLoading = false
-                        Log.d("UserProfileScreen", "✅ Profile loaded: ${profile.displayName}")
-                    }.onFailure { 
-                        error = "Failed to load profile"
-                        isLoading = false
-                        Log.e("UserProfileScreen", "❌ Failed to load profile")
+                        Log.e("UserProfileScreen", "❌ Exception loading profile: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    error = "Error loading profile: ${e.message}"
-                    isLoading = false
-                    Log.e("UserProfileScreen", "❌ Exception loading profile: ${e.message}")
                 }
             }
         } else {
@@ -101,6 +119,20 @@ fun UserProfileScreen(navController: NavHostController) {
             isLoading = false
         }
     }
+
+    // Use appropriate profile data based on whether it's own profile or other user's
+    val displayProfile = if (isOwnProfile) userProfile else null
+    val displayName = displayProfile?.displayName ?: otherUserState.displayName
+    val username = displayProfile?.username ?: otherUserState.username
+    val profileImageUrl = displayProfile?.profileImageUrl ?: otherUserState.profileImageUrl
+    val followingCount = displayProfile?.followingCount ?: otherUserState.followingCount
+    val followersCount = displayProfile?.followersCount ?: otherUserState.followersCount
+    val likesCount = displayProfile?.likesCount ?: 0
+    val isFollowing = otherUserState.isFollowing
+
+    // Use loading state from appropriate source
+    val currentIsLoading = if (isOwnProfile) isLoading else otherUserState.isLoading
+    val currentError = if (isOwnProfile) error else otherUserState.error
 
     LazyColumn(
         modifier = Modifier
@@ -111,7 +143,9 @@ fun UserProfileScreen(navController: NavHostController) {
         item {
             // Top Bar: Back (left), Menu (right)
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, start = 6.dp, end = 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp, start = 6.dp, end = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -157,14 +191,14 @@ fun UserProfileScreen(navController: NavHostController) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ProfileStat(
-                        number = userProfile?.followingCount?.toString() ?: "0",
+                        number = followingCount.toString(),
                         label = "Following"
                     )
-                    
+
                     // Profile Image - Use real data if available, fallback to default
-                    if (userProfile?.profileImageUrl != null) {
+                    if (profileImageUrl != null) {
                         AsyncImage(
-                            model = userProfile?.profileImageUrl,
+                            model = profileImageUrl,
                             contentDescription = "Profile Picture",
                             modifier = Modifier
                                 .size(100.dp)
@@ -181,9 +215,9 @@ fun UserProfileScreen(navController: NavHostController) {
                                 .clip(CircleShape)
                         )
                     }
-                    
+
                     ProfileStat(
-                        number = userProfile?.followersCount?.toString() ?: "0",
+                        number = followersCount.toString(),
                         label = "Followers"
                     )
                 }
@@ -194,7 +228,7 @@ fun UserProfileScreen(navController: NavHostController) {
 
         item {
             // Name & Username
-            if (isLoading) {
+            if (currentIsLoading) {
                 // Show loading state
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -209,7 +243,7 @@ fun UserProfileScreen(navController: NavHostController) {
                         color = Color.Gray
                     )
                 }
-            } else if (error != null) {
+            } else if (currentError != null) {
                 // Show error state
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -219,7 +253,7 @@ fun UserProfileScreen(navController: NavHostController) {
                         color = Color.Red
                     )
                     Text(
-                        text = error!!,
+                        text = currentError,
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
@@ -228,7 +262,7 @@ fun UserProfileScreen(navController: NavHostController) {
                 // Show real user data
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = userProfile?.displayName?.ifEmpty { "User" } ?: "User",
+                        text = displayName.ifEmpty { "User" },
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0D3D67)
@@ -241,7 +275,7 @@ fun UserProfileScreen(navController: NavHostController) {
                     )
                 }
                 Text(
-                    text = "@${userProfile?.username?.ifEmpty { "user" } ?: "user"}",
+                    text = "@${username.ifEmpty { "user" }}",
                     fontSize = 13.sp,
                     color = Color.Gray
                 )
@@ -253,34 +287,41 @@ fun UserProfileScreen(navController: NavHostController) {
 
         item {
             ProfileStat(
-                number = userProfile?.likesCount?.toString() ?: "0",
+                number = likesCount.toString(),
                 label = "Likes"
             )
         }
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
 
-        item {
-            // Follow Button (main orange color)
-            Button(
-                onClick = {
-                    isFollowing = !isFollowing
-                },
-                colors = ButtonDefaults.buttonColors(
-                    backgroundColor = if (isFollowing) Color.LightGray else Color(0xFFFF6600)
-                ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .width(150.dp)
-                    .height(44.dp),
-                elevation = ButtonDefaults.elevation(defaultElevation = 4.dp)
-            ) {
-                Text(
-                    if (isFollowing) "Following" else "Follow",
-                    fontSize = 16.sp,
-                    color = if (isFollowing) Color.DarkGray else Color.White,
-                    fontWeight = FontWeight.Bold
-                )
+        // Only show Follow button if viewing another user's profile
+        if (!isOwnProfile && targetUserId != null) {
+            item {
+                // Follow/Unfollow Button (properly integrated with ViewModel)
+                Button(
+                    onClick = {
+                        if (isFollowing) {
+                            otherUserProfileViewModel.unfollowUser(targetUserId)
+                        } else {
+                            otherUserProfileViewModel.followUser(targetUserId)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = if (isFollowing) Color.LightGray else Color(0xFFFF6600)
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .width(150.dp)
+                        .height(44.dp),
+                    elevation = ButtonDefaults.elevation(defaultElevation = 4.dp)
+                ) {
+                    Text(
+                        if (isFollowing) "Following" else "Follow",
+                        fontSize = 16.sp,
+                        color = if (isFollowing) Color.DarkGray else Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 

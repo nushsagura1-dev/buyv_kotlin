@@ -44,6 +44,7 @@ import com.project.e_commerce.android.domain.repository.NotificationRepository
 import com.project.e_commerce.android.presentation.ui.navigation.AppBottomBar
 import com.project.e_commerce.android.presentation.ui.navigation.MyNavHost
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.AddToCartBottomSheet
 import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.MainUiStateViewModel
@@ -128,6 +129,8 @@ class MainActivity : ComponentActivity() {
                 // Collect state for showing/hiding bottom bar and FAB
                 val isBottomSheetVisible by mainUiStateViewModel.isBottomSheetVisible.collectAsState()
                 val hideBottomBar by mainUiStateViewModel.hideBottomBar.collectAsState()
+                val isAddToCartSheetVisible by mainUiStateViewModel.isAddToCartSheetVisible.collectAsState()
+                val selectedReelForCart by mainUiStateViewModel.selectedReelForCart.collectAsState()
 
                 // Only display bottom bar and FAB on these main tab screens
                 val showBottomBar = currentRoute in listOf(
@@ -268,8 +271,8 @@ class MainActivity : ComponentActivity() {
                                                 Reels(
                                                     id = "buy_fab_reel",
                                                     productName = "Buy FAB Product",
-                                                    productPrice = "0",
-                                                    userName = "FAB",
+                                                    productPrice = "29.99",
+                                                    userName = "FAB User",
                                                     userImage = R.drawable.profile,
                                                     video = null
                                                 )
@@ -330,6 +333,19 @@ class MainActivity : ComponentActivity() {
                                 startDestination = Screens.ReelsScreen.route,
                                 mainUiStateViewModel = mainUiStateViewModel
                             )
+                            // AddToCartBottomSheet
+                            if (isAddToCartSheetVisible && selectedReelForCart != null) {
+                                AddToCartBottomSheet(
+                                    onClose = { mainUiStateViewModel.hideAddToCartSheet() },
+                                    productId = selectedReelForCart!!.id,
+                                    productName = selectedReelForCart!!.productName,
+                                    productPrice = selectedReelForCart!!.productPrice.toDoubleOrNull()
+                                        ?: 0.0,
+                                    productImage = selectedReelForCart!!.productImage,
+                                    cartViewModel = cartViewModel,
+                                    modifier = Modifier
+                                )
+                            }
                         }
                     }
                 }

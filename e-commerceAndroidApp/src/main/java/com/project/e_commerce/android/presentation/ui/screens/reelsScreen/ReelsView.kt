@@ -1,5 +1,9 @@
 package com.project.e_commerce.android.presentation.ui.screens.reelsScreen
 
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+
 // ORIGINAL GLIDE IMPORTS (COMMENTED OUT):
 // import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 // import com.bumptech.glide.integration.compose.GlideImage
@@ -79,8 +83,10 @@ import com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewM
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import android.util.Log
+import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.mutableStateMapOf
 import kotlinx.coroutines.tasks.await
 import com.project.e_commerce.android.presentation.utils.UserInfoCache
@@ -99,6 +105,7 @@ fun ReelsView(
 ) {
     val showLoginPrompt = remember { mutableStateOf(false) }
     val recentlyViewedViewModel: RecentlyViewedViewModel = koinViewModel()
+    val lifecycleOwner = LocalLifecycleOwner.current
     Log.d("ReelsView", "ReelsView: composable entry, viewModel=$viewModel")
 
     val firebaseUser = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser }
@@ -168,6 +175,49 @@ fun ReelsView(
         "ReelsView",
         "collected reels state, size=${reelsList.size}, isLoading=$isLoading, error=$errorMessage"
     )
+
+    // NEW: Global video state management for lifecycle handling
+    val globalVideoPlayStates = remember { mutableStateMapOf<String, Boolean>() }
+    var wasAppInBackground by remember { mutableStateOf(false) }
+
+    // NEW: Lifecycle observer for the entire ReelsView
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    Log.d("ReelsView", "🎥 App going to background - pausing all videos")
+                    wasAppInBackground = true
+                    // Pause all currently playing videos
+                    globalVideoPlayStates.keys.forEach { reelId ->
+                        if (globalVideoPlayStates[reelId] == true) {
+                            Log.d("ReelsView", "🎥 Pausing reel $reelId due to app background")
+                            globalVideoPlayStates[reelId] = false
+                        }
+                    }
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    Log.d("ReelsView", "🎥 App coming to foreground")
+                    if (wasAppInBackground) {
+                        // Only resume the current page video if it was playing
+                        // This will be handled by individual VideoPlayer components
+                        wasAppInBackground = false
+                        Log.d("ReelsView", "🎥 App resumed from background")
+                    }
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    Log.d("ReelsView", "🎥 App stopped - ensuring all videos are paused")
+                    globalVideoPlayStates.clear() // Clear all play states
+                }
+                else -> { /* Handle other lifecycle events if needed */ }
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val currentUserId = remember {
         runCatching {
@@ -343,6 +393,41 @@ fun ReelsView(
         // Force refresh reels when screen becomes active
         Log.d("ReelsView", "🔄 ReelsView became active, forcing reels refresh")
         viewModel.forceRefreshFromProductViewModel()
+
+        // IMPORTANT: Also load following data for correct Follow button states
+        val currentUser = auth?.currentUser
+        if (currentUser != null) {
+            Log.d("ReelsView", "🔄 Loading following data for correct Follow button states")
+            val username =
+                currentUser.displayName ?: currentUser.email?.split("@")?.firstOrNull() ?: "user"
+
+            // Reset any previous load attempts to ensure fresh load
+            followingViewModel.resetLoadAttempts()
+
+            // Only load if not already loading to avoid conflicts
+            val currentState = followingViewModel.uiState.value
+            if (!currentState.isLoading && currentState.following.isEmpty()) {
+                Log.d("ReelsView", "🔄 Following data is empty, loading fresh data")
+                followingViewModel.loadUserData(currentUser.uid, username)
+
+                // Add a fallback mechanism - retry after 3 seconds if still empty
+                kotlinx.coroutines.delay(3000)
+                val stateAfterDelay = followingViewModel.uiState.value
+                if (!stateAfterDelay.isLoading && stateAfterDelay.following.isEmpty() && stateAfterDelay.error != null) {
+                    Log.d("ReelsView", "🔄 Retrying following data load after initial failure")
+                    followingViewModel.clearError()
+                    followingViewModel.resetLoadAttempts()
+                    followingViewModel.loadUserData(currentUser.uid, username)
+                }
+            } else if (!currentState.isLoading) {
+                Log.d(
+                    "ReelsView",
+                    "✅ Following data already available (${currentState.following.size} users)"
+                )
+            } else {
+                Log.d("ReelsView", "⏳ Following data is already loading, waiting...")
+            }
+        }
     }
 
     var isSelectedRatings by remember { mutableStateOf(false) }
@@ -456,7 +541,8 @@ fun ReelsView(
                     showLoginPrompt = showLoginPrompt,
                     initialPage = initialPage,
                     onShareReel = ::shareReel,
-                    recentlyViewedViewModel = recentlyViewedViewModel
+                    recentlyViewedViewModel = recentlyViewedViewModel,
+                    globalVideoPlayStates = globalVideoPlayStates // NEW: Pass global state
                 )
             }
             else -> {
@@ -705,7 +791,8 @@ fun ReelsList(
     showLoginPrompt: androidx.compose.runtime.MutableState<Boolean>,
     initialPage: Int = 0,
     onShareReel: (Reels) -> Unit = {},
-    recentlyViewedViewModel: com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel
+    recentlyViewedViewModel: com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel,
+    globalVideoPlayStates: SnapshotStateMap<String, Boolean> = mutableStateMapOf() // NEW: Accept global state
 ) {
     val pagerState = rememberPagerState(
         initialPage = if (reelsList.isNotEmpty()) {
@@ -729,6 +816,23 @@ fun ReelsList(
 
     var showHeart by remember { mutableStateOf(false) }
     var heartPosition by remember { mutableStateOf(Offset.Zero) }
+
+    // NEW: Use the global state for tracking which videos are playing/paused
+    val videoPlayStates = globalVideoPlayStates
+
+    // Initialize play states - only current page should be playing
+    LaunchedEffect(currentPage, reelsList) {
+        if (reelsList.isNotEmpty() && currentPage < reelsList.size) {
+            val currentReelId = reelsList[currentPage].id
+            // Pause all other videos
+            videoPlayStates.keys.forEach { key ->
+                videoPlayStates[key] = false
+            }
+            // Play only the current video
+            videoPlayStates[currentReelId] = true
+            Log.d("ReelsList", "🎥 Set playing state for reel $currentReelId (GLOBAL)")
+        }
+    }
 
     VerticalPager(
         state = pagerState,
@@ -765,6 +869,9 @@ fun ReelsList(
         Log.d("ReelsView", "🎬 Reel images count: ${reel.images?.size}")
         Log.d("ReelsView", "🎬 Reel fallback image: ${reel.fallbackImageRes}")
 
+        // NEW: Get play state for this reel
+        val isCurrentlyPlaying = videoPlayStates[reel.id] ?: (currentPage == page)
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -775,9 +882,26 @@ fun ReelsList(
             if (videoUriToUse != null && !reel.isError && videoUriToUse.toString().isNotEmpty() && videoUriToUse.toString().startsWith("http")) {
                 VideoPlayer(
                     uri = videoUriToUse,
-                    isPlaying = (currentPage == page),
+                    isPlaying = isCurrentlyPlaying, // Use the state-managed play status
                     onPlaybackStarted = {
                         Log.d("ReelsView", "🎬 Video playback started for reel ${reel.id}")
+                    },
+                    // NEW: Handle play/pause toggle
+                    onPlaybackToggle = { isPlaying ->
+                        Log.d(
+                            "ReelsView",
+                            "🎥 Video playback toggled for reel ${reel.id}: $isPlaying"
+                        )
+                        videoPlayStates[reel.id] = isPlaying
+
+                        // If this video starts playing, pause all others
+                        if (isPlaying) {
+                            videoPlayStates.keys.forEach { reelId ->
+                                if (reelId != reel.id) {
+                                    videoPlayStates[reelId] = false
+                                }
+                            }
+                        }
                     },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -1209,18 +1333,33 @@ fun UserInfo(
     // Coroutine scope for async operations
     val coroutineScope = rememberCoroutineScope()
 
-    // Check if current user is following the reel owner
-    val isFollowing = uiState.following.any { it.id == reel.userId }
+    // FALLBACK: Ensure following data is loaded if it's empty (last resort)
+    LaunchedEffect(currentUserId) {
+        if (currentUserId != null && !uiState.isLoading && uiState.following.isEmpty() && uiState.error == null) {
+            Log.d("UserInfo", "🔄 Following data is empty in UserInfo, triggering load as fallback")
+            val currentUser = auth.currentUser
+            val username =
+                currentUser?.displayName ?: currentUser?.email?.split("@")?.firstOrNull() ?: "user"
+            followingViewModel.loadUserData(currentUserId, username)
+        }
+    }
+
+    // LOCAL STATE: Track follow status for immediate UI updates
+    val isFollowingFromState = uiState.following.any { it.id == reel.userId }
+    var isFollowingLocal by remember(reel.userId) { mutableStateOf(isFollowingFromState) }
+
+    // Update local state when the global state changes
+    LaunchedEffect(isFollowingFromState) {
+        isFollowingLocal = isFollowingFromState
+    }
+
+    val isFollowing = isFollowingLocal
+
     Log.d(
         "FollowBtnDebug",
-        "UserInfo: reel.userId=${reel.userId}, currentUserId=$currentUserId, uiState.following ids=[" +
-                uiState.following.joinToString { it.id } + "] isFollowing=$isFollowing"
+        "UserInfo: reel.userId=${reel.userId}, currentUserId=$currentUserId, isFollowing=$isFollowing, " +
+                "followingCount=${uiState.following.size}, isLoading=${uiState.isLoading}"
     )
-
-    // Monitor following state changes
-    LaunchedEffect(uiState.following, isFollowing) {
-        // State updated, no need to log everything
-    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -1271,28 +1410,49 @@ fun UserInfo(
                             Brush.horizontalGradient(listOf(Color(0xFFF05F57), Color(0xFF360940)))
                         else
                             Brush.horizontalGradient(listOf(Color(0xFFf8a714), Color(0xFFed380a))),
-
                         shape = RoundedCornerShape(8.dp)
                     )
                     .clickable {
                         if (!isActuallyLoggedIn) {
                             showLoginPrompt.value = true
                         } else {
-                            // Call actual follow/unfollow functionality
+                            // IMMEDIATE UI UPDATE: Toggle local state first
+                            isFollowingLocal = !isFollowingLocal
+
+                            // Then do the backend operation
                             currentUserId?.let { userId ->
                                 coroutineScope.launch {
-                                    followingViewModel.toggleFollow(userId, reel.userId)
+                                    try {
+                                        Log.d(
+                                            "UserInfo",
+                                            "🔄 Starting follow/unfollow operation for ${reel.userId}"
+                                        )
+                                        followingViewModel.toggleFollow(userId, reel.userId)
 
-                                    // Refresh following data immediately after the operation
-                                    delay(500) // Small delay to allow Firebase operation to complete
-                                    val currentUser = auth.currentUser
-                                    val username =
-                                        currentUser?.displayName ?: currentUser?.email?.split("@")
-                                            ?.firstOrNull() ?: "user"
-                                    followingViewModel.loadUserData(userId, username)
-                                    
-                                    // Clear user info cache so follower counts update
-                                    UserInfoCache.clearUserCache(reel.userId)
+                                        // Refresh following data after the operation
+                                        delay(500) // Small delay to allow Firebase operation to complete
+                                        val currentUser = auth.currentUser
+                                        val username =
+                                            currentUser?.displayName
+                                                ?: currentUser?.email?.split("@")
+                                                    ?.firstOrNull() ?: "user"
+                                        followingViewModel.loadUserData(userId, username)
+
+                                        // Clear user info cache so follower counts update
+                                        UserInfoCache.clearUserCache(reel.userId)
+
+                                        Log.d(
+                                            "UserInfo",
+                                            "✅ Follow/unfollow operation completed successfully"
+                                        )
+                                    } catch (e: Exception) {
+                                        Log.e(
+                                            "UserInfo",
+                                            "❌ Follow/unfollow operation failed: ${e.message}"
+                                        )
+                                        // Revert local state if operation failed
+                                        isFollowingLocal = !isFollowingLocal
+                                    }
                                 }
                             }
                         }
@@ -3024,6 +3184,10 @@ fun FollowingReelsContent(
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     val hasLoadedFollowing =
         androidx.compose.runtime.saveable.rememberSaveable(currentUserId) { mutableStateOf(false) }
+
+    // NEW: Create dedicated state for following reels videos
+    val followingVideoPlayStates = remember { mutableStateMapOf<String, Boolean>() }
+
     Log.d(
         "FollowingTabDebug",
         "currentUserId=$currentUserId hasLoadedFollowing.value=${hasLoadedFollowing.value}"
@@ -3118,7 +3282,8 @@ fun FollowingReelsContent(
                 cartViewModel = cartViewModel,
                 onShowSheet = onShowSheet,
                 onShareReel = onShareReel,
-                recentlyViewedViewModel = recentlyViewedViewModel
+                recentlyViewedViewModel = recentlyViewedViewModel,
+                globalVideoPlayStates = followingVideoPlayStates // NEW: Pass the remembered mutableStateMapOf
             )
         }
     }
@@ -3132,7 +3297,8 @@ fun FollowingReelsList(
     cartViewModel: CartViewModel,
     onShowSheet: (SheetType, Reels?) -> Unit,
     onShareReel: (Reels) -> Unit,
-    recentlyViewedViewModel: com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel
+    recentlyViewedViewModel: com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel,
+    globalVideoPlayStates: SnapshotStateMap<String, Boolean> = mutableStateMapOf() // NEW: Accept global state
 ) {
     val reelsState by reelsViewModel.state.collectAsState()
 
@@ -3188,7 +3354,8 @@ fun FollowingReelsList(
             showLoginPrompt = remember { mutableStateOf(false) },
             initialPage = 0,
             onShareReel = onShareReel,
-            recentlyViewedViewModel = recentlyViewedViewModel
+            recentlyViewedViewModel = recentlyViewedViewModel,
+            globalVideoPlayStates = globalVideoPlayStates // Pass through
         )
     }
 }

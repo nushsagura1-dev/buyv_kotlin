@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.project.e_commerce.android.presentation.ui.screens.AddNewContentScreen
 import com.project.e_commerce.android.presentation.ui.screens.AllProductsScreen
+import com.project.e_commerce.android.presentation.ui.screens.BuyScreen
 import com.project.e_commerce.android.presentation.ui.screens.CartScreen
 import com.project.e_commerce.android.presentation.ui.screens.DetailsScreen
 import com.project.e_commerce.android.presentation.ui.screens.EditProfileScreen
@@ -158,6 +159,7 @@ fun MyNavHost(
         }
 
         composable(Screens.ProductScreen.route) { ProductScreen(navController,productViewModel) }
+        composable(Screens.BuyScreen.route) { BuyScreen(navController = navController) }
 
 
         composable(Screens.ProductScreen.SearchScreen.route) {
