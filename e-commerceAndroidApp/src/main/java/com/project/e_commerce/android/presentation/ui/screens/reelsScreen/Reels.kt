@@ -12,7 +12,7 @@ data class Reels(
     val userImage: Int = 0,
     val video: Uri? = null,
     val images: List<Uri>? = null,
-    val fallbackImageRes: Int = R.drawable.reelsphoto,
+    val fallbackImageRes: Int = R.drawable.img_2,
     val contentDescription: String = "",
     val love: LoveItem = LoveItem(),
     val ratings: List<Ratings> = emptyList(),
@@ -79,7 +79,10 @@ data class Reels(
                         null
                     }
                 },
-                contentDescription = product.reelTitle.ifEmpty { product.description },
+                contentDescription = enhanceWithHashtags(
+                    product.reelTitle.ifEmpty { product.description },
+                    product.name
+                ),
                 love = LoveItem(number = 0, isLoved = false),
                 ratings = emptyList(),
                 comments = emptyList(),
@@ -102,6 +105,27 @@ data class Reels(
                 colors = emptyList(), // TODO: Add colors to Product model if available
                 rating = 0.0          // TODO: Add rating to Product model if available
             )
+        }
+
+        private fun enhanceWithHashtags(description: String, productName: String): String {
+            // Clean up product name words and filter out short/common words
+            val cleanedWords = productName.lowercase()
+                .split(" ")
+                .filter { it.length > 2 && it !in listOf("the", "and", "for", "with", "from") }
+                .map { "#$it" }
+
+            // Add some common e-commerce hashtags
+            val commonHashtags =
+                listOf("#fashion", "#lifestyle", "#shopping", "#style", "#trending")
+
+            // Combine original description with hashtags
+            val allHashtags = (cleanedWords + commonHashtags.take(2)).joinToString(" ")
+
+            return if (description.isNotBlank()) {
+                "$description $allHashtags"
+            } else {
+                "Check out this amazing product! $allHashtags"
+            }
         }
     }
 }

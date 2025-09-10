@@ -33,7 +33,7 @@ class LoginScreenViewModel(
         val copyState = _state.value.copy(
             email = _state.value.email.copy(
                 email = email,
-                isError = validation.first,
+                isError = !validation.first,
                 errorMessage = validation.second.orEmpty()
             )
         )
@@ -45,7 +45,7 @@ class LoginScreenViewModel(
         val copyState = _state.value.copy(
             password = _state.value.password.copy(
                 password = password,
-                isError = validation.first,
+                isError = !validation.first,
                 errorMessage = validation.second
             )
         )
@@ -55,11 +55,44 @@ class LoginScreenViewModel(
     }
 
     override fun onClickLogin(navController: NavController, context: Context) {
-        val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("isLoggedIn", true).apply()
+        setLoadingState(true)
+        val email = _state.value.email.email
+        val password = _state.value.password.password
 
-        navController.navigate(Screens.ReelsScreen.route) {
-            popUpTo(0) { inclusive = true }
+        // Validate login credentials
+        val validation = checkLoginValidation(email, password)
+        if (!validation.first) {
+            setLoadingState(false)
+            setErrorState(true, validation.second)
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                // Use Firebase authentication
+                val result = loginByEmailAndPasswordUseCase(email, password)
+                result.fold(
+                    onSuccess = { firebaseUser ->
+                        // Save login state in SharedPreferences
+                        val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+                        prefs.edit().putBoolean("isLoggedIn", true).apply()
+
+                        setLoadingState(false)
+                        setErrorState(false, "")
+
+                        navController.navigate(Screens.ReelsScreen.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onFailure = { exception ->
+                        setLoadingState(false)
+                        setErrorState(true, exception.message ?: "خطأ في تسجيل الدخول")
+                    }
+                )
+            } catch (e: Exception) {
+                setLoadingState(false)
+                setErrorState(true, "خطأ غير متوقع: ${e.message}")
+            }
         }
     }
 

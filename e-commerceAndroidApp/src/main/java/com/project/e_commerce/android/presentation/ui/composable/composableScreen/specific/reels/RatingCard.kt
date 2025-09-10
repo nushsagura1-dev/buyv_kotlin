@@ -66,7 +66,7 @@ fun RatingCard(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(time, fontSize = 12.sp, color = Color.Gray)
             Icon(
-                painter = painterResource(if (isLoved) R.drawable.ic_heart_checked else R.drawable.ic_love_un_checked),
+                painter = painterResource(if (isLoved) R.drawable.ic_heart_checked else R.drawable.ic_heart_outlined),
                 contentDescription = null,
                 tint = if (isLoved) Color.Red else Color.Gray,
                 modifier = Modifier

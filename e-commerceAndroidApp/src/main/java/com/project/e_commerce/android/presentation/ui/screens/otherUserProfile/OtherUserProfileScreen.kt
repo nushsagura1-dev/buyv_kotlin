@@ -35,6 +35,7 @@ import android.util.Log
 import com.project.e_commerce.android.presentation.utils.VideoThumbnailUtils
 import com.project.e_commerce.android.presentation.ui.composable.composableScreen.public.VideoThumbnail
 import android.net.Uri
+import androidx.core.net.toUri
 
 @Composable
 fun OtherUserProfileScreen(
@@ -206,11 +207,14 @@ fun OtherUserProfileScreen(
                         color = Color(0xFF0D3D67)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
+                    // Verification badge temporarily hidden - keeping code for future use
+                    /*
                     Image(
                         painter = painterResource(id = R.drawable.verified_badge),
                         contentDescription = "Verified",
                         modifier = Modifier.size(22.dp)
                     )
+                    */
                 }
                 Text(
                     text = "@${uiState.username.ifEmpty { "user" }}",
@@ -378,7 +382,7 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
                         contentDescription = "Reel thumbnail",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.img2),
+                        error = painterResource(id = R.drawable.img_2),
                         onSuccess = { 
                             Log.d("OtherUserProfile", "✅ Thumbnail loaded successfully: $bestThumbnail")
                         },
@@ -390,8 +394,8 @@ fun UserReelsGrid(reels: List<com.project.e_commerce.android.domain.model.UserPo
                 } else if (!reel.mediaUrl.isNullOrBlank()) {
                     Log.d("OtherUserProfile", "🎬 Using VideoThumbnail component for: ${reel.mediaUrl}")
                     VideoThumbnail(
-                        videoUri = Uri.parse(reel.mediaUrl),
-                        fallbackImageRes = R.drawable.img2,
+                        videoUri = reel.mediaUrl.toUri(),
+                        fallbackImageRes = R.drawable.img_2,
                         modifier = Modifier.fillMaxSize(),
                         showPlayIcon = false
                     )
@@ -485,7 +489,7 @@ fun UserProductsGrid(products: List<com.project.e_commerce.android.domain.model.
                         contentDescription = "Product image",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.img4)
+                        error = painterResource(id = R.drawable.img_2)
                     )
                 } else {
                     Box(

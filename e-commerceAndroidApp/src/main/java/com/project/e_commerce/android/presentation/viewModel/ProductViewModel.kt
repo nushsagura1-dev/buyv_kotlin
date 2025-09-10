@@ -537,11 +537,11 @@ class ProductViewModel : ViewModel() {
                             contentDescription = doc.getString("description") ?: "",
                             love = LoveItem(0, false), // Map as needed
                             ratings = emptyList(),
-                            comments = emptyList(),
+                            comments = emptyList(), // Removed hardcoded comments
                             isLoading = false,
                             isError = false,
                             numberOfCart = 0,
-                            numberOfComments = 0,
+                            numberOfComments = 0, // Updated to match empty comments
                             newComment = NewComment(),
                             cartStats = CartStats(productId = doc.id),
                             productName = doc.getString("productName") ?: "",

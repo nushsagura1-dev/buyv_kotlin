@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.Timestamp
 import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -29,7 +30,7 @@ class RecentlyViewedRepository(
         }
 
         try {
-            val viewedReel = mapOf(
+            val viewedReel = hashMapOf<String, Any?>(
                 "userId" to currentUser.uid,
                 "reelId" to reel.id,
                 "reelUserId" to reel.userId,
@@ -42,8 +43,8 @@ class RecentlyViewedRepository(
                 "video" to reel.video?.toString(),
                 "images" to reel.images?.map { it.toString() },
                 "fallbackImageRes" to reel.fallbackImageRes,
-                "viewedAt" to Date(),
-                "timestamp" to System.currentTimeMillis()
+                "viewedAt" to Timestamp.now(),
+                "timestamp" to Timestamp.now()
             )
 
             val documentId = "${currentUser.uid}_${reel.id}"
@@ -163,7 +164,7 @@ class RecentlyViewedRepository(
                         }
                     },
                     fallbackImageRes = (data["fallbackImageRes"] as? Long)?.toInt()
-                        ?: com.project.e_commerce.android.R.drawable.reelsphoto,
+                        ?: com.project.e_commerce.android.R.drawable.img_2,
                     contentDescription = data["contentDescription"] as? String ?: "",
                     productName = data["productName"] as? String ?: "",
                     productPrice = data["productPrice"] as? String ?: "",

@@ -79,9 +79,6 @@ fun ProfileScreen(navController: NavHostController) {
     val cartViewModel: CartViewModel = koinViewModel()
     val cartState by cartViewModel.state.collectAsState()
 
-    // Logout state
-    var showLogoutDialog by remember { mutableStateOf(false) }
-
     // Refresh following data when screen becomes active
     LaunchedEffect(Unit) {
         profileViewModel.refreshFollowingData()
@@ -118,36 +115,6 @@ fun ProfileScreen(navController: NavHostController) {
         )
     }
 
-    // Show logout confirmation dialog
-    if (showLogoutDialog) {
-        AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Logout") },
-            text = { Text("Are you sure you want to logout?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showLogoutDialog = false
-                        // Perform logout
-                        val auth = FirebaseAuth.getInstance()
-                        auth.signOut()
-                        // Navigate to login screen
-                        navController.navigate(Screens.LoginScreen.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    }
-                ) {
-                    Text("Yes", color = Color(0xFFFF6F00))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("No", color = Color.Gray)
-                }
-            }
-        )
-    }
-
     // Firebase Auth state
     val auth = remember { FirebaseAuth.getInstance() }
     var isLoggedIn by remember { mutableStateOf(auth.currentUser != null) }
@@ -177,7 +144,7 @@ fun ProfileScreen(navController: NavHostController) {
         Pair(R.drawable.ic_reels, R.drawable.ic_reels),
         Pair(R.drawable.ic_products_filled, R.drawable.ic_products),
         Pair(R.drawable.ic_save_filled, R.drawable.ic_save),
-        Pair(R.drawable.ic_love_checked, R.drawable.ic_love_un_checked)
+        Pair(R.drawable.ic_love_checked, R.drawable.ic_heart_outlined)
     )
 
     if (uiState.isLoading) {
@@ -199,24 +166,14 @@ fun ProfileScreen(navController: NavHostController) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
         item {
-            // Top Bar with Logout and Menu
+            // Top Bar with Menu
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp, start = 4.dp, end = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Logout Icon (Left)
-                IconButton(onClick = { showLogoutDialog = true }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_logout),
-                        contentDescription = "Logout",
-                        tint = Color(0xFFFF6F00),
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
                 // Right side icons
                 Row(
                     horizontalArrangement = Arrangement.End,
@@ -386,11 +343,14 @@ fun ProfileScreen(navController: NavHostController) {
                     color = Color(0xFF0D3D67)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
+                // Verification badge temporarily hidden - keeping code for future use
+                /*
                 Image(
                     painter = painterResource(id = R.drawable.verified_badge),
                     contentDescription = "Verified",
                     modifier = Modifier.size(22.dp)
                 )
+                */
             }
             Text(
                 text = "@${uiState.username.ifEmpty { "user" }}",
@@ -583,6 +543,7 @@ fun ProfileReelsGrid(
         Log.d("PROFILE_DEBUG", "🎯 Reel $index: ID='${reel.id}', Title='${reel.title}'")
         Log.d("PROFILE_DEBUG", "🎯 Reel $index: UserId='${reel.userId}'")
         Log.d("PROFILE_DEBUG", "🎯 Reel $index: MediaUrl='${reel.mediaUrl}'")
+        Log.d("PROFILE_DEBUG", "🎯 Reel $index: ThumbnailUrl='${reel.thumbnailUrl}'")
     }
 
     // Check for duplicates by ID
@@ -665,7 +626,7 @@ fun ProfileReelsGrid(
                             contentDescription = "Reel thumbnail",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
-                            error = painterResource(id = R.drawable.img2),
+                            error = painterResource(id = R.drawable.img_2),
                             onSuccess = {
                                 Log.d(
                                     "PROFILE_DEBUG",
@@ -688,10 +649,26 @@ fun ProfileReelsGrid(
                         )
                         VideoThumbnail(
                             videoUri = Uri.parse(reel.mediaUrl),
-                            fallbackImageRes = R.drawable.img2,
+                            fallbackImageRes = R.drawable.img_2,
                             modifier = Modifier.fillMaxSize(),
-                            showPlayIcon = false
+                            showPlayIcon = false // We'll add our own play icon overlay
                         )
+
+                        // Add video play icon overlay
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.3f))
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_play),
+                                contentDescription = "Play video",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .size(32.dp)
+                            )
+                        }
                     }
 
                     else -> {
@@ -793,11 +770,11 @@ fun UserProductsGrid(products: List<com.project.e_commerce.android.domain.model.
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
-                            error = painterResource(id = R.drawable.img2)
+                            error = painterResource(id = R.drawable.img_2)
                         )
                     } else {
                         Image(
-                            painter = painterResource(id = R.drawable.img2),
+                            painter = painterResource(id = R.drawable.img_2),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
@@ -859,14 +836,20 @@ fun UserCartBookmarkGrid(
                     .background(Color(0xFFF8F8F8))
                     .height(130.dp)
                     .clickable {
-                        val found = allProducts.find { it.id == item.productId }
-                        if (found != null) {
-                            productViewModel.selectedProduct = found
+                        val associatedProduct = allProducts.find { it.id == item.productId }
+                        val hasVideoReel = associatedProduct?.reelVideoUrl?.isNotBlank() == true
+
+                        if (hasVideoReel && !associatedProduct?.reelVideoUrl.isNullOrBlank()) {
+                            navController.navigate("${Screens.ReelsScreen.route}/${item.productId}")
+                        } else {
+                            val found = allProducts.find { it.id == item.productId }
+                            if (found != null) {
+                                productViewModel.selectedProduct = found
+                            }
+                            navController.navigate("details_screen/${item.productId}")
                         }
-                        navController.navigate("details_screen/${item.productId}")
                     }
             ) {
-                // Check if this product has an associated reel with video content
                 val associatedProduct = allProducts.find { it.id == item.productId }
                 val hasVideoReel = associatedProduct?.reelVideoUrl?.isNotBlank() == true
 
@@ -877,7 +860,7 @@ fun UserCartBookmarkGrid(
                     )
                     VideoThumbnail(
                         videoUri = Uri.parse(associatedProduct!!.reelVideoUrl),
-                        fallbackImageRes = R.drawable.img2,
+                        fallbackImageRes = R.drawable.img_2,
                         modifier = Modifier.fillMaxSize(),
                         showPlayIcon = false // We'll add our own play icon overlay
                     )
@@ -905,11 +888,11 @@ fun UserCartBookmarkGrid(
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
-                            error = painterResource(id = R.drawable.img2)
+                            error = painterResource(id = R.drawable.img_2)
                         )
                     } else {
                         Image(
-                            painter = painterResource(id = R.drawable.img2),
+                            painter = painterResource(id = R.drawable.img_2),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
@@ -967,7 +950,7 @@ fun UserBookmarkedGrid(bookmarkedContent: List<com.project.e_commerce.android.do
                     )
                     VideoThumbnail(
                         videoUri = Uri.parse(post.mediaUrl),
-                        fallbackImageRes = R.drawable.img2,
+                        fallbackImageRes = R.drawable.img_2,
                         modifier = Modifier.fillMaxSize(),
                         showPlayIcon = false // We'll add our own play icon overlay
                     )
@@ -981,24 +964,21 @@ fun UserBookmarkedGrid(bookmarkedContent: List<com.project.e_commerce.android.do
                         contentDescription = "Post image",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.img2)
+                        error = painterResource(id = R.drawable.img_2)
                     )
                 } else if (!post.thumbnailUrl.isNullOrBlank()) {
-                    Log.d(
-                        "CrashDebug",
-                        "UserBookmarkedGrid: loading thumbnailUrl: ${post.thumbnailUrl}"
-                    )
+                    Log.d("CrashDebug", "UserBookmarkedGrid: loading thumbnailUrl: ${post.thumbnailUrl}")
                     AsyncImage(
                         model = post.thumbnailUrl,
                         contentDescription = "Post thumbnail",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.img2)
+                        error = painterResource(id = R.drawable.img_2)
                     )
                 } else {
                     Log.d("CrashDebug", "UserBookmarkedGrid: using fallback image")
                     Image(
-                        painter = painterResource(id = R.drawable.img2),
+                        painter = painterResource(id = R.drawable.img_2),
                         contentDescription = "Fallback image",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -1070,7 +1050,7 @@ fun UserLikedGrid(likedContent: List<com.project.e_commerce.android.domain.model
                     )
                     VideoThumbnail(
                         videoUri = Uri.parse(post.mediaUrl),
-                        fallbackImageRes = R.drawable.img2,
+                        fallbackImageRes = R.drawable.img_2,
                         modifier = Modifier.fillMaxSize(),
                         showPlayIcon = false // We'll add our own play icon overlay
                     )
@@ -1084,7 +1064,7 @@ fun UserLikedGrid(likedContent: List<com.project.e_commerce.android.domain.model
                         contentDescription = "Post image",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.img2)
+                        error = painterResource(id = R.drawable.img_2)
                     )
                 } else if (!post.thumbnailUrl.isNullOrBlank()) {
                     Log.d("CrashDebug", "UserLikedGrid: loading thumbnailUrl: ${post.thumbnailUrl}")
@@ -1093,12 +1073,12 @@ fun UserLikedGrid(likedContent: List<com.project.e_commerce.android.domain.model
                         contentDescription = "Post thumbnail",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.img2)
+                        error = painterResource(id = R.drawable.img_2)
                     )
                 } else {
                     Log.d("CrashDebug", "UserLikedGrid: using fallback image")
                     Image(
-                        painter = painterResource(id = R.drawable.img2),
+                        painter = painterResource(id = R.drawable.img_2),
                         contentDescription = "Fallback image",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()

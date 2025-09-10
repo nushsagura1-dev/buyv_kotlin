@@ -57,6 +57,10 @@ import coil3.compose.AsyncImage
 import com.project.e_commerce.android.presentation.utils.UserDisplayName
 import com.project.e_commerce.android.presentation.utils.UserFollowStats
 import com.project.e_commerce.android.presentation.utils.UserDisplayType
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import com.project.e_commerce.android.presentation.ui.navigation.Screens
+import androidx.compose.foundation.clickable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +75,11 @@ fun FollowListScreen(
     val auth = remember { FirebaseAuth.getInstance() }
     val currentUserId = auth.currentUser?.uid
 
-    val tabs = listOf("Followers", "Following")
+    val tabs = if (showFriendsTab) {
+        listOf("Followers", "Following", "Friends", "Suggested")
+    } else {
+        listOf("Followers", "Following")
+    }
 
     val pagerState = rememberPagerState(initialPage = startTabIndex)
     val coroutineScope = rememberCoroutineScope()
@@ -115,11 +123,11 @@ fun FollowListScreen(
             )
         )
 
-        TabRow(
+        ScrollableTabRow(
             backgroundColor = Color.White,
-            modifier = Modifier.fillMaxWidth(),
             selectedTabIndex = pagerState.currentPage,
             contentColor = Color(0xFF0066CC),
+            edgePadding = 0.dp,
             indicator = { tabPositions ->
                 TabRowDefaults.Indicator(
                     Modifier
@@ -133,6 +141,8 @@ fun FollowListScreen(
                 val labelWithCount = when (title) {
                     "Followers" -> "Followers (${uiState.followersCount})"
                     "Following" -> "Following (${uiState.followingCount})"
+                    "Friends" -> "Friends (${uiState.friends.size})"
+                    "Suggested" -> "Suggested (${uiState.suggestedUsers.size})"
                     else -> title
                 }
 
@@ -147,9 +157,7 @@ fun FollowListScreen(
                         Text(
                             text = labelWithCount,
                             fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 15.sp,
+                            fontSize = if (showFriendsTab) 13.sp else 15.sp,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -162,6 +170,7 @@ fun FollowListScreen(
                 "Followers" -> FollowersTab(
                     users = uiState.followers,
                     currentUserId = currentUserId,
+                    navController = navController,
                     onFollowClick = { targetUserId ->
                         currentUserId?.let { userId ->
                             coroutineScope.launch {
@@ -177,6 +186,39 @@ fun FollowListScreen(
                 "Following" -> FollowingTab(
                     users = uiState.following,
                     currentUserId = currentUserId,
+                    navController = navController,
+                    onFollowClick = { targetUserId ->
+                        currentUserId?.let { userId ->
+                            coroutineScope.launch {
+                                followingViewModel.toggleFollow(
+                                    userId,
+                                    targetUserId
+                                )
+                            }
+                        }
+                    },
+                    isLoading = uiState.isLoading
+                )
+                "Friends" -> FriendsTab(
+                    users = uiState.friends,
+                    currentUserId = currentUserId,
+                    navController = navController,
+                    onFollowClick = { targetUserId ->
+                        currentUserId?.let { userId ->
+                            coroutineScope.launch {
+                                followingViewModel.toggleFollow(
+                                    userId,
+                                    targetUserId
+                                )
+                            }
+                        }
+                    },
+                    isLoading = uiState.isLoading
+                )
+                "Suggested" -> SuggestedTab(
+                    users = uiState.suggestedUsers,
+                    currentUserId = currentUserId,
+                    navController = navController,
                     onFollowClick = { targetUserId ->
                         currentUserId?.let { userId ->
                             coroutineScope.launch {
@@ -198,6 +240,7 @@ fun FollowListScreen(
 fun FollowersTab(
     users: List<UserFollowModel>,
     currentUserId: String?,
+    navController: NavHostController,
     onFollowClick: (String) -> Unit,
     isLoading: Boolean
 ) {
@@ -224,7 +267,10 @@ fun FollowersTab(
                 UserFollowItem(
                     user = user,
                     currentUserId = currentUserId,
-                    onFollowClick = { onFollowClick(user.id) }
+                    onFollowClick = { onFollowClick(user.id) },
+                    onUserClick = { uid ->
+                        navController.navigate(Screens.OtherUserProfileScreen.createRoute(uid))
+                    }
                 )
             }
         }
@@ -235,6 +281,7 @@ fun FollowersTab(
 fun FollowingTab(
     users: List<UserFollowModel>,
     currentUserId: String?,
+    navController: NavHostController,
     onFollowClick: (String) -> Unit,
     isLoading: Boolean
 ) {
@@ -261,7 +308,92 @@ fun FollowingTab(
                 UserFollowItem(
                     user = user,
                     currentUserId = currentUserId,
-                    onFollowClick = { onFollowClick(user.id) }
+                    onFollowClick = { onFollowClick(user.id) },
+                    onUserClick = { uid ->
+                        navController.navigate(Screens.OtherUserProfileScreen.createRoute(uid))
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FriendsTab(
+    users: List<UserFollowModel>,
+    currentUserId: String?,
+    navController: NavHostController,
+    onFollowClick: (String) -> Unit,
+    isLoading: Boolean
+) {
+    if (isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Color(0xFFFF6F00))
+        }
+    } else if (users.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("No friends yet", color = Color.Gray)
+        }
+    } else {
+        LazyColumn(modifier = Modifier
+            .fillMaxSize()
+            .background(color = Color.White)) {
+            items(users.size) { index ->
+                val user = users[index]
+                UserFollowItem(
+                    user = user,
+                    currentUserId = currentUserId,
+                    onFollowClick = { onFollowClick(user.id) },
+                    onUserClick = { uid ->
+                        navController.navigate(Screens.OtherUserProfileScreen.createRoute(uid))
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SuggestedTab(
+    users: List<UserFollowModel>,
+    currentUserId: String?,
+    navController: NavHostController,
+    onFollowClick: (String) -> Unit,
+    isLoading: Boolean
+) {
+    if (isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Color(0xFFFF6F00))
+        }
+    } else if (users.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("No suggested users yet", color = Color.Gray)
+        }
+    } else {
+        LazyColumn(modifier = Modifier
+            .fillMaxSize()
+            .background(color = Color.White)) {
+            items(users.size) { index ->
+                val user = users[index]
+                UserFollowItem(
+                    user = user,
+                    currentUserId = currentUserId,
+                    onFollowClick = { onFollowClick(user.id) },
+                    onUserClick = { uid ->
+                        navController.navigate(Screens.OtherUserProfileScreen.createRoute(uid))
+                    }
                 )
             }
         }
@@ -272,7 +404,8 @@ fun FollowingTab(
 fun UserFollowItem(
     user: UserFollowModel,
     currentUserId: String?,
-    onFollowClick: () -> Unit
+    onFollowClick: () -> Unit,
+    onUserClick: (String) -> Unit
 ) {
     // State for confirmation dialog
     var showUnfollowDialog by remember { mutableStateOf(false) }
@@ -328,7 +461,8 @@ fun UserFollowItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .clickable { onUserClick(user.id) },
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Profile Image

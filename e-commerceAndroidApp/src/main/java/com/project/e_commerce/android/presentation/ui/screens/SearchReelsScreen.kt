@@ -45,6 +45,7 @@ import com.project.e_commerce.android.R
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.style.TextAlign
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import org.koin.androidx.compose.koinViewModel
 import com.project.e_commerce.android.presentation.viewModel.ProductViewModel
@@ -91,7 +92,7 @@ fun SearchReelsAndUsersScreen(navController: NavHostController) {
             TextField(
                 value = uiState.searchQuery,
                 onValueChange = { searchViewModel.updateSearchQuery(it) },
-                placeholder = { Text("Search reels or users...", color = Color.Gray) },
+                placeholder = { Text("Search reels, users or #hashtags...", color = Color.Gray) },
                 trailingIcon = {
                     Icon(
                         Icons.Default.Search,
@@ -181,7 +182,8 @@ fun SearchReelsAndUsersScreen(navController: NavHostController) {
                     query = uiState.searchQuery,
                     reels = uiState.reels,
                     isLoading = uiState.isLoading,
-                    navController = navController
+                    navController = navController,
+                    searchViewModel = searchViewModel
                 )
 
                 1 -> UsersListContent(
@@ -200,7 +202,8 @@ fun ReelsGridContent(
     query: String,
     reels: List<Reels>,
     isLoading: Boolean,
-    navController: NavHostController
+    navController: NavHostController,
+    searchViewModel: SearchViewModel
 ) {
     when {
         isLoading -> {
@@ -218,7 +221,15 @@ fun ReelsGridContent(
                         tint = Color.Gray
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Start typing to search for reels", color = Color.Gray)
+                    Text("Start typing to search for reels", color = Color.Gray, fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Try searching with hashtags like #fashion, #lifestyle, or #tech",
+                        color = Color.Gray.copy(alpha = 0.7f),
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }
@@ -229,9 +240,17 @@ fun ReelsGridContent(
                     Text("No reels found for \"$query\"", color = Color.Gray, fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Try searching with different keywords",
+                        "Try searching with different keywords or hashtags",
                         color = Color.Gray,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Examples: #fashion, #lifestyle, product names, or usernames",
+                        color = Color.Gray.copy(alpha = 0.7f),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
                     )
                 }
             }

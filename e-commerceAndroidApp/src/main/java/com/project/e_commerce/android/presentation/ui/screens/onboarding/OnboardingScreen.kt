@@ -237,20 +237,4 @@ fun OnboardingScreen3(navController: NavController) {
     )
 }
 
-@Preview(showBackground = true)
-@Composable
-fun OnboardingScreen1Preview() {
-    OnboardingScreen1(navController = rememberNavController())
-}
 
-@Preview(showBackground = true)
-@Composable
-fun OnboardingScreen2Preview() {
-    OnboardingScreen2(navController = rememberNavController())
-}
-
-@Preview(showBackground = true)
-@Composable
-fun OnboardingScreen3Preview() {
-    OnboardingScreen3(navController = rememberNavController())
-}

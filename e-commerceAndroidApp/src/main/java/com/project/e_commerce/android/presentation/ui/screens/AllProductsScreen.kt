@@ -145,7 +145,7 @@ fun BagProductCard(product: Product, onClick: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(Color.White)
-            .border(1.dp, Color(0xFFF2F2F2), RoundedCornerShape(14.dp))
+            .border(1.dp, Color(0xFF176DBA), RoundedCornerShape(14.dp))
             .clickable { onClick() }
             .padding(bottom = 8.dp)
     ) {
@@ -170,11 +170,11 @@ fun BagProductCard(product: Product, onClick: () -> Unit) {
                     Icon(
                         imageVector = Icons.Default.ShoppingCart,
                         contentDescription = "Cart",
-                        tint = Color(0xFF0B74DA),
+                        tint = Color(0xFF176DBA),
                         modifier = Modifier
                             .size(28.dp)
                             .background(
-                                Color(0xFFEFF6FB),
+                                Color(0xFFE3F2FD),
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(5.dp)

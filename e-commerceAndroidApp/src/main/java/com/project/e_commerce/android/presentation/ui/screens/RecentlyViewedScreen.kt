@@ -303,8 +303,8 @@ fun ReelCard(
                         contentDescription = reel.contentDescription,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.reelsphoto),
-                        placeholder = painterResource(id = R.drawable.reelsphoto)
+                        error = painterResource(id = R.drawable.img_2),
+                        placeholder = painterResource(id = R.drawable.img_2)
                     )
                 }
                 // Priority 4: Show video placeholder if thumbnail failed but it's a video
@@ -330,8 +330,8 @@ fun ReelCard(
                         contentDescription = reel.contentDescription,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
-                        error = painterResource(id = R.drawable.reelsphoto),
-                        placeholder = painterResource(id = R.drawable.reelsphoto)
+                        error = painterResource(id = R.drawable.img_2),
+                        placeholder = painterResource(id = R.drawable.img_2)
                     )
                 }
                 // Priority 6: Show fallback image as last resort

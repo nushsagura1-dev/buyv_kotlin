@@ -12,16 +12,12 @@ class CheckLoginValidation {
             return Pair(false, "Invalid email format")
         }
 
-        if (password.length < 8) {
-            return Pair(false, "Password must be at least 8 characters long")
+        if (password.isEmpty()) {
+            return Pair(false, "Password cannot be empty")
         }
 
-        val containsNumber = password.any { it.isDigit() }
-
-        if (!containsNumber) {
-            return Pair(false, "Password must contain at least one number")
-        }
-
+        // Removed all password complexity requirements
+        // Password can now be only numbers or any combination
 
         return Pair(true, "Login credentials are valid")
     }

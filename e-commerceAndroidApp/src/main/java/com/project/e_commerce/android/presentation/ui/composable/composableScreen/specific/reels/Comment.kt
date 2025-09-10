@@ -78,7 +78,7 @@ fun CommentItem(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     painter = painterResource(
-                        if (localIsLoved) R.drawable.ic_heart_checked else R.drawable.ic_love_un_checked
+                        if (localIsLoved) R.drawable.ic_heart_checked else R.drawable.ic_heart_outlined
                     ),
                     contentDescription = null,
                     tint = if (localIsLoved) Color.Red else Color.Gray,

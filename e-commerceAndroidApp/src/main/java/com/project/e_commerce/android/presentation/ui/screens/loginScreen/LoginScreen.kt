@@ -35,6 +35,9 @@ import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.project.e_commerce.android.R
 
 @Composable
 fun LoginScreen(navController: NavController) {
@@ -44,6 +47,14 @@ fun LoginScreen(navController: NavController) {
     val s by vm.state.collectAsState()
     Log.d("CrashDebug", "LoginScreen: collected state loading=${s.loading} email=${s.email}")
     val context = LocalContext.current
+
+    // Google Sign-In Launcher
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        // Handle Google Sign-In result
+        vm.handleGoogleSignInResult(result.data)
+    }
 
     // One-shot effects: Navigation + Toasts (بدون أي تغيير بصري)
     LaunchedEffect(Unit) {
@@ -233,6 +244,40 @@ fun LoginScreen(navController: NavController) {
             )
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // "Or login with" text
+        Text(
+            text = "Or login with",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Normal,
+            color = Color.Gray,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Social Login Buttons
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            SocialLoginButton(
+                iconResId = R.drawable.ic_google,
+                isLoading = s.loading,
+                onClick = {
+                    // Build intent for Google Sign-In and launch
+                    val signInIntent = vm.getGoogleSignInIntent()
+                    signInIntent?.let { intent ->
+                        googleSignInLauncher.launch(intent)
+                    }
+                }
+            )
+        }
+
         s.generalError?.let {
             Text(
                 text = it,
@@ -271,20 +316,32 @@ fun LoginScreen(navController: NavController) {
 }
 
 @Composable
-fun SocialLoginButton(iconResId: Int) {
+fun SocialLoginButton(
+    iconResId: Int,
+    isLoading: Boolean,
+    onClick: () -> Unit = {}
+) {
     Button(
-        onClick = { },
+        onClick = onClick,
         modifier = Modifier.size(50.dp),
         colors = ButtonDefaults.buttonColors(backgroundColor = Color.White),
         shape = RoundedCornerShape(25.dp),
         border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
         elevation = ButtonDefaults.elevation(2.dp)
     ) {
-        Image(
-            painter = painterResource(id = iconResId),
-            contentDescription = null,
-            modifier = Modifier.size(24.dp)
-        )
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+                color = Color(0xFF1B7ACE)
+            )
+        } else {
+            Image(
+                painter = painterResource(id = iconResId),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp)
+            )
+        }
     }
 }
 

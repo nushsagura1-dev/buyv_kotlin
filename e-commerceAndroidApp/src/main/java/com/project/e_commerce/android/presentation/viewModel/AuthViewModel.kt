@@ -1,11 +1,15 @@
 package com.project.e_commerce.android.presentation.viewModel
 
+import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.e_commerce.android.data.repository.AuthRepository
 import com.project.e_commerce.android.domain.usecase.CheckEmailValidation
 import com.project.e_commerce.android.domain.usecase.CheckMatchedPasswordUseCase
 import com.project.e_commerce.android.domain.usecase.CheckPasswordValidation
+import com.project.e_commerce.android.domain.usecase.GoogleSignInUseCase
+import com.project.e_commerce.android.data.helper.GoogleSignInHelper
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +41,8 @@ class AuthViewModel(
     private val checkEmailValidation: CheckEmailValidation,
     private val checkPasswordValidation: CheckPasswordValidation,
     private val checkMatchedPassword: CheckMatchedPasswordUseCase,
+    private val googleSignInUseCase: GoogleSignInUseCase,
+    private val googleSignInHelper: GoogleSignInHelper,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthUiState())
@@ -138,6 +144,58 @@ class AuthViewModel(
             _effect.trySend(AuthEffect.Toast(it.message ?: "فشل إرسال البريد"))
         }
     }
+
+    fun getGoogleSignInIntent(): Intent? {
+        return if (googleSignInHelper.isGooglePlayServicesAvailable()) {
+            googleSignInHelper.getSignInIntent()
+        } else {
+            _effect.trySend(AuthEffect.Toast("Google Play Services not available"))
+            null
+        }
+    }
+
+    fun handleGoogleSignInResult(data: Intent?) = viewModelScope.launch {
+        _state.value = _state.value.copy(loading = true, generalError = null)
+
+        val tokenResult = googleSignInHelper.handleSignInResult(data)
+        tokenResult.fold(
+            onSuccess = { idToken ->
+                val result = googleSignInUseCase(idToken)
+                result.onSuccess {
+                    _state.value = _state.value.copy(loading = false, isLoggedIn = true)
+                    _effect.trySend(AuthEffect.NavigateToHome)
+                }.onFailure {
+                    _state.value = _state.value.copy(loading = false, generalError = it.message)
+                    _effect.trySend(AuthEffect.Toast(it.message ?: "Google sign in failed"))
+                }
+            },
+            onFailure = { exception ->
+                _state.value = _state.value.copy(loading = false, generalError = exception.message)
+                _effect.trySend(AuthEffect.Toast(exception.message ?: "Google sign in failed"))
+            }
+        )
+    }
+
+    fun signOut() = viewModelScope.launch {
+        _state.value = _state.value.copy(loading = true)
+
+        // Sign out from Firebase
+        val firebaseSignOutResult = repo.signOut()
+
+        // Sign out from Google
+        googleSignInHelper.signOut()
+
+        firebaseSignOutResult.fold(
+            onSuccess = {
+                _state.value = AuthUiState() // Reset to initial state
+                _effect.trySend(AuthEffect.NavigateToLogin)
+            },
+            onFailure = {
+                _state.value = _state.value.copy(loading = false, generalError = it.message)
+                _effect.trySend(AuthEffect.Toast("Sign out failed: ${it.message}"))
+            }
+        )
+    }
 }
 
 /* ===================== Helpers ===================== */
@@ -163,5 +221,3 @@ private fun Any?.matchErrorOrNull(defaultMsg: String = "Passwords do not match")
         else       -> null
     }
 }
-
-

@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import android.util.Log
 import com.project.e_commerce.android.presentation.utils.UserInfoCache
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 class FollowingViewModel(
     private val followUserUseCase: FollowUserUseCase,
@@ -21,7 +23,8 @@ class FollowingViewModel(
     private val getFollowingStatusUseCase: GetFollowingStatusUseCase,
     private val getFollowingUsersUseCase: GetFollowingUsersUseCase,
     private val getUserProfilesByIdsUseCase: GetUserProfilesByIdsUseCase,
-    private val getFollowersUseCase: GetFollowersUseCase
+    private val getFollowersUseCase: GetFollowersUseCase,
+    private val firestore: FirebaseFirestore
 ) : BaseViewModel() {
 
     private var loadAttempts = 0
@@ -202,10 +205,60 @@ class FollowingViewModel(
             }.map { user ->
                 user.copy(isFollowingMe = true, isIFollow = true)
             }
-            
-            // Generate suggested users (for now, just show some followers)
-            val suggestedUsers = followersUsers.take(3).map { user ->
-                user.copy(isFollowingMe = true, isIFollow = false)
+
+            // Generate suggested users (users who don't follow current user and current user doesn't follow)
+            // Get all users from Firestore and filter out those with relationships
+            val suggestedUsers = try {
+                Log.d(TAG, "🔍 Fetching all users from Firestore for suggestions...")
+                val allUsersSnapshot = firestore.collection("users")
+                    .limit(100) // Limit to prevent excessive data transfer
+                    .get()
+                    .await()
+
+                Log.d(TAG, "📥 Retrieved ${allUsersSnapshot.documents.size} users from Firestore")
+
+                allUsersSnapshot.documents.mapNotNull { document ->
+                    try {
+                        val userId = document.id
+                        val userData = document.data
+
+                        // Skip if no data or if it's the current user
+                        if (userData == null || userId == currentUserId) {
+                            return@mapNotNull null
+                        }
+
+                        // Skip if user already has a relationship with current user
+                        if ((followingUserIds + followersUserIds).contains(userId)) {
+                            return@mapNotNull null
+                        }
+
+                        val displayName = userData["displayName"] as? String ?: ""
+                        val username = userData["username"] as? String ?: ""
+                        val profileImageUrl = userData["profileImageUrl"] as? String
+
+                        // Skip users with empty names/usernames
+                        if (displayName.isBlank() && username.isBlank()) {
+                            return@mapNotNull null
+                        }
+
+                        UserFollowModel(
+                            id = userId,
+                            name = displayName.ifEmpty { username },
+                            username = username,
+                            profileImageUrl = profileImageUrl,
+                            isFollowingMe = false,
+                            isIFollow = false
+                        )
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Error parsing user document ${document.id}: ${e.message}")
+                        null
+                    }
+                }.take(20) // Limit suggested users to 20
+
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to fetch suggested users from Firestore: ${e.message}")
+                // Fallback to empty list if Firestore fails
+                emptyList()
             }
             
             _uiState.value = _uiState.value.copy(
@@ -221,6 +274,7 @@ class FollowingViewModel(
             Log.d(TAG, "📊 Updated UI state - Following: ${followingUsers.size}, Followers: ${followersUsers.size}")
             Log.d(TAG, "👥 Following user IDs: ${followingUsers.map { it.id }}")
             Log.d(TAG, "👥 Followers user IDs: ${followersUsers.map { it.id }}")
+            Log.d(TAG, "💡 Suggested users: ${suggestedUsers.size} (mutual strangers)")
             
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to load real following data: ${e.message}")
@@ -266,14 +320,15 @@ class FollowingViewModel(
             )
         }
 
-        val mockSuggested = List(4) { index ->
+        // Mock suggested users - people with NO relationship to current user
+        val mockSuggested = List(6) { index ->
             UserFollowModel(
                 id = "suggested_$index",
-                name = "Suggested $index",
-                username = "User_Suggested$index",
+                name = "Suggested User ${index + 1}",
+                username = "suggested_user_${index + 1}",
                 profileImageUrl = null,
-                isFollowingMe = index % 2 == 0,
-                isIFollow = false
+                isFollowingMe = false, // They don't follow current user
+                isIFollow = false      // Current user doesn't follow them
             )
         }
 
@@ -284,6 +339,11 @@ class FollowingViewModel(
             suggestedUsers = mockSuggested,
             followersCount = mockFollowers.size,
             followingCount = mockFollowing.size
+        )
+
+        Log.d(
+            TAG,
+            "✅ Mock data loaded - Suggested: ${mockSuggested.size} users with no relationships"
         )
     }
 

@@ -12,6 +12,7 @@ import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,6 +26,7 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -55,6 +57,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.java.KoinJavaComponent
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.layout.Box
 
 class MainActivity : ComponentActivity() {
     private val mainUiStateViewModel: MainUiStateViewModel by viewModels()
@@ -150,7 +158,8 @@ class MainActivity : ComponentActivity() {
                         !hideBottomBar
 
                 // Show FAB only when on the main reels screen
-                val showFAB = currentRoute == Screens.ReelsScreen.route && !hideBottomBar
+                val showFAB =
+                    currentRoute == Screens.ReelsScreen.route && !hideBottomBar && !isAddToCartSheetVisible
 
                 // Fixed selectedTab calculation to handle sub-screens correctly
                 val selectedTab = when {
@@ -264,7 +273,16 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             floatingActionButton = {
-                                if (showFAB) {
+                                AnimatedVisibility(
+                                    visible = showFAB,
+                                    enter = scaleIn(
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessHigh
+                                        ),
+                                        initialScale = 0.6f
+                                    )
+                                ) {
                                     FloatingActionButton(
                                         onClick = {
                                             mainUiStateViewModel.showAddToCartSheet(
@@ -320,7 +338,7 @@ class MainActivity : ComponentActivity() {
                                             fontWeight = FontWeight.SemiBold
                                         )
                                     }
-                                }
+                                } // <-- Properly closes AnimatedVisibility block
                             },
                             floatingActionButtonPosition = FabPosition.Center,
                             isFloatingActionButtonDocked = true
@@ -335,16 +353,24 @@ class MainActivity : ComponentActivity() {
                             )
                             // AddToCartBottomSheet
                             if (isAddToCartSheetVisible && selectedReelForCart != null) {
-                                AddToCartBottomSheet(
-                                    onClose = { mainUiStateViewModel.hideAddToCartSheet() },
-                                    productId = selectedReelForCart!!.id,
-                                    productName = selectedReelForCart!!.productName,
-                                    productPrice = selectedReelForCart!!.productPrice.toDoubleOrNull()
-                                        ?: 0.0,
-                                    productImage = selectedReelForCart!!.productImage,
-                                    cartViewModel = cartViewModel,
+                                Box(
                                     modifier = Modifier
-                                )
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f)) // Semi-transparent overlay
+                                        .clickable { mainUiStateViewModel.hideAddToCartSheet() } // Close on outside click
+                                ) {
+                                    AddToCartBottomSheet(
+                                        onClose = { mainUiStateViewModel.hideAddToCartSheet() },
+                                        productId = selectedReelForCart!!.id,
+                                        productName = selectedReelForCart!!.productName,
+                                        productPrice = selectedReelForCart!!.productPrice.toDoubleOrNull()
+                                            ?: 0.0,
+                                        productImage = selectedReelForCart!!.productImage,
+                                        cartViewModel = cartViewModel,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                    )
+                                }
                             }
                         }
                     }

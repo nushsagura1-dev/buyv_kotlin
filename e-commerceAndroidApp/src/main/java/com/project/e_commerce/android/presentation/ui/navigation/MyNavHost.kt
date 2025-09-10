@@ -154,8 +154,25 @@ fun MyNavHost(
                 navController.currentBackStackEntry?.savedStateHandle?.set("reelId", reelId)
             }
         }
-        composable(Screens.ReelsScreen.SoundPageScreen.route) {
-            SoundPageScreen( navController)
+        composable(
+            route = Screens.ReelsScreen.SoundPageScreen.route + "?videoUrl={videoUrl}",
+            arguments = listOf(
+                navArgument("videoUrl") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                }
+            )
+        ) { backStackEntry ->
+            val encodedVideoUrl = backStackEntry.arguments?.getString("videoUrl") ?: ""
+            val videoUrl = if (encodedVideoUrl.isNotEmpty()) {
+                java.net.URLDecoder.decode(encodedVideoUrl, "UTF-8")
+            } else {
+                ""
+            }
+            SoundPageScreen(
+                navController = navController,
+                videoUrl = videoUrl
+            )
         }
 
         composable(Screens.ProductScreen.route) { ProductScreen(navController,productViewModel) }
@@ -163,7 +180,7 @@ fun MyNavHost(
 
 
         composable(Screens.ProductScreen.SearchScreen.route) {
-            SearchScreen(navController = navController)
+            SearchScreen(navController = navController, viewModel = productViewModel)
         }
 
         composable(
@@ -279,7 +296,11 @@ fun MyNavHost(
             )
         }
 
-        composable(Screens.CartScreen.PaymentScreen.route){ com.project.e_commerce.android.presentation.ui.screens.PaymentScreen(navController = navController) }
+        composable(Screens.CartScreen.PaymentScreen.route) {
+            com.project.e_commerce.android.presentation.ui.screens.PaymentScreen(
+                navController = navController
+            )
+        }
 
 
 

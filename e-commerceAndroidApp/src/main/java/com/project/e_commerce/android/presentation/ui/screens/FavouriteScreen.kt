@@ -93,7 +93,7 @@ fun FavouriteScreen(navController: NavHostController) {
                             .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color.White)
-                            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0xFF176DBA), RoundedCornerShape(12.dp))
                             .padding(8.dp)
                     ) {
                         Box(
@@ -105,7 +105,8 @@ fun FavouriteScreen(navController: NavHostController) {
                                 painter = painterResource(id = R.drawable.perfume1), // غيرها لصورتك
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier
+                                    .fillMaxSize()
                                     .clip(RoundedCornerShape(8.dp))
                             )
                             IconButton(
@@ -164,7 +165,7 @@ fun FavouriteScreen(navController: NavHostController) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_cart),
                                     contentDescription = "Cart",
-                                    tint = Color(0xFF1B7ACE),
+                                    tint = Color(0xFF176DBA),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }

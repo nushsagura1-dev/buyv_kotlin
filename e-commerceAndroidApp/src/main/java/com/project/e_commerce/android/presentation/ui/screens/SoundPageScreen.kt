@@ -42,6 +42,8 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +58,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -64,11 +67,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.project.e_commerce.android.R
+import android.media.MediaPlayer
+import android.net.Uri
+import android.util.Log
 
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun SoundPageScreen(navController: NavHostController) {
+fun SoundPageScreen(
+    navController: NavHostController,
+    videoUrl: String = ""
+) {
 
     var isFavorite by remember { mutableStateOf(false) }
 
@@ -78,16 +87,16 @@ fun SoundPageScreen(navController: NavHostController) {
     val postsCount = "5K posts"
 
     val posts = listOf(
-        SoundPost(painterResource(id = R.drawable.img1), isImage = false),
-        SoundPost(painterResource(id = R.drawable.img2), isImage = true),
+        SoundPost(painterResource(id = R.drawable.img_2), isImage = false),
+        SoundPost(painterResource(id = R.drawable.img_2), isImage = true),
         SoundPost(painterResource(id = R.drawable.img3), isImage = false),
-        SoundPost(painterResource(id = R.drawable.img4), isImage = true),
-        SoundPost(painterResource(id = R.drawable.img5), isImage = false),
-        SoundPost(painterResource(id = R.drawable.img1), isImage = false),
-        SoundPost(painterResource(id = R.drawable.img2), isImage = true),
+        SoundPost(painterResource(id = R.drawable.img_2), isImage = true),
+        SoundPost(painterResource(id = R.drawable.img_2), isImage = false),
+        SoundPost(painterResource(id = R.drawable.img_2), isImage = false),
+        SoundPost(painterResource(id = R.drawable.img_2), isImage = true),
         SoundPost(painterResource(id = R.drawable.img3), isImage = false),
-        SoundPost(painterResource(id = R.drawable.img4), isImage = true),
-        SoundPost(painterResource(id = R.drawable.img5), isImage = false),
+        SoundPost(painterResource(id = R.drawable.img_2), isImage = true),
+        SoundPost(painterResource(id = R.drawable.img_2), isImage = false),
 //        SoundPost(painterResource(id = R.drawable.img1), isImage = false),
 //        SoundPost(painterResource(id = R.drawable.img2), isImage = true),
 //        SoundPost(painterResource(id = R.drawable.img3), isImage = false),
@@ -97,7 +106,9 @@ fun SoundPageScreen(navController: NavHostController) {
 
     val headerHeight = 56.dp
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(Color.White)) {
 
         // Header ثابت بالأعلى
         Box(
@@ -148,7 +159,8 @@ fun SoundPageScreen(navController: NavHostController) {
                 soundImage = soundImage,
                 soundTitle = soundTitle,
                 soundAuthor = soundAuthor,
-                postsCount = postsCount
+                postsCount = postsCount,
+                audioUrl = videoUrl.ifEmpty { "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" }
             )
             /*   Row(
                    modifier = Modifier
@@ -317,7 +329,9 @@ fun SoundPageScreen(navController: NavHostController) {
         ) {
             OutlinedButton(
                 onClick = { /* Add to Story */ },
-                modifier = Modifier.weight(1f).height(42.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp),
                 shape = RoundedCornerShape(32.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
                     backgroundColor = Color(0xFF0066CC),
@@ -333,7 +347,9 @@ fun SoundPageScreen(navController: NavHostController) {
             Spacer(modifier = Modifier.width(12.dp))
             Button(
                 onClick = { /* Use Sound */ },
-                modifier = Modifier.weight(1f).height(42.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp),
                 shape = RoundedCornerShape(32.dp),
                 colors = ButtonDefaults.buttonColors(
                     backgroundColor = Color(0xFFFF6F00),
@@ -363,9 +379,12 @@ fun SoundHeaderSection(
     soundTitle: String,
     soundAuthor: String,
     postsCount: String,
+    audioUrl: String = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" // Provide a sample audio url
 ) {
+    val context = LocalContext.current
     var isPlaying by remember { mutableStateOf(false) }
     var rotation by remember { mutableStateOf(0f) }
+    var mediaPlayer: MediaPlayer? by remember { mutableStateOf(null) }
 
     val infiniteTransition = rememberInfiniteTransition(label = "rotate")
     val animatedRotation by infiniteTransition.animateFloat(
@@ -379,6 +398,52 @@ fun SoundHeaderSection(
     )
 
     val actualRotation = if (isPlaying) animatedRotation else 0f
+
+    // Handle MediaPlayer lifecycle
+    DisposableEffect(audioUrl) {
+        // Cleanup when composable leaves composition
+        onDispose {
+            mediaPlayer?.release()
+            mediaPlayer = null
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            if (mediaPlayer == null) {
+                try {
+                    mediaPlayer = MediaPlayer().apply {
+                        setDataSource(context, Uri.parse(audioUrl))
+                        setOnPreparedListener {
+                            start()
+                        }
+                        setOnCompletionListener {
+                            isPlaying = false
+                        }
+                        prepareAsync()
+                    }
+                } catch (e: Exception) {
+                    Log.e("SoundHeaderSection", "Error preparing media player: $e")
+                    isPlaying = false
+                }
+            } else {
+                try {
+                    if (!mediaPlayer!!.isPlaying) {
+                        mediaPlayer?.start()
+                    }
+                } catch (e: Exception) {
+                    Log.e("SoundHeaderSection", "Error starting media player: $e")
+                    isPlaying = false
+                }
+            }
+        } else {
+            try {
+                mediaPlayer?.pause()
+            } catch (e: Exception) {
+                Log.e("SoundHeaderSection", "Error pausing media player: $e")
+            }
+        }
+    }
 
     Column(
         modifier = Modifier

@@ -18,7 +18,12 @@ sealed class Screens(val route: String, val title : String? = null, val icon : I
     object ReelsScreen: Screens(title = "Reels",route = "reels_screen", icon = R.drawable.ic_home){
         object SearchReelsAndUsersScreen : Screens(route = "search_reels_screen")
         object ExploreScreen : Screens(route = "explore")
-        object SoundPageScreen : Screens(route = "sound")
+        object SoundPageScreen : Screens(route = "sound") {
+            fun createRoute(videoUrl: String = ""): String {
+                val encodedUrl = java.net.URLEncoder.encode(videoUrl, "UTF-8")
+                return "sound?videoUrl=$encodedUrl"
+            }
+        }
         object UserProfileScreen : Screens(route = "UserProfileScreen")
     }
 

@@ -26,6 +26,15 @@ import com.project.e_commerce.android.domain.usecase.GetUserPostsUseCase
 import com.project.e_commerce.android.domain.usecase.GetUserProductsUseCase
 import com.project.e_commerce.android.domain.usecase.GetUserProfileUseCase
 import com.project.e_commerce.android.domain.usecase.GetUserLikedPostsUseCase
+import com.project.e_commerce.android.domain.usecase.LikeReelUseCase
+import com.project.e_commerce.android.domain.usecase.GetReelLikeStatusUseCase
+import com.project.e_commerce.android.domain.usecase.GetReelLikeCountUseCase
+import com.project.e_commerce.android.domain.usecase.UpdateUserLikeCountUseCase
+import com.project.e_commerce.android.domain.usecase.AddCommentUseCase
+import com.project.e_commerce.android.domain.usecase.GetReelCommentsUseCase
+import com.project.e_commerce.android.domain.usecase.LikeCommentUseCase
+import com.project.e_commerce.android.domain.usecase.GetCommentLikeStatusUseCase
+import com.project.e_commerce.android.domain.usecase.GetCommentLikeCountUseCase
 import com.project.e_commerce.android.domain.usecase.FollowUserUseCase
 import com.project.e_commerce.android.domain.usecase.UnfollowUserUseCase
 import com.project.e_commerce.android.domain.usecase.GetFollowersUseCase
@@ -68,6 +77,8 @@ import com.project.e_commerce.android.domain.usecase.GetUserOrdersUseCase
 import com.project.e_commerce.android.domain.usecase.UpdateOrderStatusUseCase
 import com.project.e_commerce.android.domain.usecase.CancelOrderUseCase
 import com.project.e_commerce.android.data.repository.FirebaseOrderRepository
+import com.project.e_commerce.android.domain.usecase.GoogleSignInUseCase
+import com.project.e_commerce.android.data.helper.GoogleSignInHelper
 
 val viewModelModule = module {
     try {
@@ -203,6 +214,55 @@ val viewModelModule = module {
             useCase
         }
 
+        // Like-related Use Cases
+        single {
+            val useCase = UpdateUserLikeCountUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: UpdateUserLikeCountUseCase created")
+            useCase
+        }
+        single {
+            val useCase = LikeReelUseCase(get(), get())
+            android.util.Log.d("CrashDebug", "AppModule: LikeReelUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetReelLikeStatusUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetReelLikeStatusUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetReelLikeCountUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetReelLikeCountUseCase created")
+            useCase
+        }
+
+        // Comment-related Use Cases
+        single {
+            val useCase = AddCommentUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: AddCommentUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetReelCommentsUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetReelCommentsUseCase created")
+            useCase
+        }
+        single {
+            val useCase = LikeCommentUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: LikeCommentUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetCommentLikeStatusUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetCommentLikeStatusUseCase created")
+            useCase
+        }
+        single {
+            val useCase = GetCommentLikeCountUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GetCommentLikeCountUseCase created")
+            useCase
+        }
+
         // Following Use Cases
         single {
             val useCase = FollowUserUseCase(get())
@@ -283,6 +343,17 @@ val viewModelModule = module {
             android.util.Log.d("CrashDebug", "AppModule: FCMTokenUseCase created")
             useCase
         }
+        single {
+            val useCase = GoogleSignInUseCase(get())
+            android.util.Log.d("CrashDebug", "AppModule: GoogleSignInUseCase created")
+            useCase
+        }
+
+        single {
+            val helper = GoogleSignInHelper(androidContext())
+            android.util.Log.d("CrashDebug", "AppModule: GoogleSignInHelper created")
+            helper
+        }
 
         // ViewModels
         viewModel {
@@ -291,7 +362,9 @@ val viewModelModule = module {
                 repo = get(),
                 checkEmailValidation = get(),
                 checkPasswordValidation = get(),
-                checkMatchedPassword = get()
+                checkMatchedPassword = get(),
+                googleSignInUseCase = get(),
+                googleSignInHelper = get()
             )
         }
 
@@ -329,15 +402,29 @@ val viewModelModule = module {
 
         viewModel {
             android.util.Log.d("CrashDebug", "AppModule: RestPasswordViewModel created")
-            RestPasswordViewModel(get(), get())
+            RestPasswordViewModel(get(), get(), get())
         }
         viewModel {
             android.util.Log.d("CrashDebug", "AppModule: ProductViewModel created")
             ProductViewModel()
         }
         viewModel {
-            android.util.Log.d("CrashDebug", "AppModule: ReelsScreenViewModel created")
-            ReelsScreenViewModel(get(), get(), get(), get())
+            android.util.Log.d("CrashDebug", "AppModule: ReelsScreenViewModel creation")
+            ReelsScreenViewModel(
+                productViewModel = get(),
+                getUserProfileUseCase = get(),
+                likeReelUseCase = get(),
+                getReelLikeStatusUseCase = get(),
+                getReelLikeCountUseCase = get(),
+                updateUserLikeCountUseCase = get(),
+                addCommentUseCase = get(),
+                getReelCommentsUseCase = get(),
+                likeCommentUseCase = get(),
+                getCommentLikeStatusUseCase = get(),
+                getCommentLikeCountUseCase = get(),
+                firestore = get(),
+                cartRepository = get()
+            )
         }
         viewModel {
             android.util.Log.d("CrashDebug", "AppModule: CartViewModel created")
@@ -354,7 +441,8 @@ val viewModelModule = module {
                 getFollowingStatusUseCase = get(),
                 getFollowingUsersUseCase = get(),
                 getUserProfilesByIdsUseCase = get(),
-                getFollowersUseCase = get()
+                getFollowersUseCase = get(),
+                firestore = get()
             )
         }
 

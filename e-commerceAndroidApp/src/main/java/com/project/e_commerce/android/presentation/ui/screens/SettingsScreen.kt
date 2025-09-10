@@ -23,6 +23,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,10 +42,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.project.e_commerce.android.R
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
+import com.google.firebase.auth.FirebaseAuth
 
 // SettingsScreen.kt
 @Composable
 fun SettingsScreen(navController: NavHostController) {
+
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -68,7 +77,7 @@ fun SettingsScreen(navController: NavHostController) {
                 )
             }
 
-            androidx.compose.material.Text(
+            androidx.compose.material3.Text(
                 text = "Settings",
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
@@ -98,7 +107,43 @@ fun SettingsScreen(navController: NavHostController) {
         Spacer(modifier = Modifier.height(16.dp))
         SettingsItem("Language", R.drawable.ic_language){}
         Spacer(modifier = Modifier.height(16.dp))
+        SettingsItem("Change Password", R.drawable.ic_password_key) {
+            navController.navigate(Screens.LoginScreen.ChangePasswordScreen.route)
+        }
+        Spacer(modifier = Modifier.height(16.dp))
         SettingsItem("Ask Help", R.drawable.ic_help){}
+        Spacer(modifier = Modifier.height(16.dp))
+        SettingsItem("Logout", R.drawable.ic_logout) {
+            showLogoutDialog = true
+        }
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text(text = "Logout") },
+            text = { Text(text = "Are you sure you want to log out?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        FirebaseAuth.getInstance().signOut()
+                        navController.navigate(Screens.LoginScreen.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                        showLogoutDialog = false
+                    }
+                ) {
+                    Text("Logout", color = Color(0xFFFF6600))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showLogoutDialog = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -109,7 +154,7 @@ fun SettingsItem(title: String, icon: Int,onClick: () -> Unit) {
             .fillMaxWidth()
             .border(1.dp, Color(0xFFFF6600), RoundedCornerShape(12.dp))
             .clickable { onClick() }
-            .padding(vertical = 14.dp, horizontal =  12.dp)
+            .padding(vertical = 14.dp, horizontal = 12.dp)
             ,
         verticalAlignment = Alignment.CenterVertically
     ) {

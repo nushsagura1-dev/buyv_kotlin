@@ -112,7 +112,7 @@ fun TrackOrderScreen(navController: NavHostController) {
     val productName = "Hanger Shirt"
     val productDesc = "Slim Fit, Men's Fashion"
     val productPrice = "$100.00"
-    val productImage = R.drawable.img4
+    val productImage = R.drawable.img_2
 
 
     var rating by remember { mutableStateOf(0) }
@@ -492,7 +492,7 @@ fun ProductHeader() {
     val productName = "Hanger Shirt"
     val productDesc = "Slim Fit, Men's Fashion"
     val productPrice = "$100.00"
-    val productImage = R.drawable.img4
+    val productImage = R.drawable.img_2
 
     Row(
         modifier = Modifier

@@ -456,7 +456,7 @@ class FirebaseUserProfileRepository(
             .document(currentUserId)
             .collection(FOLLOWING_COLLECTION)
             .document(targetUserId)
-            .set(mapOf("followedAt" to System.currentTimeMillis()))
+            .set(hashMapOf("followedAt" to com.google.firebase.Timestamp.now()))
             .await()
         
         // Add to followers collection
@@ -464,7 +464,7 @@ class FirebaseUserProfileRepository(
             .document(targetUserId)
             .collection(FOLLOWERS_COLLECTION)
             .document(currentUserId)
-            .set(mapOf("followedAt" to System.currentTimeMillis()))
+            .set(hashMapOf("followedAt" to com.google.firebase.Timestamp.now()))
             .await()
         
         // Update follower counts

@@ -470,6 +470,7 @@ fun ReelsView(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black) // Add black background
             .imePadding()
     ) {
         // Always use the local selectedTab state for top tab bar
@@ -680,21 +681,13 @@ fun ReelsTopHeader(
     headerStyle: HeaderStyle,
     modifier: Modifier = Modifier
 ) {
-    val bgColor = when (headerStyle) {
-        HeaderStyle.TRANSPARENT_WHITE_TEXT -> Color.Transparent
-        HeaderStyle.WHITE_BLACK_TEXT -> Color.White
-    }
-    val textColor = when (headerStyle) {
-        HeaderStyle.TRANSPARENT_WHITE_TEXT -> Color.White
-        HeaderStyle.WHITE_BLACK_TEXT -> Color.Black
-    }
     val underlineColor = if (selectedTab == "Explore") Color(0xFF0066CC) else Color.White
 
+    // Completely transparent header with only text buttons visible
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(bgColor)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -706,21 +699,21 @@ fun ReelsTopHeader(
                     onTabChange("Explore")
                     onClickExplore()
                 },
-                textColor = textColor,
-                underlineColor = underlineColor
+                textColor = Color.White, // Force white text for visibility
+                underlineColor = if (selectedTab == "Explore") Color(0xFF0066CC) else Color.White
             )
             HeaderTab(
                 text = "Following",
                 isSelected = selectedTab == "Following",
                 onClick = { onTabChange("Following") },
-                textColor = textColor,
+                textColor = Color.White, // Force white text for visibility
                 underlineColor = underlineColor
             )
             HeaderTab(
                 text = "For you",
                 isSelected = selectedTab == "For you",
                 onClick = { onTabChange("For you") },
-                textColor = textColor,
+                textColor = Color.White, // Force white text for visibility
                 underlineColor = underlineColor
             )
         }
@@ -731,7 +724,7 @@ fun ReelsTopHeader(
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "Search",
-                tint = if (selectedTab == "Explore") Color(0xFF0066CC) else textColor,
+                tint = if (selectedTab == "Explore") Color(0xFF0066CC) else Color.White,
                 modifier = Modifier.size(26.dp)
             )
         }
@@ -751,20 +744,30 @@ fun HeaderTab(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Text(
             text = text,
-            color = if (isSelected) textColor else textColor.copy(alpha = 0.6f),
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = if (isSelected) Color.White else Color.White.copy(alpha = 0.8f),
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
             fontSize = 16.sp,
+            style = androidx.compose.ui.text.TextStyle(
+                shadow = androidx.compose.ui.graphics.Shadow(
+                    color = Color.Black.copy(alpha = 0.7f),
+                    offset = androidx.compose.ui.geometry.Offset(0f, 2f),
+                    blurRadius = 4f
+                )
+            )
         )
         Spacer(modifier = Modifier.height(6.dp))
         if (isSelected) {
             Box(
                 modifier = Modifier
-                    .width(28.dp)
+                    .width(32.dp)
                     .height(3.dp)
+                    .shadow(3.dp, RoundedCornerShape(2.dp))
                     .background(underlineColor, RoundedCornerShape(2.dp))
             )
         } else {
@@ -875,6 +878,21 @@ fun ReelsList(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .pointerInput(reel.id) {
+                    detectTapGestures(
+                        onDoubleTap = { offset ->
+                            // Double tap to like
+                            if (isLoggedIn) {
+                                heartPosition = offset
+                                showHeart = true
+                                // Call the like function with correct ViewModel function
+                                viewModel.onClackLoveReelsButton(reel.id)
+                            } else {
+                                showLoginPrompt.value = true
+                            }
+                        }
+                    )
+                }
         ) {
 
             val videoUriToUse = reel.video
@@ -1065,19 +1083,23 @@ fun ReelsList(
                 }
                 Spacer(modifier = Modifier.height(15.dp))
                 Icon(
-                    painter = painterResource(id = if (reel.love.isLoved) R.drawable.ic_love_checked else R.drawable.ic_love),
+                    painter = painterResource(id = if (reel.love.isLoved) R.drawable.ic_love_checked else R.drawable.ic_heart_outlined),
                     contentDescription = "Like",
                     tint = if (reel.love.isLoved) Color.Red else Color.White,
                     modifier = Modifier
                         .size(38.dp)
                         .clickable {
-                            if (!isLoggedIn) showLoginPrompt.value = true else showHeart = true
+                            if (!isLoggedIn) {
+                                showLoginPrompt.value = true
+                            } else {
+                                viewModel.onClackLoveReelsButton(reel.id)
+                            }
                         }
                 )
                 Text(text = "${reel.love.number}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(14.dp))
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_comment),
+                    painter = painterResource(id = R.drawable.comment_outlined),
                     contentDescription = "Comments",
                     tint = Color.White,
                     modifier = Modifier
@@ -1119,7 +1141,7 @@ fun ReelsList(
                 val cartState by cartViewModel.state.collectAsState()
                 val isInCart = currentUserId != null && cartState.items.any { it.productId == reel.id }
                 Icon(
-                    painter = painterResource(id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart),
+                    painter = painterResource(id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart_outlined),
                     contentDescription = "Add to Cart",
                     tint = if (isInCart) Color(0xFFFFC107) else Color.White,
                     modifier = Modifier
@@ -1158,7 +1180,7 @@ fun ReelsList(
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_share),
+                    painter = painterResource(id = R.drawable.ic_share_outlined),
                     contentDescription = "Share",
                     tint = Color.White,
                     modifier = Modifier
@@ -1175,7 +1197,15 @@ fun ReelsList(
                     tint = Color.White,
                     modifier = Modifier
                         .size(38.dp)
-                        .clickable { }
+                        .clickable {
+                            val videoUrl = reel.video?.toString() ?: ""
+                            val route = if (videoUrl.isNotEmpty()) {
+                                Screens.ReelsScreen.SoundPageScreen.createRoute(videoUrl)
+                            } else {
+                                Screens.ReelsScreen.SoundPageScreen.route
+                            }
+                            navController.navigate(route)
+                        }
                 )
             }
 
@@ -1268,7 +1298,7 @@ fun ReelContent(
                 productName = "Hanger Shirt",
                 productType = "Shirt",
                 productPrice = "100.00 \$",
-                productImage = R.drawable.img4,
+                productImage = R.drawable.img_2,
                 onViewClick = { /* action */ }
             )
             Spacer(modifier = Modifier.height(6.dp))
@@ -1407,9 +1437,9 @@ fun UserInfo(
                     )
                     .background(
                         brush = if (!isFollowing)
-                            Brush.horizontalGradient(listOf(Color(0xFFF05F57), Color(0xFF360940)))
+                            Brush.horizontalGradient(listOf(Color(0xFFf8a714), Color(0xFFed380a)))
                         else
-                            Brush.horizontalGradient(listOf(Color(0xFFf8a714), Color(0xFFed380a))),
+                            Brush.horizontalGradient(listOf(Color(0xFF9E9E9E), Color(0xFF757575))),
                         shape = RoundedCornerShape(8.dp)
                     )
                     .clickable {
@@ -1480,7 +1510,7 @@ fun OfferCard(
     productName: String = "Hanger Shirt",
     productType: String = "Shirt",
     productPrice: String = "100.00 \$",
-    productImage: Int = R.drawable.img4,
+    productImage: Int = R.drawable.img_2,
     onViewClick: () -> Unit = {}
 ) {
     Row(
@@ -1752,6 +1782,8 @@ fun InteractionButtons(
                 )
             }
 
+            // Verification badge temporarily hidden - keeping code for future use
+            /*
             Image(
                 painter = painterResource(id = R.drawable.verified_badge),
                 contentDescription = "Verified Badge",
@@ -1760,17 +1792,18 @@ fun InteractionButtons(
                     .offset(y = (2f).dp)
                     .align(Alignment.BottomCenter)
             )
+            */
         }
         InteractionButton(
             painter = painterResource(
-                id = if (reel.love.isLoved) R.drawable.ic_love_checked else R.drawable.ic_love
+                id = if (reel.love.isLoved) R.drawable.ic_love_checked else R.drawable.ic_heart_outlined
             ),
             count = (reel.love.number + 10).toString(),
             tint = if (reel.love.isLoved) Color.Red else Color.White,
             onClick = onClickLoveButton
         )
         InteractionButton(
-            painter = painterResource(id = R.drawable.ic_comment),
+            painter = painterResource(id = R.drawable.comment_outlined),
             count = reel.numberOfComments.toString(),
             onClick = { onClickCommentButton(reel) }
         )
@@ -1778,7 +1811,7 @@ fun InteractionButtons(
         // NEW: Updated cart button with real state and error handling
         InteractionButton(
             painter = painterResource(
-                id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart
+                id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart_outlined
             ),
             count = if (isInCart && cartState.items.isNotEmpty()) {
                 val cartItem = cartState.items.find { it.productId == reel.id }
@@ -1813,7 +1846,7 @@ fun InteractionButtons(
             }
         )
         InteractionButton(
-            painter = painterResource(id = R.drawable.ic_share),
+            painter = painterResource(id = R.drawable.ic_share_outlined),
             count = "Share",
             onClick = {
                 // Improved sharing implementation with product info
@@ -1824,7 +1857,15 @@ fun InteractionButtons(
             painter = painterResource(id = R.drawable.ic_music),
             count = "",
             iconSize = 32.dp,
-            onClick = {navController.navigate(Screens.ReelsScreen.SoundPageScreen.route) }
+            onClick = {
+                val videoUrl = reel.video?.toString() ?: ""
+                val route = if (videoUrl.isNotEmpty()) {
+                    Screens.ReelsScreen.SoundPageScreen.createRoute(videoUrl)
+                } else {
+                    Screens.ReelsScreen.SoundPageScreen.route
+                }
+                navController.navigate(route)
+            }
         )
         Spacer(modifier = Modifier.height(4.dp))
     }
@@ -1885,8 +1926,12 @@ fun ModernBottomSheetContent(
     Log.d("BottomSheetDebug", "🎬 isSelectedComments: $isSelectedComments")
     Log.d("BottomSheetDebug", "🎬 isSelectedRatings: $isSelectedRatings")
 
+    // ✅ FIX: Observe the ViewModel state to get reactive comment text
+    val reelsState by viewModel.state.collectAsState()
+    val currentReel = reelsState.find { it.id == reel?.id }
+
     val commentsList = try {
-        reel?.comments ?: emptyList()
+        currentReel?.comments ?: emptyList()
     } catch (e: Exception) {
         Log.e("BottomSheetDebug", "🎬 Error accessing comments list: ${e.message}")
         emptyList()
@@ -1894,25 +1939,43 @@ fun ModernBottomSheetContent(
     Log.d("BottomSheetDebug", "🎬 Comments list size: ${commentsList.size}")
 
     val ratesList = try {
-        reel?.ratings ?: emptyList()
+        currentReel?.ratings ?: emptyList()
     } catch (e: Exception) {
         Log.e("BottomSheetDebug", "🎬 Error accessing ratings list: ${e.message}")
         emptyList()
     }
     Log.d("BottomSheetDebug", "🎬 Ratings list size: ${ratesList.size}")
 
+    // ✅ FIX: Use the reactive state for the comment text
     val newComment = try {
-        reel?.newComment?.comment ?: ""
+        val comment = currentReel?.newComment?.comment ?: ""
+        Log.d("BottomSheetDebug", "🎬 Extracted newComment from reactive state: '$comment' from reel id: ${currentReel?.id}")
+        comment
     } catch (e: Exception) {
         Log.e("BottomSheetDebug", "🎬 Error accessing newComment: ${e.message}")
         ""
     }
-    Log.d("BottomSheetDebug", "🎬 New comment: '$newComment'")
+    Log.d("BottomSheetDebug", "🎬 New comment from reactive state: '$newComment'")
 
-    val onCommentChange: (String) -> Unit = { viewModel.onWriteNewComment(it) }
+    val onCommentChange: (String) -> Unit = { newText ->
+        val reelId = try {
+            currentReel?.id ?: ""
+        } catch (e: Exception) {
+            Log.e("BottomSheetDebug", "🎬 Error accessing reel id for comment change: ${e.message}")
+            ""
+        }
+        Log.d("BottomSheetDebug", "🎬 onCommentChange called with text: '$newText', reelId: '$reelId'")
+        if (reelId.isNotBlank()) {
+            Log.d("BottomSheetDebug", "🎬 Calling viewModel.onWriteNewCommentForReel...")
+            viewModel.onWriteNewCommentForReel(reelId, newText)
+            Log.d("BottomSheetDebug", "🎬 viewModel.onWriteNewCommentForReel completed")
+        } else {
+            Log.e("BottomSheetDebug", "🎬 ReelId is blank, cannot update comment")
+        }
+    }
     val onClickSend: () -> Unit = {
         val reelId = try {
-            reel?.id ?: ""
+            currentReel?.id ?: ""
         } catch (e: Exception) {
             Log.e("BottomSheetDebug", "🎬 Error accessing reel id: ${e.message}")
             ""
@@ -1989,7 +2052,7 @@ fun ModernBottomSheetContent(
             ) {
                 ModernTabButton(
                     text = "Comments",
-                    icon = painterResource(id = R.drawable.ic_comment),
+                    icon = painterResource(id = R.drawable.comment_outlined),
                     isSelected = isSelectedComments,
                     iconSize = 24,
                     onClick = onCommentTabClick
@@ -2163,6 +2226,27 @@ fun CommentsSection(
 }
 
 
+// Helper function to calculate average rating from ratings list
+private fun calculateAverageRating(ratings: List<Ratings>): Double {
+    return if (ratings.isEmpty()) {
+        0.0
+    } else {
+        val totalStars = ratings.sumOf { it.rate }
+        val averageRating = totalStars.toDouble() / ratings.size
+        // Round to 1 decimal place
+        (averageRating * 10).toInt() / 10.0
+    }
+}
+
+// Helper function to format rating display
+private fun formatRating(rating: Double): String {
+    return if (rating == 0.0) {
+        "0.0"
+    } else {
+        String.format("%.1f", rating)
+    }
+}
+
 @Composable
 fun RatingsSection(
     ratings: List<Ratings>,
@@ -2195,6 +2279,9 @@ fun RatingsSection(
         }
     }
 
+    val averageRating = calculateAverageRating(ratings)
+    val formattedRating = formatRating(averageRating)
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -2219,7 +2306,7 @@ fun RatingsSection(
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = "4.9",
+                        text = formattedRating,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
@@ -2235,7 +2322,7 @@ fun RatingsSection(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "(32 Rates)",
+                    text = "(${ratings.size} Rates)",
                     fontSize = 14.sp,
                     color = Color(0xFF888888)
                 )
@@ -2420,6 +2507,11 @@ fun ModernInputField(
     placeholder: String = "Add Rate",
     modifier: Modifier = Modifier
 ) {
+    Log.d(
+        "ModernInputFieldDebug",
+        "🎬 ModernInputField called with value: '$value', placeholder: '$placeholder'"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -2440,7 +2532,11 @@ fun ModernInputField(
     ) {
         TextField(
             value = value,
-            onValueChange = onValueChange,
+            onValueChange = { newValue ->
+                Log.d("ModernInputFieldDebug", "🎬 TextField onValueChange called with: '$newValue'")
+                onValueChange(newValue)
+                Log.d("ModernInputFieldDebug", "🎬 TextField onValueChange callback completed")
+            },
             placeholder = {
                 Text(
                     text = placeholder,
@@ -2508,7 +2604,7 @@ fun ModernCommentItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 12.dp, horizontal = 16.dp),
         verticalAlignment = Alignment.Top
     ) {
         // User avatar with real profile image
@@ -2536,57 +2632,67 @@ fun ModernCommentItem(
 
         Spacer(modifier = Modifier.width(12.dp))
 
+        // Main content area
         Column(
-            verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.weight(1f)
         ) {
+            // Username
             Text(
                 text = comment.userName,
-                fontSize = 14.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.Black
             )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Comment text
             Text(
                 text = comment.comment,
                 fontSize = 14.sp,
                 color = Color(0xFF333333),
-                lineHeight = 18.sp
+                lineHeight = 20.sp
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Time and Reply
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
                     text = comment.time,
-                    fontSize = 12.sp,
-                    color = Color.Gray
+                    fontSize = 13.sp,
+                    color = Color(0xFF888888)
                 )
                 Text(
                     text = "Reply",
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     color = Color(0xFF888888),
                     modifier = Modifier.clickable { /* Handle reply */ }
                 )
             }
         }
 
+        // Right side - Icons and counts
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-
+            // Icons row
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     painter = painterResource(
-                        id = if (isLoved) R.drawable.ic_love_checked else R.drawable.ic_love_un_checked
+                        id = if (isLoved) R.drawable.ic_love_checked else R.drawable.ic_heart_outlined
                     ),
                     contentDescription = "Like",
-                    tint = if (isLoved) Color.Red else Color.Gray,
+                    tint = if (isLoved) Color.Red else Color(0xFF999999),
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(18.dp)
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() }
@@ -2598,29 +2704,34 @@ fun ModernCommentItem(
                 Icon(
                     painter = painterResource(id = R.drawable.dis_like),
                     contentDescription = "Dislike",
-                    tint = Color.Gray,
+                    tint = Color(0xFF999999),
                     modifier = Modifier
-                        .size(20.dp)
-                        .clickable {
+                        .size(18.dp)
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) {
                             dislikesCount++
                         }
                 )
             }
 
-            // الصف السفلي: الأرقام
+            // Counts row
             Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = likesCount.toString(),
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = Color(0xFF888888),
+                    fontWeight = FontWeight.Medium
                 )
                 Text(
                     text = dislikesCount.toString(),
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = Color(0xFF888888),
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
@@ -2734,7 +2845,7 @@ fun ModernRatingItem(
         ) {
             Icon(
                 painter = painterResource(
-                    id = if (isFavorite) R.drawable.ic_love_checked else R.drawable.ic_love_un_checked
+                    id = if (isFavorite) R.drawable.ic_love_checked else R.drawable.ic_heart_outlined
                 ),
                 contentDescription = "Favorite",
                 tint = if (isFavorite) Color.Red else Color.Gray,
@@ -3163,7 +3274,7 @@ fun AddToCartBottomSheet(
             Text("Add to Cart", color = Color.White, fontWeight = FontWeight.Bold)
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(100.dp))
     }
 }
 

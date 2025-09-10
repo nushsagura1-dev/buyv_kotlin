@@ -236,7 +236,7 @@ fun SearchBar(searchQuery: String, onQueryChanged: (String) -> Unit, onClick: ()
                 androidx.compose.material.Icon(
                     Icons.Default.Search,
                     contentDescription = "Search",
-                    tint = Color(0xFF0066CC)
+                    tint = Color(0xFF176DBA)
                 )
             },
             singleLine = true,
@@ -412,7 +412,7 @@ fun ProductCard(product: Product, onClick: () -> Unit) {
             .width(160.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
-            .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
+            .border(1.dp, Color(0xFF176DBA), RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .padding(8.dp),
     ) {
@@ -435,13 +435,13 @@ fun ProductCard(product: Product, onClick: () -> Unit) {
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(6.dp)
-                    .background(Color.White.copy(alpha = 0.8f), CircleShape)
+                    .background(Color.White.copy(alpha = 0.9f), CircleShape)
                     .size(28.dp)
             ) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = "Favorite",
-                    tint = if (isFavorite) Color.Red else Color.Gray,
+                    tint = if (isFavorite) Color(0xFF176DBA) else Color(0xFF176DBA),
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -468,10 +468,10 @@ fun ProductCard(product: Product, onClick: () -> Unit) {
             Icon(
                 imageVector = Icons.Default.ShoppingCart,
                 contentDescription = "Add to cart",
-                tint = Color(0xFF0B74DA),
+                tint = Color(0xFF176DBA),
                 modifier = Modifier
                     .size(24.dp)
-                    .background(Color(0xFFEFF6FB), shape = RoundedCornerShape(8.dp))
+                    .background(Color(0xFFE3F2FD), shape = RoundedCornerShape(8.dp))
                     .padding(4.dp)
             )
         }

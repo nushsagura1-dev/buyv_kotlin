@@ -268,11 +268,14 @@ fun UserProfileScreen(
                         color = Color(0xFF0D3D67)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
+                    // Verification badge temporarily hidden - keeping code for future use
+                    /*
                     Image(
                         painter = painterResource(id = R.drawable.verified_badge),
                         contentDescription = "Verified",
                         modifier = Modifier.size(22.dp)
                     )
+                    */
                 }
                 Text(
                     text = "@${username.ifEmpty { "user" }}",
@@ -365,9 +368,9 @@ fun UserProfileScreen(
 @Composable
 fun SimpleReelGrid(navController: NavHostController) {
     val reels = listOf(
-        R.drawable.perfume1, R.drawable.img2, R.drawable.img3, R.drawable.img4,
-        R.drawable.perfume1, R.drawable.img2, R.drawable.img3, R.drawable.img4,
-        R.drawable.perfume1, R.drawable.img2, R.drawable.img3
+        R.drawable.perfume1, R.drawable.img_2, R.drawable.img3, R.drawable.img_2,
+        R.drawable.perfume1, R.drawable.img_2, R.drawable.img3, R.drawable.img_2,
+        R.drawable.perfume1, R.drawable.img_2, R.drawable.img3
     )
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
@@ -436,7 +439,7 @@ fun SimpleProductGrid(navController: NavHostController) {
                         .height(120.dp)
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.img2),
+                        painter = painterResource(id = R.drawable.img_2),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()

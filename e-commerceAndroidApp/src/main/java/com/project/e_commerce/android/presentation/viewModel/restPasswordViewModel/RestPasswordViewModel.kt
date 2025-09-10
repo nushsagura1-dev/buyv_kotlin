@@ -7,6 +7,7 @@ import com.project.e_commerce.android.domain.usecase.CheckPasswordValidation
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.ui.screens.changePasswordScreen.ChangePasswordUIState
 import com.project.e_commerce.android.presentation.viewModel.baseViewModel.BaseViewModel
+import com.project.e_commerce.android.data.repository.AuthRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +16,8 @@ import kotlinx.coroutines.launch
 
 class RestPasswordViewModel(
     private val checkPasswordValidation: CheckPasswordValidation,
-    private val checkMatchedPasswordUseCase : CheckMatchedPasswordUseCase
+    private val checkMatchedPasswordUseCase: CheckMatchedPasswordUseCase,
+    private val authRepository: AuthRepository
 ) : RestPasswordInteraction, BaseViewModel() {
 
     private val _state = MutableStateFlow(ChangePasswordUIState())
@@ -53,22 +55,47 @@ class RestPasswordViewModel(
         setLoadingState(true)
         val newPassword = _state.value.newPassword.value
         val confirmNewPassword = _state.value.confirmNewPassword.value
-            if(checkMatchedPasswordUseCase.invoke(newPassword, confirmNewPassword)){
-                setLoadingState(false)
-                setErrorState(false, "")
-                val copyState = _state.value.copy(
-                    isSuccessChanged = true
-                )
-                viewModelScope.launch {
-                    _state.emit(copyState)
-                    delay(2000)
-                    navController.navigate(Screens.LoginScreen.route)
+
+        viewModelScope.launch {
+            if (checkMatchedPasswordUseCase.invoke(newPassword, confirmNewPassword)) {
+                try {
+                    // Use Firebase to actually change the password
+                    val result = authRepository.changePassword(newPassword)
+                    result.fold(
+                        onSuccess = {
+                            // Sign out the user after password change to force fresh login
+                            authRepository.signOut()
+
+                            setLoadingState(false)
+                            setErrorState(false, "")
+                            val copyState = _state.value.copy(
+                                isSuccessChanged = true
+                            )
+                            _state.emit(copyState)
+                            // Navigate to login screen after a short delay
+                            delay(1000)
+                            navController.navigate(Screens.LoginScreen.route) {
+                                // Clear back stack to prevent going back to settings
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onFailure = { exception ->
+                            setLoadingState(false)
+                            setErrorState(
+                                true,
+                                exception.message ?: "حدث خطأ أثناء تغيير كلمة المرور"
+                            )
+                        }
+                    )
+                } catch (e: Exception) {
+                    setLoadingState(false)
+                    setErrorState(true, "حدث خطأ غير متوقع: ${e.message}")
                 }
-            }
-            else {
+            } else {
                 setLoadingState(false)
                 setErrorState(true, "كلمة المرور غير مطابقة")
             }
+        }
     }
 
     override fun onClickBackArrowButton(navController: NavController) {

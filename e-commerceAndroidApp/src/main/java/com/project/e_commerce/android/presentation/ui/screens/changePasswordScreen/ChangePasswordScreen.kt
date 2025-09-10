@@ -4,10 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.OutlinedTextField
@@ -157,8 +158,8 @@ fun ChangePasswordScreen(navController: NavController) {
                     viewModel.onWriteNewPasswordConfirmed(rePassword)
                     viewModel.onClickChangePassword(navController)
                 }
-
             },
+            enabled = !state.isLoading, // Disable button while loading
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
@@ -166,20 +167,30 @@ fun ChangePasswordScreen(navController: NavController) {
             shape = RoundedCornerShape(10.dp),
             elevation = ButtonDefaults.elevation(8.dp)
         ) {
-            Text(
-                text = "Change Password",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
+            if (state.isLoading) {
+                androidx.compose.material.CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            } else {
+                Text(
+                    text = "Change Password",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         if (state.isError) {
             Text(
                 text = state.errorMessage,
                 color = ErrorPrimaryColor,
                 fontWeight = FontWeight.Normal,
-                fontSize = UnitsApplication.tinyFontSize
+                fontSize = UnitsApplication.tinyFontSize,
+                textAlign = TextAlign.Center
             )
         }
     }

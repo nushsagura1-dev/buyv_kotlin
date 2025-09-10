@@ -90,6 +90,8 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics:23.0.0")
     implementation("com.google.firebase:firebase-firestore-ktx:25.1.4")
     implementation("com.google.firebase:firebase-messaging-ktx:24.1.2")
+    // Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
     // implementation("com.google.firebase:firebase-storage-ktx:21.0.2") // Commented out - using Cloudinary instead
 
     // Cloudinary

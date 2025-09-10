@@ -208,29 +208,29 @@ fun ExploreScreenWithHeader(
                 .height(headerHeight)
                 .zIndex(1f)
         )
-        
-        // Refresh button overlay
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = headerHeight + 8.dp, end = 16.dp)
-                .zIndex(2f)
-        ) {
-            androidx.compose.material3.FloatingActionButton(
-                onClick = {
-                    productViewModel.getAllProductsFromFirebase()
-                },
-                modifier = Modifier.size(40.dp),
-                containerColor = Color(0xFF0066CC),
-                contentColor = Color.White
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Refresh",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
+
+        // Removed the blue refresh FAB (FloatingActionButton) from the explore page
+        // Box(
+        //     modifier = Modifier
+        //         .align(Alignment.TopEnd)
+        //         .padding(top = headerHeight + 8.dp, end = 16.dp)
+        //         .zIndex(2f)
+        // ) {
+        //     androidx.compose.material3.FloatingActionButton(
+        //         onClick = {
+        //             productViewModel.getAllProductsFromFirebase()
+        //         },
+        //         modifier = Modifier.size(40.dp),
+        //         containerColor = Color(0xFF0066CC),
+        //         contentColor = Color.White
+        //     ) {
+        //         Icon(
+        //             imageVector = Icons.Default.Refresh,
+        //             contentDescription = "Refresh",
+        //             modifier = Modifier.size(20.dp)
+        //         )
+        //     }
+        // }
     }
 }
 
@@ -238,8 +238,13 @@ fun ExploreScreenWithHeader(
 fun ExploreGridItem(
     item: ExploreItem,
     onItemClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = 150.dp
 ) {
+    // Determine if this is a square (shorter) or rectangle (taller) component
+    // Square components: heights <= 130dp, Rectangle components: heights > 130dp
+    val isSquare = height <= 130.dp
+
     Box(
         modifier = modifier
             .clickable { onItemClick() }
@@ -248,7 +253,7 @@ fun ExploreGridItem(
         if (item.isVideo && item.videoUri != null) {
             VideoThumbnail(
                 videoUri = item.videoUri,
-                fallbackImageRes = R.drawable.reelsphoto,
+                fallbackImageRes = R.drawable.img_2,
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(12.dp)),
@@ -294,7 +299,7 @@ fun ExploreGridItem(
             }
         }
 
-        // Content type indicator (video/image icon)
+        // Content type indicator (video/image icon) - show for all components
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -310,104 +315,106 @@ fun ExploreGridItem(
             )
         }
 
-        // Product information overlay at bottom
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .background(
-                    Color.Black.copy(alpha = 0.75f),
-                    shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
-                )
-                .padding(8.dp)
-        ) {
-            Column {
-                // Product name
-                Text(
-                    text = item.productName,
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1
-                )
-                
-                // Product price
-                Text(
-                    text = "$${item.productPrice}",
-                    color = Color(0xFFFF6F00),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                
-                // User info and engagement
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Use UserDisplayName for real user names instead of hardcoded userName
-                    Box(
-                        modifier = Modifier.weight(1f, false)
-                    ) {
-                        if (item.userId.isNotBlank()) {
-                            UserDisplayName(
-                                userId = item.userId,
-                                displayType = UserDisplayType.DISPLAY_NAME_ONLY,
-                                color = Color.White.copy(alpha = 0.8f),
-                                textStyle = androidx.compose.ui.text.TextStyle(
-                                    fontSize = 10.sp
-                                ),
-                                maxLines = 1
-                            )
-                        } else {
-                            // Fallback to original userName if userId is blank
-                            Text(
-                                text = item.userName,
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 10.sp,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                    
+        // Product information overlay - ONLY show for rectangle components (not squares)
+        if (!isSquare) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(
+                        Color.Black.copy(alpha = 0.75f),
+                        shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
+                    )
+                    .padding(8.dp)
+            ) {
+                Column {
+                    // Product name
+                    Text(
+                        text = item.productName,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+
+                    // Product price
+                    Text(
+                        text = "$${item.productPrice}",
+                        color = Color(0xFFFF6F00),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    // User info and engagement
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Love count
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        // Use UserDisplayName for real user names instead of hardcoded userName
+                        Box(
+                            modifier = Modifier.weight(1f, false)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Favorite,
-                                contentDescription = "Likes",
-                                tint = if (item.isLoved) Color.Red else Color.White.copy(alpha = 0.7f),
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = "${item.loveCount}",
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 9.sp
-                            )
+                            if (item.userId.isNotBlank()) {
+                                UserDisplayName(
+                                    userId = item.userId,
+                                    displayType = UserDisplayType.DISPLAY_NAME_ONLY,
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    textStyle = androidx.compose.ui.text.TextStyle(
+                                        fontSize = 10.sp
+                                    ),
+                                    maxLines = 1
+                                )
+                            } else {
+                                // Fallback to original userName if userId is blank
+                                Text(
+                                    text = item.userName,
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 10.sp,
+                                    maxLines = 1
+                                )
+                            }
                         }
                         
-                        // Comment count
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Comment,
-                                contentDescription = "Comments",
-                                tint = Color.White.copy(alpha = 0.7f),
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = "${item.commentCount}",
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 9.sp
-                            )
+                            // Love count
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Favorite,
+                                    contentDescription = "Likes",
+                                    tint = if (item.isLoved) Color.Red else Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "${item.loveCount}",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 9.sp
+                                )
+                            }
+
+                            // Comment count
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Comment,
+                                    contentDescription = "Comments",
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "${item.commentCount}",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 9.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -446,7 +453,8 @@ fun ExploreMasonryGrid(
                         onItemClick = { onItemClick(item) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(randomHeight)
+                            .height(randomHeight),
+                        height = randomHeight
                     )
                 }
             }

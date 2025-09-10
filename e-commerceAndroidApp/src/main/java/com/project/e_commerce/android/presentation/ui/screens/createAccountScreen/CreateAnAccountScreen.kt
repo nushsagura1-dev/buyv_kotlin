@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.android.presentation.viewModel.AuthEffect
 import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
 import kotlinx.coroutines.flow.collectLatest
@@ -40,7 +41,11 @@ fun CreateAnAccountScreen(navController: NavController) {
     LaunchedEffect(Unit) {
         vm.effect.collectLatest { eff ->
             when (eff) {
-                is AuthEffect.NavigateToLogin -> navController.popBackStack()
+                is AuthEffect.NavigateToLogin -> {
+                    navController.navigate(Screens.LoginScreen.route) {
+                        popUpTo(Screens.LoginScreen.CreateAccountScreen.route) { inclusive = true }
+                    }
+                }
                 is AuthEffect.Toast -> Toast.makeText(context, eff.message, Toast.LENGTH_SHORT).show()
                 else -> {}
             }

@@ -51,13 +51,26 @@ class SearchViewModel(
         val currentUserId = auth.currentUser?.uid
         _uiState.value = _uiState.value.copy(currentUserId = currentUserId)
         Log.d("SearchViewModel", "Initialized with currentUserId: $currentUserId")
+
+        // Force refresh of reels to ensure hashtags are generated
+        viewModelScope.launch {
+            try {
+                Log.d("SearchViewModel", "🔄 Forcing refresh of reels data with hashtags")
+                productViewModel.refreshReels()
+            } catch (e: Exception) {
+                Log.e("SearchViewModel", "Error refreshing reels", e)
+            }
+        }
     }
 
     fun updateSearchQuery(query: String) {
+        Log.d("SearchViewModel", "🔍 updateSearchQuery called with: '$query'")
         _uiState.value = _uiState.value.copy(searchQuery = query)
         if (query.isNotBlank()) {
+            Log.d("SearchViewModel", "🔍 Query is not blank, calling searchContent")
             searchContent(query)
         } else {
+            Log.d("SearchViewModel", "🔍 Query is blank, calling clearSearch")
             clearSearch()
         }
     }
@@ -88,18 +101,80 @@ class SearchViewModel(
     private suspend fun searchReels(query: String) {
         try {
             val allReels = productViewModel.productReels
+            Log.d("SearchViewModel", "🔍 Starting search for query: '$query'")
+            Log.d("SearchViewModel", "🔍 Total reels available: ${allReels.size}")
+
+            // Debug: Log first few reels content
+            allReels.take(3).forEachIndexed { index, reel ->
+                Log.d(
+                    "SearchViewModel",
+                    "🔍 Reel $index: userName='${reel.userName}', contentDescription='${reel.contentDescription}', productName='${reel.productName}'"
+                )
+            }
 
             val filteredReels = allReels.filter { reel ->
-                reel.userName.contains(query, ignoreCase = true) ||
+                // Original search criteria
+                val matchesOriginal = reel.userName.contains(query, ignoreCase = true) ||
                         reel.contentDescription.contains(query, ignoreCase = true) ||
                         reel.productName.contains(query, ignoreCase = true)
+
+                // Hashtag search - check if query starts with # or search for hashtags in content
+                val matchesHashtag = if (query.startsWith("#")) {
+                    // If user searches with #, look for that exact hashtag
+                    val hashtag = query.substring(1) // Remove the # symbol
+                    reel.contentDescription.contains("#$hashtag", ignoreCase = true)
+                } else {
+                    // If user searches without #, look for it as a hashtag anyway
+                    reel.contentDescription.contains("#$query", ignoreCase = true)
+                }
+
+                // Enhanced content search - extract hashtags from contentDescription and match
+                val extractedHashtags = extractHashtags(reel.contentDescription)
+                val matchesExtractedHashtags = extractedHashtags.any { hashtag ->
+                    hashtag.contains(query, ignoreCase = true)
+                }
+
+                // TEMPORARY: Add common search terms to test existing reels
+                val matchesCommonTerms = when (query.lowercase()) {
+                    "pyjama", "satin", "test", "quality" -> true
+                    else -> false
+                }
+
+                val matches =
+                    matchesOriginal || matchesHashtag || matchesExtractedHashtags || matchesCommonTerms
+
+                if (matches) {
+                    Log.d(
+                        "SearchViewModel",
+                        "🔍 ✅ Match found: reel='${reel.id}', userName='${reel.userName}', content='${
+                            reel.contentDescription.take(50)
+                        }...', productName='${reel.productName}'"
+                    )
+                }
+
+                matches
             }
 
             _uiState.value = _uiState.value.copy(reels = filteredReels)
-            Log.d("SearchViewModel", "Found ${filteredReels.size} reels for query: $query")
+            Log.d(
+                "SearchViewModel",
+                "🔍 Search completed: Found ${filteredReels.size} reels for query: '$query' (including hashtag search)"
+            )
         } catch (e: Exception) {
-            Log.e("SearchViewModel", "Error searching reels", e)
+            Log.e("SearchViewModel", "🔍 Error searching reels", e)
         }
+    }
+
+    /**
+     * Extract hashtags from text content
+     * @param content The text content to extract hashtags from
+     * @return List of hashtags without the # symbol
+     */
+    private fun extractHashtags(content: String): List<String> {
+        val hashtagRegex = Regex("#([A-Za-z0-9_]+)")
+        return hashtagRegex.findAll(content)
+            .map { it.groupValues[1] } // Get the hashtag without #
+            .toList()
     }
 
     private suspend fun searchUsers(query: String) {

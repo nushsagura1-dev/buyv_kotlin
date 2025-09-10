@@ -195,7 +195,7 @@ private fun saveProductToFirestore(
         "productImages" to imageUrls,
         "thumbnailUrl" to (imageUrls.firstOrNull() ?: ""),
         "quantity" to productQuantity,
-        "rating" to 0,
+        "rating" to 0L,
         "reelTitle" to reelTitle,
         "reelVideoUrl" to videoUrl,
         "search_query" to "",
@@ -212,7 +212,7 @@ private fun saveProductToFirestore(
             Log.d("UPLOAD_DEBUG", "✅ Product saved with ID: $productId")
             
             // Also save as a post/reel so it appears in the profile
-            val post = mutableMapOf<String, Any>(
+            val post = hashMapOf<String, Any>(
                 "id" to productId,
                 "userId" to currentUser.uid,
                 "type" to "REEL", // Changed from PostType.REEL.name to "REEL" string
@@ -221,9 +221,9 @@ private fun saveProductToFirestore(
                 "mediaUrl" to videoUrl,
                 "thumbnailUrl" to (imageUrls.firstOrNull() ?: ""),
                 "images" to imageUrls, // Add images field for smart thumbnails
-                "likesCount" to 0,
-                "commentsCount" to 0,
-                "viewsCount" to 0,
+                "likesCount" to 0L,
+                "commentsCount" to 0L,
+                "viewsCount" to 0L,
                 "isPublished" to true,
                 "createdAt" to FieldValue.serverTimestamp(),
                 "updatedAt" to FieldValue.serverTimestamp(),
