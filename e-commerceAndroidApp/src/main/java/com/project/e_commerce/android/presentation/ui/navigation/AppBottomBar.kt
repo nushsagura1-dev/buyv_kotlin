@@ -96,15 +96,13 @@ fun AppBottomBar(
                             onTabSelected(0)
                         }
                 ) {
-                    Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.size(28.dp)) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
                         if (icons.getOrNull(0) != null) {
                             Material3Icon(
                                 painter = painterResource(id = icons.getOrNull(0)!!),
                                 contentDescription = null,
                                 tint = if (selectedTab == 0) Color(0xFF176DBA) else Color(0xD8000000),
-                                modifier = Modifier
-                                    .size(26.dp)
-                                    .padding(top = 4.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         // Profile badge
@@ -112,7 +110,7 @@ fun AppBottomBar(
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
-                                    .offset(x = 8.dp, y = (-2).dp)
+                                    .offset(x = 8.dp, y = (-8).dp)
                                     .background(Color.Red, shape = CircleShape)
                             )
                         }
@@ -121,18 +119,18 @@ fun AppBottomBar(
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
-                                    .offset(x = 8.dp, y = (-2).dp)
+                                    .offset(x = 8.dp, y = (-8).dp)
                                     .background(Color.Red, shape = CircleShape)
                             )
                         }
                     }
                     Material3Text(
                         text = titles.getOrNull(0) ?: "",
-                        fontSize = 12.sp,
+                        fontSize = 10.sp,
                         fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
                         color = if (selectedTab == 0) Color(0xFF176DBA) else Color(0xD8000000),
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
                 Column(
@@ -146,15 +144,13 @@ fun AppBottomBar(
                             onTabSelected(1)
                         }
                 ) {
-                    Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.size(28.dp)) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
                         if (icons.getOrNull(1) != null) {
                             Material3Icon(
                                 painter = painterResource(id = icons.getOrNull(1)!!),
                                 contentDescription = null,
                                 tint = if (selectedTab == 1) Color(0xFF176DBA) else Color(0xD8000000),
-                                modifier = Modifier
-                                    .size(26.dp)
-                                    .padding(top = 4.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         // Profile badge
@@ -162,7 +158,7 @@ fun AppBottomBar(
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
-                                    .offset(x = 8.dp, y = (-2).dp)
+                                    .offset(x = 8.dp, y = (-8).dp)
                                     .background(Color.Red, shape = CircleShape)
                             )
                         }
@@ -171,18 +167,18 @@ fun AppBottomBar(
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
-                                    .offset(x = 8.dp, y = (-2).dp)
+                                    .offset(x = 8.dp, y = (-8).dp)
                                     .background(Color.Red, shape = CircleShape)
                             )
                         }
                     }
                     Material3Text(
                         text = titles.getOrNull(1) ?: "",
-                        fontSize = 12.sp,
+                        fontSize = 10.sp,
                         fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
                         color = if (selectedTab == 1) Color(0xFF176DBA) else Color(0xD8000000),
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
                 Column(
@@ -196,15 +192,13 @@ fun AppBottomBar(
                             onTabSelected(2)
                         }
                 ) {
-                    Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.size(28.dp)) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
                         if (icons.getOrNull(2) != null) {
                             Material3Icon(
                                 painter = painterResource(id = icons.getOrNull(2)!!),
                                 contentDescription = null,
                                 tint = if (selectedTab == 2) Color(0xFF176DBA) else Color(0xD8000000),
-                                modifier = Modifier
-                                    .size(26.dp)
-                                    .padding(top = 4.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         // Profile badge
@@ -212,7 +206,7 @@ fun AppBottomBar(
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
-                                    .offset(x = 8.dp, y = (-2).dp)
+                                    .offset(x = 8.dp, y = (-8).dp)
                                     .background(Color.Red, shape = CircleShape)
                             )
                         }
@@ -221,18 +215,18 @@ fun AppBottomBar(
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
-                                    .offset(x = 8.dp, y = (-2).dp)
+                                    .offset(x = 8.dp, y = (-8).dp)
                                     .background(Color.Red, shape = CircleShape)
                             )
                         }
                     }
                     Material3Text(
                         text = titles.getOrNull(2) ?: "",
-                        fontSize = 12.sp,
+                        fontSize = 10.sp,
                         fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal,
                         color = if (selectedTab == 2) Color(0xFF176DBA) else Color(0xD8000000),
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
                 Column(
@@ -246,15 +240,13 @@ fun AppBottomBar(
                             onTabSelected(3)
                         }
                 ) {
-                    Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.size(28.dp)) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
                         if (icons.getOrNull(3) != null) {
                             Material3Icon(
                                 painter = painterResource(id = icons.getOrNull(3)!!),
                                 contentDescription = null,
                                 tint = if (selectedTab == 3) Color(0xFF176DBA) else Color(0xD8000000),
-                                modifier = Modifier
-                                    .size(26.dp)
-                                    .padding(top = 4.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         // Profile badge
@@ -262,7 +254,7 @@ fun AppBottomBar(
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
-                                    .offset(x = 8.dp, y = (-2).dp)
+                                    .offset(x = 8.dp, y = (-8).dp)
                                     .background(Color.Red, shape = CircleShape)
                             )
                         }
@@ -271,18 +263,18 @@ fun AppBottomBar(
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
-                                    .offset(x = 8.dp, y = (-2).dp)
+                                    .offset(x = 8.dp, y = (-8).dp)
                                     .background(Color.Red, shape = CircleShape)
                             )
                         }
                     }
                     Material3Text(
                         text = titles.getOrNull(3) ?: "",
-                        fontSize = 12.sp,
+                        fontSize = 10.sp,
                         fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal,
                         color = if (selectedTab == 3) Color(0xFF176DBA) else Color(0xD8000000),
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
             }

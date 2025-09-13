@@ -364,8 +364,9 @@ fun ReelsView(
     Log.d("ReelsView", "🎬 Current page state initialized: $currentPage")
 
     var isSelectedComments by remember { mutableStateOf(true) }
-    var showHeart by remember { mutableStateOf(false) }
-    var heartPosition by remember { mutableStateOf(Offset.Zero) }
+    // Heart animation: per-reel state (fix double tap bug)
+    // Instead of using just one showHeart/heartPosition for all pages,
+    // use per-reel state keyed by reel.id!
 
     // NEW: Use only local selectedTab state for tab logic (never use savedStateHandle)
     val tabList = listOf("For you", "Following", "Explore")
@@ -817,9 +818,6 @@ fun ReelsList(
         return
     }
 
-    var showHeart by remember { mutableStateOf(false) }
-    var heartPosition by remember { mutableStateOf(Offset.Zero) }
-
     // NEW: Use the global state for tracking which videos are playing/paused
     val videoPlayStates = globalVideoPlayStates
 
@@ -875,24 +873,13 @@ fun ReelsList(
         // NEW: Get play state for this reel
         val isCurrentlyPlaying = videoPlayStates[reel.id] ?: (currentPage == page)
 
+        // NEW: Per-reel heart animation state
+        var showHeartForThisReel by remember(reel.id) { mutableStateOf(false) }
+        var heartPositionForThisReel by remember(reel.id) { mutableStateOf(Offset.Zero) }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(reel.id) {
-                    detectTapGestures(
-                        onDoubleTap = { offset ->
-                            // Double tap to like
-                            if (isLoggedIn) {
-                                heartPosition = offset
-                                showHeart = true
-                                // Call the like function with correct ViewModel function
-                                viewModel.onClackLoveReelsButton(reel.id)
-                            } else {
-                                showLoginPrompt.value = true
-                            }
-                        }
-                    )
-                }
         ) {
 
             val videoUriToUse = reel.video
@@ -919,6 +906,21 @@ fun ReelsList(
                                     videoPlayStates[reelId] = false
                                 }
                             }
+                        }
+                    },
+                    // NEW: Handle double tap to like with exact position
+                    onDoubleTap = { tapOffset ->
+                        if (isLoggedIn) {
+                            // Heart animation fix: Record position & show trigger for this reel only!
+                            heartPositionForThisReel = tapOffset
+                            showHeartForThisReel = true
+
+                            // Only like if not already liked, but always animate
+                            if (!reel.love.isLoved) {
+                                viewModel.onClackLoveReelsButton(reel.id)
+                            }
+                        } else {
+                            showLoginPrompt.value = true
                         }
                     },
                     modifier = Modifier.fillMaxSize()
@@ -1041,7 +1043,6 @@ fun ReelsList(
                         modifier = Modifier
                             .size(43.dp)
                             .clip(CircleShape)
-                            .border(2.dp, Color.White, CircleShape)
                             .shadow(6.dp, CircleShape, clip = false)
                             .clickable {
                                 val auth = FirebaseAuth.getInstance()
@@ -1054,9 +1055,7 @@ fun ReelsList(
                                     )
                                 )
                             },
-                        contentScale = ContentScale.Crop,
-                        placeholder = painterResource(id = R.drawable.profile),
-                        error = painterResource(id = R.drawable.profile)
+                        contentScale = ContentScale.Crop
                     )
                 } else {
                     AsyncImage(
@@ -1065,7 +1064,6 @@ fun ReelsList(
                         modifier = Modifier
                             .size(43.dp)
                             .clip(CircleShape)
-                            .border(2.dp, Color.White, CircleShape)
                             .shadow(6.dp, CircleShape, clip = false)
                             .clickable {
                                 val auth = FirebaseAuth.getInstance()
@@ -1087,7 +1085,7 @@ fun ReelsList(
                     contentDescription = "Like",
                     tint = if (reel.love.isLoved) Color.Red else Color.White,
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(30.dp)
                         .clickable {
                             if (!isLoggedIn) {
                                 showLoginPrompt.value = true
@@ -1103,7 +1101,7 @@ fun ReelsList(
                     contentDescription = "Comments",
                     tint = Color.White,
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(30.dp)
                         .clickable {
                             try {
                                 Log.d(
@@ -1145,7 +1143,7 @@ fun ReelsList(
                     contentDescription = "Add to Cart",
                     tint = if (isInCart) Color(0xFFFFC107) else Color.White,
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(30.dp)
                         .clickable {
                             if (currentUserId != null && reel.id.isNotBlank()) {
                                 if (isInCart) {
@@ -1184,7 +1182,7 @@ fun ReelsList(
                     contentDescription = "Share",
                     tint = Color.White,
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(30.dp)
                         .clickable {
                             // Improved sharing implementation with product info
                             onShareReel(reel)
@@ -1196,7 +1194,7 @@ fun ReelsList(
                     contentDescription = "Music",
                     tint = Color.White,
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(30.dp)
                         .clickable {
                             val videoUrl = reel.video?.toString() ?: ""
                             val route = if (videoUrl.isNotEmpty()) {
@@ -1235,19 +1233,22 @@ fun ReelsList(
                         productType = "Shirt",
                         productPrice = "${reel.productPrice} $",
                         productImage = R.drawable.profile,
-                        onViewClick = { }
+                        onViewClick = {
+                            // Navigate to product details screen with the reel's product ID
+                            navController.navigate("${Screens.ProductScreen.DetailsScreen.route}/${reel.id}")
+                        }
                     )
                 }
             }
 
-            // Heart animation overlay for like
-            if (showHeart) {
+            // Heart animation overlay for like -- FIXED per-reel state!
+            if (showHeartForThisReel) {
                 HeartAnimation(
                     isVisible = true,
-                    position = heartPosition,
+                    position = heartPositionForThisReel,
                     iconPainter = painterResource(id = R.drawable.ic_love_checked),
-                    onAnimationEnd = { showHeart = false },
-                    iconSize = 70.dp
+                    onAnimationEnd = { showHeartForThisReel = false },
+                    iconSize = 100.dp
                 )
             }
             // RequireLoginPrompt overlay
@@ -1299,7 +1300,10 @@ fun ReelContent(
                 productType = "Shirt",
                 productPrice = "100.00 \$",
                 productImage = R.drawable.img_2,
-                onViewClick = { /* action */ }
+                onViewClick = {
+                    // Navigate to product details screen with the reel's product ID
+                    navController.navigate("${Screens.ProductScreen.DetailsScreen.route}/${reel.id}")
+                }
             )
             Spacer(modifier = Modifier.height(6.dp))
         }
@@ -1488,7 +1492,7 @@ fun UserInfo(
                         }
                     }
                     .height(26.dp)
-                    .padding(horizontal = if (!isFollowing) 12.dp else 16.dp)
+                    .width(80.dp)
                 ,
                 contentAlignment = Alignment.Center
             ) {
@@ -2615,9 +2619,7 @@ fun ModernCommentItem(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(CircleShape),
-                placeholder = painterResource(id = R.drawable.profile),
-                error = painterResource(id = R.drawable.profile)
+                    .clip(CircleShape)
             )
         } else {
             AsyncImage(
@@ -2787,9 +2789,7 @@ fun ModernRatingItem(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(CircleShape),
-                placeholder = painterResource(id = R.drawable.profile),
-                error = painterResource(id = R.drawable.profile)
+                    .clip(CircleShape)
             )
         } else {
             AsyncImage(

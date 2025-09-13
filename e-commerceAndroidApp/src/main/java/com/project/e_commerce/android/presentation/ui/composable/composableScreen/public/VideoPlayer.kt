@@ -3,7 +3,6 @@ package com.project.e_commerce.android.presentation.ui.composable.composableScre
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -23,11 +23,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -54,7 +56,8 @@ fun VideoPlayer(
     uri: Uri?,
     isPlaying: Boolean,
     onPlaybackStarted: () -> Unit,
-    onPlaybackToggle: ((Boolean) -> Unit)? = null
+    onPlaybackToggle: ((Boolean) -> Unit)? = null,
+    onDoubleTap: ((Offset) -> Unit)? = null // NEW: Pass tap position
 ) {
 
     val context = LocalContext.current
@@ -356,7 +359,12 @@ fun VideoPlayer(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .clickable { handleTap() }
+            .pointerInput(isPlayerPlaying, isAppInBackground) {
+                detectTapGestures(
+                    onTap = { handleTap() },
+                    onDoubleTap = { offset -> onDoubleTap?.invoke(offset) }
+                )
+            }
     ) {
         if (hasError) {
             Log.w("VideoPlayer", "🎥 Showing error UI: $errorMessage")
@@ -436,14 +444,8 @@ fun VideoPlayer(
                     Icon(
                         imageVector = if (isPlayerPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlayerPlaying) "Pause" else "Play",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .size(64.dp)
-                            .background(
-                                Color.Black.copy(alpha = 0.6f),
-                                CircleShape
-                            )
-                            .padding(16.dp)
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(64.dp)
                     )
                 }
             }

@@ -241,9 +241,17 @@ fun ExploreGridItem(
     modifier: Modifier = Modifier,
     height: androidx.compose.ui.unit.Dp = 150.dp
 ) {
-    // Determine if this is a square (shorter) or rectangle (taller) component
-    // Square components: heights <= 130dp, Rectangle components: heights > 130dp
-    val isSquare = height <= 130.dp
+    // Determine component type based on height:
+    // - Tall rectangles (height > 150dp): Show thumbnail + info overlay
+    // - Short rectangles (height <= 150dp but > 130dp): Show only thumbnail
+    // - Squares (height <= 130dp): Show only thumbnail
+    val isTallRectangle = height > 150.dp
+
+    // Debug logging to verify the logic
+    Log.d(
+        "ExploreGridItem",
+        " Height: $height, isTallRectangle: $isTallRectangle, showInfo: $isTallRectangle"
+    )
 
     Box(
         modifier = modifier
@@ -315,8 +323,9 @@ fun ExploreGridItem(
             )
         }
 
-        // Product information overlay - ONLY show for rectangle components (not squares)
-        if (!isSquare) {
+        // Product information overlay - ONLY show for TALL rectangles (height > 150dp)
+        // Squares and short rectangles show only thumbnails
+        if (isTallRectangle) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -447,7 +456,17 @@ fun ExploreMasonryGrid(
                 modifier = Modifier.weight(1f)
             ) {
                 columnItems.forEach { item ->
-                    val randomHeight = listOf(130.dp, 170.dp, 120.dp, 150.dp).random()
+                    // Generate heights for different component types:
+                    // - Squares: 120-130dp (show only thumbnails)  
+                    // - Short rectangles: 135-145dp (show only thumbnails)
+                    // - Tall rectangles: 160-180dp (show thumbnails + info)
+                    // Removed 150dp to avoid confusion at the threshold
+                    val heightOptions = listOf(
+                        120.dp, 130.dp, 135.dp, 145.dp,  // Thumbnail only (≤ 150dp)
+                        160.dp, 170.dp, 180.dp           // Thumbnail + info (> 150dp)
+                    )
+                    val randomHeight = heightOptions.random()
+
                     ExploreGridItem(
                         item = item,
                         onItemClick = { onItemClick(item) },
