@@ -15,8 +15,15 @@ class MainUiStateViewModel : ViewModel() {
     private val _selectedReelForCart = MutableStateFlow<Reels?>(null)
     val selectedReelForCart: StateFlow<Reels?> = _selectedReelForCart
 
+    private val _currentReel = MutableStateFlow<Reels?>(null)
+    val currentReel: StateFlow<Reels?> = _currentReel
+
     private val _hideBottomBar = MutableStateFlow(false)
     val hideBottomBar: StateFlow<Boolean> = _hideBottomBar
+
+    fun setCurrentReel(reel: Reels?) {
+        _currentReel.value = reel
+    }
 
     fun showAddToCartSheet(reel: Reels) { 
         _selectedReelForCart.value = reel

@@ -46,8 +46,7 @@ import com.project.e_commerce.android.domain.repository.NotificationRepository
 import com.project.e_commerce.android.presentation.ui.navigation.AppBottomBar
 import com.project.e_commerce.android.presentation.ui.navigation.MyNavHost
 import com.project.e_commerce.android.presentation.ui.navigation.Screens
-import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.AddToCartBottomSheet
-import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.Reels
+import com.project.e_commerce.android.presentation.ui.screens.reelsScreen.BuyBottomSheet
 import com.project.e_commerce.android.presentation.viewModel.CartViewModel
 import com.project.e_commerce.android.presentation.viewModel.MainUiStateViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -139,6 +138,7 @@ class MainActivity : ComponentActivity() {
                 val hideBottomBar by mainUiStateViewModel.hideBottomBar.collectAsState()
                 val isAddToCartSheetVisible by mainUiStateViewModel.isAddToCartSheetVisible.collectAsState()
                 val selectedReelForCart by mainUiStateViewModel.selectedReelForCart.collectAsState()
+                val currentReel by mainUiStateViewModel.currentReel.collectAsState()
 
                 // Only display bottom bar and FAB on these main tab screens
                 val showBottomBar = currentRoute in listOf(
@@ -157,9 +157,9 @@ class MainActivity : ComponentActivity() {
                         !currentRoute.startsWith("password_changed_success_screen") &&
                         !hideBottomBar
 
-                // Show FAB only when on the main reels screen
+                // Show FAB only when on the main reels screen and there is a current reel
                 val showFAB =
-                    currentRoute == Screens.ReelsScreen.route && !hideBottomBar && !isAddToCartSheetVisible
+                    currentRoute == Screens.ReelsScreen.route && !hideBottomBar && currentReel != null
 
                 // Fixed selectedTab calculation to handle sub-screens correctly
                 val selectedTab = when {
@@ -285,16 +285,13 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     FloatingActionButton(
                                         onClick = {
-                                            mainUiStateViewModel.showAddToCartSheet(
-                                                Reels(
-                                                    id = "buy_fab_reel",
-                                                    productName = "Buy FAB Product",
-                                                    productPrice = "29.99",
-                                                    userName = "FAB User",
-                                                    userImage = R.drawable.profile,
-                                                    video = null
+                                            currentReel?.let { reel ->
+                                                Log.d(
+                                                    "BuyFABDebug",
+                                                    "🎬 Buy FAB clicked for reel: ${reel.id}"
                                                 )
-                                            )
+                                                mainUiStateViewModel.showAddToCartSheet(reel)
+                                            }
                                         },
                                         shape = CircleShape,
                                         containerColor = Color(0xFFFF6F00),
@@ -351,7 +348,7 @@ class MainActivity : ComponentActivity() {
                                 startDestination = Screens.ReelsScreen.route,
                                 mainUiStateViewModel = mainUiStateViewModel
                             )
-                            // AddToCartBottomSheet
+                            // BuyBottomSheet
                             if (isAddToCartSheetVisible && selectedReelForCart != null) {
                                 Box(
                                     modifier = Modifier
@@ -359,16 +356,15 @@ class MainActivity : ComponentActivity() {
                                         .background(Color.Black.copy(alpha = 0.5f)) // Semi-transparent overlay
                                         .clickable { mainUiStateViewModel.hideAddToCartSheet() } // Close on outside click
                                 ) {
-                                    AddToCartBottomSheet(
+                                    BuyBottomSheet(
                                         onClose = { mainUiStateViewModel.hideAddToCartSheet() },
-                                        productId = selectedReelForCart!!.id,
-                                        productName = selectedReelForCart!!.productName,
                                         productPrice = selectedReelForCart!!.productPrice.toDoubleOrNull()
                                             ?: 0.0,
                                         productImage = selectedReelForCart!!.productImage,
-                                        cartViewModel = cartViewModel,
+                                        reel = selectedReelForCart,
                                         modifier = Modifier
                                             .align(Alignment.BottomCenter)
+                                            .padding(top = 36.dp) // create gap for the overlapped card
                                     )
                                 }
                             }

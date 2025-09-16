@@ -9,7 +9,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 // import com.bumptech.glide.integration.compose.GlideImage
 // import com.project.e_commerce.android.presentation.viewModel.MainUiStateViewModel
 
-import android.content.Intent
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -20,7 +19,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -39,10 +37,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.MutableState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -83,11 +79,14 @@ import com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewM
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import android.util.Log
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.tooling.preview.Preview
 import kotlinx.coroutines.tasks.await
 import com.project.e_commerce.android.presentation.utils.UserInfoCache
 import com.project.e_commerce.android.presentation.utils.UserDisplayName
@@ -544,7 +543,8 @@ fun ReelsView(
                     initialPage = initialPage,
                     onShareReel = ::shareReel,
                     recentlyViewedViewModel = recentlyViewedViewModel,
-                    globalVideoPlayStates = globalVideoPlayStates // NEW: Pass global state
+                    globalVideoPlayStates = globalVideoPlayStates, // NEW: Pass global state
+                    mainUiStateViewModel = mainUiStateViewModel // NEW: Pass mainUiStateViewModel
                 )
             }
             else -> {
@@ -636,12 +636,14 @@ fun ReelsView(
         // Safety check: ensure reelsList is not empty and page index is valid
         if (reelsList.isEmpty()) {
             Log.w("ReelsView", "🎬 Reels list is empty, skipping page update")
+            mainUiStateViewModel?.setCurrentReel(null)
             return@LaunchedEffect
         }
 
         val pageIndex = pagerState.currentPage
         if (pageIndex < 0 || pageIndex >= reelsList.size) {
             Log.w("ReelsView", "🎬 Invalid page index: $pageIndex, reelsList size: ${reelsList.size}")
+            mainUiStateViewModel?.setCurrentReel(null)
             return@LaunchedEffect
         }
 
@@ -653,6 +655,9 @@ fun ReelsView(
             Log.d("ReelsView", "🎬 Current reel updated: ${currentReel.id}")
             viewModel.checkCartStatus(currentReel.id)
             
+            // Set current reel in MainUiStateViewModel for Buy FAB
+            mainUiStateViewModel?.setCurrentReel(currentReel)
+            
             // Wait a bit to make sure user is actually viewing this reel, then track it
             kotlinx.coroutines.delay(1000) // Wait 1 second before tracking as viewed
             
@@ -663,6 +668,7 @@ fun ReelsView(
             }
         } else {
             Log.w("ReelsView", "🎬 No valid current reel available")
+            mainUiStateViewModel?.setCurrentReel(null)
         }
     }
 }
@@ -796,7 +802,8 @@ fun ReelsList(
     initialPage: Int = 0,
     onShareReel: (Reels) -> Unit = {},
     recentlyViewedViewModel: com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel,
-    globalVideoPlayStates: SnapshotStateMap<String, Boolean> = mutableStateMapOf() // NEW: Accept global state
+    globalVideoPlayStates: SnapshotStateMap<String, Boolean> = mutableStateMapOf(), // NEW: Accept global state
+    mainUiStateViewModel: com.project.e_commerce.android.presentation.viewModel.MainUiStateViewModel? = null // NEW: Add mainUiStateViewModel parameter
 ) {
     val pagerState = rememberPagerState(
         initialPage = if (reelsList.isNotEmpty()) {
@@ -816,6 +823,34 @@ fun ReelsList(
             Text("No reels available")
         }
         return
+    }
+
+    // NEW: Track current reel changes and update MainUiStateViewModel
+    LaunchedEffect(pagerState.currentPage, reelsList) {
+        Log.d("ReelsListPager", "🎬 ReelsList page changed to: ${pagerState.currentPage}")
+
+        if (reelsList.isNotEmpty() && pagerState.currentPage < reelsList.size) {
+            val currentReel = reelsList[pagerState.currentPage]
+            Log.d(
+                "ReelsListPager",
+                "🎬 Current reel in ReelsList: ${currentReel.id} - ${currentReel.productName}"
+            )
+
+            // Update MainUiStateViewModel with current reel for Buy FAB
+            mainUiStateViewModel?.setCurrentReel(currentReel)
+
+            // Check cart status for the current reel
+            viewModel.checkCartStatus(currentReel.id)
+
+            // Track as recently viewed after a short delay
+            kotlinx.coroutines.delay(1000)
+            if (pagerState.currentPage < reelsList.size) { // Double-check page hasn't changed
+                recentlyViewedViewModel.addReelToRecentlyViewed(currentReel)
+            }
+        } else {
+            Log.w("ReelsListPager", "🎬 Invalid page or empty reels list")
+            mainUiStateViewModel?.setCurrentReel(null)
+        }
     }
 
     // NEW: Use the global state for tracking which videos are playing/paused
@@ -1041,7 +1076,7 @@ fun ReelsList(
                         model = userProfileImageUrl.value,
                         contentDescription = "User Avatar",
                         modifier = Modifier
-                            .size(43.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .shadow(6.dp, CircleShape, clip = false)
                             .clickable {
@@ -1062,7 +1097,7 @@ fun ReelsList(
                         model = R.drawable.profile,
                         contentDescription = "User Avatar",
                         modifier = Modifier
-                            .size(43.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .shadow(6.dp, CircleShape, clip = false)
                             .clickable {
@@ -3070,215 +3105,287 @@ fun TabWithIconAndIndicator(
 
 
 @Composable
-fun AddToCartBottomSheet(
-    onClose: () -> Unit,
-    productId: String,
-    productName: String,
-    productPrice: Double,
-    productImage: String,
-    cartViewModel: CartViewModel,
+fun BuyBottomSheet(
+    onClose: () -> Unit = {},
+    productPrice: Double = 0.0,
+    productImage: String = "",
+    reel: Reels? = null,
     modifier: Modifier = Modifier
 ) {
+    Log.d("BuyBottomSheetDebug", "🎬 BuyBottomSheet opened for reel: ${reel?.id}")
+
     var selectedColor by remember { mutableStateOf("Orange") }
     var selectedSize by remember { mutableStateOf("S") }
     var quantity by remember { mutableStateOf(1) }
+    val totalPrice = productPrice * quantity
 
-    Column(
-        modifier = modifier // هذا يجعل كل align أو خصائص تأتي من الخارج
-            .then(
+    // --- TOP CARD (Figma spec, fully refactored) ---
+    val thumbnailUrl = remember(reel) {
+        Log.d("BuyBottomSheetDebug", "🎬 Generating thumbnail for reel: ${reel?.id}")
+
+        if (reel != null) {
+            val result =
+                com.project.e_commerce.android.presentation.utils.VideoThumbnailUtils.getBestThumbnail(
+                images = reel.images?.map { it.toString() },
+                videoUrl = reel.video?.toString(),
+                fallbackUrl = reel.productImage
+            )
+            Log.d("BuyBottomSheetDebug", "🎬 Generated thumbnail: $result")
+            result
+        } else {
+            Log.d("BuyBottomSheetDebug", "🎬 No reel provided, using productImage: $productImage")
+            productImage
+        }
+    }
+    val realDescription = reel?.contentDescription.orEmpty()
+    val realName = reel?.productName.orEmpty()
+
+    // ✅ FIX: Use the same rating calculation as RatingsSection instead of hardcoded value
+    val averageRating = if (reel != null && reel.ratings.isNotEmpty()) {
+        calculateAverageRating(reel.ratings)
+    } else if (reel != null && reel.rating > 0.1) {
+        reel.rating
+    } else {
+        0.0
+    }
+    val formattedRating = formatRating(averageRating)
+    val ratingsCount = reel?.ratings?.size ?: 0
+
+
+
+    Box(
+        modifier = modifier.then(
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    color = Color.Transparent
+                )
+                .height(440.dp)
+        )
+    ) {
+
+
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(400.dp)
+                .background(
+                    color = Color.White,
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                )
+                .padding(
+                    horizontal = 16.dp,
+                )
+                .align(Alignment.BottomCenter)
+                
+
+        ) {
+
+            Spacer(modifier = Modifier.height(46.dp))
+
+
+            // Card content (below the floating image)
+            Column(
                 Modifier
                     .fillMaxWidth()
-                    .background(
-                        color = Color.White,
-                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                    .width(344.dp)
+                    .align(Alignment.CenterHorizontally),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = realName,
+                    fontSize = 20.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default, // Use Poppins if imported
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+                Spacer(Modifier.height(10.dp))
+                // Rating pill...
+                Row(
+                    modifier = Modifier
+                        .background(Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                        .align(Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = formattedRating,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
                     )
-                    .heightIn(min = 390.dp)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .imePadding()
-            )
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = "Close")
+                    Spacer(modifier = modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFC107),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(Modifier.height(15.dp))
+                if (realDescription.isNotBlank())
+                    Text(
+                        text = realDescription,
+                        fontSize = 12.sp,
+                        color = Color(0xFF000000),
+                        lineHeight = 18.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .width(327.dp),
+                        textAlign = TextAlign.Center
+                    )
             }
+            Spacer(Modifier.height(26.dp))
+
+            // Size selection
+            Text("Select Size :", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("XS", "S", "L", "M", "XL").forEach { size ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (selectedSize == size) Color(0xFF4CAF50) else Color(0xFFBDBDBD)
+                            )
+                            .clickable { selectedSize = size }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(size, color = Color.White, fontSize = 13.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Color selection
+            Text("Select Color :", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                listOf("Orange", "Blue", "Yellow", "Green", "Purple").forEach { color ->
+                    val isSelected = selectedColor == color
+                    Box(
+                        modifier = Modifier
+                            .size(if (isSelected) 36.dp else 28.dp)
+                            .shadow(
+                                elevation = if (isSelected) 4.dp else 0.dp,
+                                shape = CircleShape,
+                                clip = false
+                            )
+                            .background(
+                                color = when (color) {
+                                    "Orange" -> Color(0xFFFF9800)
+                                    "Blue" -> Color(0xFF1565C0)
+                                    "Yellow" -> Color(0xFFFFEB3B)
+                                    "Green" -> Color(0xFF37474F)
+                                    "Purple" -> Color(0xFF9C27B0)
+                                    else -> Color.Gray
+                                },
+                                shape = CircleShape
+                            )
+                            .border(
+                                width = if (isSelected) 3.dp else 0.dp,
+                                color = Color.White,
+                                shape = CircleShape
+                            )
+                            .clickable { selectedColor = color }
+                    )
+                }
+            }
+
+            // Price and quantity row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "${totalPrice.toInt()}$",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF6F00)
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .height(48.dp)
+                        .offset(y = (-10f).dp)
+                        .border(1.dp, Color(0xFF176DBA), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 6.dp)
+                ) {
+                    IconButton(onClick = { if (quantity > 1) quantity-- }) {
+                        Text("-", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                    }
+                    Text(
+                        "$quantity",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        color = Color(0xFF0B74DA)
+                    )
+                    IconButton(onClick = { quantity++ }) {
+                        Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(100.dp))
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = productName,
-            fontWeight = FontWeight.Bold,
-            fontSize = 20.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
 
         Box(
             modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .background(Color(0xFFFFF8E1), RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .fillMaxWidth(), contentAlignment = Alignment.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = "Rating",
-                    tint = Color(0xFFFFC107),
-                    modifier = Modifier.size(16.dp)
+            if (thumbnailUrl != null && thumbnailUrl.isNotBlank()) {
+                AsyncImage(
+                    model = thumbnailUrl,
+                    contentDescription = "Thumbnail",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(width = 92.dp, height = 71.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.LightGray)
+                        .align(Alignment.TopCenter)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("4.8", color = Color(0xFFFFC107), fontSize = 14.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = "Upgrade Your Wardrobe With This Premium Item — Combining Comfort, Style, And Durability.",
-            color = Color.Gray,
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text("Select Size :", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("XS", "S", "L", "M", "XL").forEach { size ->
-                Box(
+            } else {
+                // Fallback when thumbnailUrl is null or blank
+                Image(
+                    painter = painterResource(id = R.drawable.profile),
+                    contentDescription = "Fallback Thumbnail",
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (selectedSize == size) Color(0xFF4CAF50) else Color(0xFFBDBDBD)
-                        )
-                        .clickable { selectedSize = size }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(size, color = Color.White, fontSize = 13.sp)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text("Select Color :", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            listOf("Orange", "Blue", "Yellow", "Green", "Purple").forEach { color ->
-                val isSelected = selectedColor == color
-                Box(
-                    modifier = Modifier
-                        .size(if (isSelected) 36.dp else 28.dp) // حجم أكبر للمختار
-                        .shadow(
-                            elevation = if (isSelected) 4.dp else 0.dp, // شادو واضح للمختار فقط
-                            shape = CircleShape,
-                            clip = false
-                        )
-                        .background(
-                            color = when (color) {
-                                "Orange" -> Color(0xFFFF9800)
-                                "Blue" -> Color(0xFF1565C0)
-                                "Yellow" -> Color(0xFFFFEB3B)
-                                "Green" -> Color(0xFF37474F)
-                                "Purple" -> Color(0xFF9C27B0)
-                                else -> Color.Gray
-                            },
-                            shape = CircleShape
-                        )
-                        .border(
-                            width = if (isSelected) 3.dp else 0.dp,
-                            color = Color.White,
-                            shape = CircleShape
-                        )
-                        .clickable { selectedColor = color }
+                        .size(width = 92.dp, height = 71.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Transparent)
+                        .align(Alignment.TopCenter)
                 )
             }
-        }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = "$${String.format("%.2f", productPrice)}",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFFFF6F00)
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            IconButton(
+                onClick = onClose,
                 modifier = Modifier
-                    .height(48.dp)
-                    .offset(y = (-10f).dp)
-                    .border(1.dp, Color(0xFF176DBA), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 6.dp)
+                    .padding(
+                        top = 35.dp,
+                        end = 10.dp
+                    )
+                    .align(Alignment.BottomEnd)
             ) {
-                IconButton(onClick = { if (quantity > 1) quantity-- }) {
-                    Text("-", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                }
-                Text(
-                    "$quantity",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                    color = Color(0xFF0B74DA)
-                )
-                IconButton(onClick = { quantity++ }) {
-                    Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                }
+                Icon(Icons.Default.Close, contentDescription = "Close")
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // NEW: Add to Cart Button
-        Button(
-            onClick = {
-                cartViewModel.addToCart(
-                    CartItem(
-                        productId = productId,
-                        name = productName,
-                        price = productPrice,
-                        imageUrl = productImage,
-                        quantity = quantity,
-                        size = selectedSize.takeIf { it.isNotBlank() },
-                        color = selectedColor.takeIf { it.isNotBlank() }
-                    )
-                )
-                onClose()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFFF6F00)),
-            shape = RoundedCornerShape(12.dp),
-            elevation = ButtonDefaults.elevation(6.dp)
-        ) {
-            Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.White)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Add to Cart", color = Color.White, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(100.dp))
     }
+    
+    
 }
-
-
 
 @Composable
 fun FollowingReelsContent(
@@ -3466,11 +3573,15 @@ fun FollowingReelsList(
             initialPage = 0,
             onShareReel = onShareReel,
             recentlyViewedViewModel = recentlyViewedViewModel,
-            globalVideoPlayStates = globalVideoPlayStates // Pass through
+            globalVideoPlayStates = globalVideoPlayStates, // Pass through
+            mainUiStateViewModel = null // Following tab doesn't need Buy FAB, so pass null
         )
     }
 }
 
 
-
-
+@Preview(showBackground = true)
+@Composable
+private fun BuyBottomSheetPreview() {
+    BuyBottomSheet()
+}
