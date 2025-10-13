@@ -50,13 +50,13 @@ fun AppBottomBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(58.dp),
+            .height(64.dp),
         contentAlignment = Alignment.BottomCenter
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp)
+                .height(64.dp)
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color.White)
                 .drawBehind {
@@ -80,7 +80,7 @@ fun AppBottomBar(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(58.dp)
+                    .height(64.dp)
                     .align(Alignment.BottomCenter),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically

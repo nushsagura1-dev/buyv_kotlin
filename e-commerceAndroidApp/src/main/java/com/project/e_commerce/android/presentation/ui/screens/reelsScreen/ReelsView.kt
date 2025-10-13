@@ -83,6 +83,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.catch
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Alignment
@@ -694,7 +695,7 @@ fun ReelsTopHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -753,12 +754,11 @@ fun HeaderTab(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Text(
             text = text,
             color = if (isSelected) Color.White else Color.White.copy(alpha = 0.8f),
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             fontSize = 16.sp,
             style = androidx.compose.ui.text.TextStyle(
                 shadow = androidx.compose.ui.graphics.Shadow(
@@ -772,7 +772,7 @@ fun HeaderTab(
         if (isSelected) {
             Box(
                 modifier = Modifier
-                    .width(32.dp)
+                    .width(28.dp)
                     .height(3.dp)
                     .shadow(3.dp, RoundedCornerShape(2.dp))
                     .background(underlineColor, RoundedCornerShape(2.dp))
@@ -843,7 +843,7 @@ fun ReelsList(
             viewModel.checkCartStatus(currentReel.id)
 
             // Track as recently viewed after a short delay
-            kotlinx.coroutines.delay(1000)
+            delay(1000)
             if (pagerState.currentPage < reelsList.size) { // Double-check page hasn't changed
                 recentlyViewedViewModel.addReelToRecentlyViewed(currentReel)
             }
@@ -1041,240 +1041,23 @@ fun ReelsList(
                 )
             }
 
-            // Right-side vertical engagement column overlay
-            Column(
+            // Bottom content aligned like provided: left info + right interaction buttons in one row
+            ReelContent(
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 14.dp, bottom = 100.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                val auth = FirebaseAuth.getInstance()
-                val currentUserId = auth.currentUser?.uid
-                val isOwner = currentUserId == reel.userId
+                    .fillMaxWidth()
+                    .align(Alignment.BottomStart),
+                navController = navController,
+                reel = reel,
+                viewModel = viewModel,
+                cartViewModel = cartViewModel,
+                onClickCommentButton = { onClickCommentButton(reel) },
+                onClickCartButton = { onClickCartButton(reel) },
+                onClickMoreButton = { onClickMoreButton(reel) },
+                showLoginPrompt = showLoginPrompt,
+                isLoggedIn = isLoggedIn,
+            )
 
-                // Get user profile for this reel to fetch profile image
-                val userProfileImageUrl = remember { mutableStateOf<String?>(null) }
-
-                // Fetch user profile image
-                LaunchedEffect(reel.userId) {
-                    if (reel.userId.isNotBlank()) {
-                        try {
-                            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                            val doc = db.collection("users").document(reel.userId).get().await()
-                            val profileImageUrl = doc.getString("profileImageUrl")
-                            userProfileImageUrl.value = profileImageUrl
-                            Log.d("ReelsView", "✅ Fetched profile image for ${reel.userId}: $profileImageUrl")
-                        } catch (e: Exception) {
-                            Log.e("ReelsView", "❌ Failed to fetch profile image for ${reel.userId}: ${e.message}")
-                        }
-                    }
-                }
-                
-                if (userProfileImageUrl.value != null && userProfileImageUrl.value!!.isNotBlank()) {
-                    AsyncImage(
-                        model = userProfileImageUrl.value,
-                        contentDescription = "User Avatar",
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .shadow(6.dp, CircleShape, clip = false)
-                            .clickable {
-                                val auth = FirebaseAuth.getInstance()
-                                val currentUserId = auth.currentUser?.uid
-                                val isOwner = currentUserId == reel.userId
-                                if (isOwner) navController.navigate(Screens.ProfileScreen.route)
-                                else navController.navigate(
-                                    Screens.OtherUserProfileScreen.createRoute(
-                                        reel.userId
-                                    )
-                                )
-                            },
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    AsyncImage(
-                        model = R.drawable.profile,
-                        contentDescription = "User Avatar",
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .shadow(6.dp, CircleShape, clip = false)
-                            .clickable {
-                                val auth = FirebaseAuth.getInstance()
-                                val currentUserId = auth.currentUser?.uid
-                                val isOwner = currentUserId == reel.userId
-                                if (isOwner) navController.navigate(Screens.ProfileScreen.route)
-                                else navController.navigate(
-                                    Screens.OtherUserProfileScreen.createRoute(
-                                        reel.userId
-                                    )
-                                )
-                            },
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                Spacer(modifier = Modifier.height(15.dp))
-                Icon(
-                    painter = painterResource(id = if (reel.love.isLoved) R.drawable.ic_love_checked else R.drawable.ic_heart_outlined),
-                    contentDescription = "Like",
-                    tint = if (reel.love.isLoved) Color.Red else Color.White,
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clickable {
-                            if (!isLoggedIn) {
-                                showLoginPrompt.value = true
-                            } else {
-                                viewModel.onClackLoveReelsButton(reel.id)
-                            }
-                        }
-                )
-                Text(text = "${reel.love.number}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(14.dp))
-                Icon(
-                    painter = painterResource(id = R.drawable.comment_outlined),
-                    contentDescription = "Comments",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clickable {
-                            try {
-                                Log.d(
-                                    "CommentButtonDebug",
-                                    "🎬 Comment button clicked for reel: ${reel.id}"
-                                )
-                                Log.d(
-                                    "CommentButtonDebug",
-                                    "🎬 Reel data: userName=${reel.userName}, productName=${reel.productName}"
-                                )
-                                Log.d(
-                                    "CommentButtonDebug",
-                                    "🎬 Comments count: ${reel.comments.size}"
-                                )
-                                Log.d("CommentButtonDebug", "🎬 Reel object: $reel")
-                                Log.d("CommentButtonDebug", "🎬 About to call onClickCommentButton")
-                                onClickCommentButton(reel)
-                                Log.d(
-                                    "CommentButtonDebug",
-                                    "🎬 onClickCommentButton completed successfully"
-                                )
-                            } catch (e: Exception) {
-                                Log.e(
-                                    "CommentButtonDebug",
-                                    "🎬 Exception in comment button click: ${e.message}",
-                                    e
-                                )
-                                throw e
-                            }
-                        }
-                )
-                Text(text = "${reel.numberOfComments}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(14.dp))
-                // Cart Icon - PATCHED TO BE INTERACTIVE!
-                val cartState by cartViewModel.state.collectAsState()
-                val isInCart = currentUserId != null && cartState.items.any { it.productId == reel.id }
-                Icon(
-                    painter = painterResource(id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart_outlined),
-                    contentDescription = "Add to Cart",
-                    tint = if (isInCart) Color(0xFFFFC107) else Color.White,
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clickable {
-                            if (currentUserId != null && reel.id.isNotBlank()) {
-                                if (isInCart) {
-                                    cartViewModel.removeFromCartByProductId(reel.id)
-                                    cartViewModel.refreshCart()
-                                    viewModel.checkCartStatus(reel.id)
-                                } else {
-                                    val cartItem = CartItem(
-                                        productId = reel.id,
-                                        name = reel.productName.ifEmpty { "Product" },
-                                        price = reel.productPrice.toDoubleOrNull() ?: 0.0,
-                                        imageUrl = reel.productImage.ifEmpty { "" },
-                                        quantity = 1
-                                    )
-                                    cartViewModel.addToCart(cartItem)
-                                    cartViewModel.refreshCart()
-                                    viewModel.checkCartStatus(reel.id)
-                                }
-                            }
-                        }
-                )
-                Text(
-                    text = if (isInCart) {
-                        val cartItem = cartState.items.find { it.productId == reel.id }
-                        cartItem?.quantity?.toString() ?: "1"
-                    } else {
-                        "0"
-                    },
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_share_outlined),
-                    contentDescription = "Share",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clickable {
-                            // Improved sharing implementation with product info
-                            onShareReel(reel)
-                        }
-                )
-                Spacer(modifier = Modifier.height(17.dp))
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_music),
-                    contentDescription = "Music",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clickable {
-                            val videoUrl = reel.video?.toString() ?: ""
-                            val route = if (videoUrl.isNotEmpty()) {
-                                Screens.ReelsScreen.SoundPageScreen.createRoute(videoUrl)
-                            } else {
-                                Screens.ReelsScreen.SoundPageScreen.route
-                            }
-                            navController.navigate(route)
-                        }
-                )
-            }
-
-            // Bottom-left info meta, product card, hashtags, description
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = 70.dp),
-                verticalArrangement = Arrangement.Bottom
-            ) {
-                UserInfo(
-                    reel = reel,
-                    navController = navController,
-                    isLoggedIn = isLoggedIn,
-                    showLoginPrompt = showLoginPrompt
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                if (reel.contentDescription.isNotBlank()) {
-                    ReelDescription(description = reel.contentDescription)
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                ReelHashtags(hashtags = listOf("satisfying", "roadmarking"))
-                Spacer(modifier = Modifier.height(10.dp))
-                if (reel.productName.isNotBlank()) {
-                    OfferCard(
-                        productName = reel.productName,
-                        productType = "Shirt",
-                        productPrice = "${reel.productPrice} $",
-                        productImage = R.drawable.profile,
-                        onViewClick = {
-                            // Navigate to product details screen with the reel's product ID
-                            navController.navigate("${Screens.ProductScreen.DetailsScreen.route}/${reel.id}")
-                        }
-                    )
-                }
-            }
+            // (Removed separate bottom-left column in favor of unified ReelContent row)
 
             // Heart animation overlay for like -- FIXED per-reel state!
             if (showHeartForThisReel) {
@@ -1315,7 +1098,13 @@ fun ReelContent(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(
+                top = 16.dp,
+                start = 16.dp,
+                end = 16.dp,
+                bottom = 60.dp
+            )
+            .navigationBarsPadding(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom
     ) {
@@ -1333,8 +1122,8 @@ fun ReelContent(
             OfferCard(
                 productName = "Hanger Shirt",
                 productType = "Shirt",
-                productPrice = "100.00 \$",
-                productImage = R.drawable.img_2,
+                productPrice = "100.00 $",
+                productImage = R.drawable.profile,
                 onViewClick = {
                     // Navigate to product details screen with the reel's product ID
                     navController.navigate("${Screens.ProductScreen.DetailsScreen.route}/${reel.id}")
@@ -1548,8 +1337,8 @@ fun UserInfo(
 fun OfferCard(
     productName: String = "Hanger Shirt",
     productType: String = "Shirt",
-    productPrice: String = "100.00 \$",
-    productImage: Int = R.drawable.img_2,
+    productPrice: String = "100.00 $",
+    productImage: Int = R.drawable.profile,
     onViewClick: () -> Unit = {}
 ) {
     Row(
@@ -1702,20 +1491,8 @@ fun InteractionButtons(
             false
         }
     }
-    
-    // NEW: Get cart statistics for this product with error handling
-    val cartStats by remember(reel.id) {
-        runCatching {
-            if (currentUserId != null && reel.id.isNotBlank()) {
-                reelsViewModel.getProductCartStats(reel.id)
-            } else {
-                flowOf(reel.cartStats)
-            }
-        }.getOrElse { e ->
-            Log.e("InteractionButtons", "Error creating cart stats flow: ${e.message}")
-            flowOf(reel.cartStats)
-        }
-    }.collectAsState(initial = reel.cartStats)
+
+    // NOTE: Cart stats flow removed from UI to avoid unnecessary listeners; UI does not use it.
     
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1835,14 +1612,14 @@ fun InteractionButtons(
         }
         InteractionButton(
             painter = painterResource(
-                id = if (reel.love.isLoved) R.drawable.ic_love_checked else R.drawable.ic_heart_outlined
+                id = if (reel.love.isLoved) R.drawable.ic_love_checked else R.drawable.ic_love
             ),
             count = (reel.love.number + 10).toString(),
             tint = if (reel.love.isLoved) Color.Red else Color.White,
             onClick = onClickLoveButton
         )
         InteractionButton(
-            painter = painterResource(id = R.drawable.comment_outlined),
+            painter = painterResource(id = R.drawable.ic_comment),
             count = reel.numberOfComments.toString(),
             onClick = { onClickCommentButton(reel) }
         )
@@ -1850,7 +1627,7 @@ fun InteractionButtons(
         // NEW: Updated cart button with real state and error handling
         InteractionButton(
             painter = painterResource(
-                id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart_outlined
+                id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart_checked
             ),
             count = if (isInCart && cartState.items.isNotEmpty()) {
                 val cartItem = cartState.items.find { it.productId == reel.id }
@@ -1885,7 +1662,7 @@ fun InteractionButtons(
             }
         )
         InteractionButton(
-            painter = painterResource(id = R.drawable.ic_share_outlined),
+            painter = painterResource(id = R.drawable.ic_share),
             count = "Share",
             onClick = {
                 // Improved sharing implementation with product info
@@ -2880,7 +2657,7 @@ fun ModernRatingItem(
         ) {
             Icon(
                 painter = painterResource(
-                    id = if (isFavorite) R.drawable.ic_love_checked else R.drawable.ic_heart_outlined
+                    id = if (isFavorite) R.drawable.ic_love_checked else R.drawable.ic_love
                 ),
                 contentDescription = "Favorite",
                 tint = if (isFavorite) Color.Red else Color.Gray,
@@ -3151,241 +2928,176 @@ fun BuyBottomSheet(
     val formattedRating = formatRating(averageRating)
     val ratingsCount = reel?.ratings?.size ?: 0
 
-
-
-    Box(
-        modifier = modifier.then(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    color = Color.Transparent
-                )
-                .height(440.dp)
-        )
+    // UI matches AddToCartBottomSheet layout (placement and styling), logic preserved
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                color = Color.White,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            )
+            .heightIn(min = 390.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .imePadding()
     ) {
-
-
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(400.dp)
-                .background(
-                    color = Color.White,
-                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-                )
-                .padding(
-                    horizontal = 16.dp,
-                )
-                .align(Alignment.BottomCenter)
-                
-
+        // Close button row (top-right)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
         ) {
-
-            Spacer(modifier = Modifier.height(46.dp))
-
-
-            // Card content (below the floating image)
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .width(344.dp)
-                    .align(Alignment.CenterHorizontally),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = realName,
-                    fontSize = 20.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default, // Use Poppins if imported
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-                Spacer(Modifier.height(10.dp))
-                // Rating pill...
-                Row(
-                    modifier = Modifier
-                        .background(Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 6.dp, vertical = 3.dp)
-                        .align(Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = formattedRating,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                    Spacer(modifier = modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = Color(0xFFFFC107),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Spacer(Modifier.height(15.dp))
-                if (realDescription.isNotBlank())
-                    Text(
-                        text = realDescription,
-                        fontSize = 12.sp,
-                        color = Color(0xFF000000),
-                        lineHeight = 18.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .width(327.dp),
-                        textAlign = TextAlign.Center
-                    )
-            }
-            Spacer(Modifier.height(26.dp))
-
-            // Size selection
-            Text("Select Size :", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("XS", "S", "L", "M", "XL").forEach { size ->
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (selectedSize == size) Color(0xFF4CAF50) else Color(0xFFBDBDBD)
-                            )
-                            .clickable { selectedSize = size }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(size, color = Color.White, fontSize = 13.sp)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Color selection
-            Text("Select Color :", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                listOf("Orange", "Blue", "Yellow", "Green", "Purple").forEach { color ->
-                    val isSelected = selectedColor == color
-                    Box(
-                        modifier = Modifier
-                            .size(if (isSelected) 36.dp else 28.dp)
-                            .shadow(
-                                elevation = if (isSelected) 4.dp else 0.dp,
-                                shape = CircleShape,
-                                clip = false
-                            )
-                            .background(
-                                color = when (color) {
-                                    "Orange" -> Color(0xFFFF9800)
-                                    "Blue" -> Color(0xFF1565C0)
-                                    "Yellow" -> Color(0xFFFFEB3B)
-                                    "Green" -> Color(0xFF37474F)
-                                    "Purple" -> Color(0xFF9C27B0)
-                                    else -> Color.Gray
-                                },
-                                shape = CircleShape
-                            )
-                            .border(
-                                width = if (isSelected) 3.dp else 0.dp,
-                                color = Color.White,
-                                shape = CircleShape
-                            )
-                            .clickable { selectedColor = color }
-                    )
-                }
-            }
-
-            // Price and quantity row
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "${totalPrice.toInt()}$",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFF6F00)
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .height(48.dp)
-                        .offset(y = (-10f).dp)
-                        .border(1.dp, Color(0xFF176DBA), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 6.dp)
-                ) {
-                    IconButton(onClick = { if (quantity > 1) quantity-- }) {
-                        Text("-", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                    }
-                    Text(
-                        "$quantity",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                        color = Color(0xFF0B74DA)
-                    )
-                    IconButton(onClick = { quantity++ }) {
-                        Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(100.dp))
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(), contentAlignment = Alignment.Center
-        ) {
-            if (thumbnailUrl != null && thumbnailUrl.isNotBlank()) {
-                AsyncImage(
-                    model = thumbnailUrl,
-                    contentDescription = "Thumbnail",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(width = 92.dp, height = 71.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.LightGray)
-                        .align(Alignment.TopCenter)
-                )
-            } else {
-                // Fallback when thumbnailUrl is null or blank
-                Image(
-                    painter = painterResource(id = R.drawable.profile),
-                    contentDescription = "Fallback Thumbnail",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(width = 92.dp, height = 71.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.Transparent)
-                        .align(Alignment.TopCenter)
-                )
-            }
-
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier
-                    .padding(
-                        top = 35.dp,
-                        end = 10.dp
-                    )
-                    .align(Alignment.BottomEnd)
-            ) {
+            IconButton(onClick = onClose) {
                 Icon(Icons.Default.Close, contentDescription = "Close")
             }
         }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Title
+        Text(
+            text = realName,
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Rating chip (amber on light-amber)
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .background(Color(0xFFFFF8E1), RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = "Rating",
+                    tint = Color(0xFFFFC107),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("$formattedRating", color = Color(0xFFFFC107), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Description
+        if (realDescription.isNotBlank()) {
+            Text(
+                text = realDescription,
+                color = Color.Gray,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Size selector
+        Text("Select Size :", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("XS", "S", "L", "M", "XL").forEach { size ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (selectedSize == size) Color(0xFF4CAF50) else Color(0xFFBDBDBD)
+                        )
+                        .clickable { selectedSize = size }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(size, color = Color.White, fontSize = 13.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Color selector
+        Text("Select Color :", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            listOf("Orange", "Blue", "Yellow", "Green", "Purple").forEach { color ->
+                val isSelected = selectedColor == color
+                Box(
+                    modifier = Modifier
+                        .size(if (isSelected) 36.dp else 28.dp)
+                        .shadow(
+                            elevation = if (isSelected) 4.dp else 0.dp,
+                            shape = CircleShape,
+                            clip = false
+                        )
+                        .background(
+                            color = when (color) {
+                                "Orange" -> Color(0xFFFF9800)
+                                "Blue" -> Color(0xFF1565C0)
+                                "Yellow" -> Color(0xFFFFEB3B)
+                                "Green" -> Color(0xFF37474F)
+                                "Purple" -> Color(0xFF9C27B0)
+                                else -> Color.Gray
+                            },
+                            shape = CircleShape
+                        )
+                        .border(
+                            width = if (isSelected) 3.dp else 0.dp,
+                            color = Color.White,
+                            shape = CircleShape
+                        )
+                        .clickable { selectedColor = color }
+                )
+            }
+        }
+
+        // Price and quantity row
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "${totalPrice.toInt()}$",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFFF6F00)
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .height(48.dp)
+                    .offset(y = (-10f).dp)
+                    .border(1.dp, Color(0xFF176DBA), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 6.dp)
+            ) {
+                IconButton(onClick = { if (quantity > 1) quantity-- }) {
+                    Text("-", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                }
+                Text(
+                    "$quantity",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                    color = Color(0xFF0B74DA)
+                )
+                IconButton(onClick = { quantity++ }) {
+                    Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
     }
-    
-    
 }
+
 
 @Composable
 fun FollowingReelsContent(
