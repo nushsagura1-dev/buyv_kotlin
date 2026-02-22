@@ -1,0 +1,29 @@
+{% extends 'admin/base.html' %}
+
+{% block head_tail %}
+{{ super() }}
+<style>
+    .navbar-brand {
+        font-weight: bold;
+        font-size: 1.3em;
+    }
+    .navbar {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    }
+</style>
+{% endblock %}
+
+{% block brand %}
+<a class="navbar-brand" href="{{ admin_view.admin.url }}">
+    🛍️ Buyv Admin Panel
+</a>
+{% endblock %}
+
+{% block access_control %}
+{% if current_user.is_authenticated %}
+<div class="navbar-text">
+    <span class="badge badge-light">👤 {{ current_user.username }}</span>
+    <a href="{{ url_for('admin.logout') }}" class="btn btn-sm btn-outline-light ml-2">Logout</a>
+</div>
+{% endif %}
+{% endblock %}

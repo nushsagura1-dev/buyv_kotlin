@@ -1,0 +1,199 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <h1 class="mb-4">
+        <i class="fa fa-shopping-cart"></i> Marketplace Dashboard
+    </h1>
+    
+    <!-- Statistiques principales -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Products</h5>
+                    <h2>{{ stats.total_products }}</h2>
+                    <small>{{ stats.active_products }} active</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Sales</h5>
+                    <h2>{{ stats.total_sales }}</h2>
+                    <small>${{ "%.2f"|format(stats.total_revenue) }}</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Commissions Paid</h5>
+                    <h2>${{ "%.2f"|format(stats.total_commissions) }}</h2>
+                    <small>To promoters</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Pending</h5>
+                    <h2>${{ "%.2f"|format(stats.pending_commissions) }}</h2>
+                    <small>{{ stats.pending_withdrawals }} withdrawals</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top Produits -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fa fa-star"></i> Top Products</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Sales</th>
+                                <th>Price</th>
+                                <th>Commission</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in stats.top_products %}
+                            <tr>
+                                <td>
+                                    {% if product.is_featured %}
+                                    <i class="fa fa-star text-warning"></i>
+                                    {% endif %}
+                                    {{ product.name[:40] }}
+                                </td>
+                                <td>{{ product.total_sales }}</td>
+                                <td>${{ "%.2f"|format(product.selling_price) }}</td>
+                                <td>{{ "%.1f"|format(product.commission_rate) }}%</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No products yet</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Top Promoteurs -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fa fa-users"></i> Top Promoters</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Sales</th>
+                                <th>Total Earned</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for promoter in stats.top_promoters %}
+                            <tr>
+                                <td>{{ promoter.user_id[:20] }}</td>
+                                <td>{{ promoter.total_sales_count }}</td>
+                                <td>${{ "%.2f"|format(promoter.total_earned) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">No promoters yet</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ventes récentes -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fa fa-shopping-bag"></i> Recent Sales</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Product</th>
+                                <th>Promoter</th>
+                                <th>Amount</th>
+                                <th>Commission</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in stats.recent_sales %}
+                            <tr>
+                                <td>{{ sale.order_id }}</td>
+                                <td>{{ sale.product.name[:30] if sale.product else '-' }}</td>
+                                <td>{{ sale.promoter_user_id[:15] }}</td>
+                                <td>${{ "%.2f"|format(sale.sale_amount) }}</td>
+                                <td>${{ "%.2f"|format(sale.commission_amount) }}</td>
+                                <td>
+                                    <span class="badge badge-{% if sale.commission_status == 'paid' %}success{% elif sale.commission_status == 'approved' %}info{% elif sale.commission_status == 'pending' %}warning{% else %}danger{% endif %}">
+                                        {{ sale.commission_status }}
+                                    </span>
+                                </td>
+                                <td>{{ sale.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">No sales yet</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Actions rapides -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fa fa-bolt"></i> Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{{ url_for('cjimport.index') }}" class="btn btn-primary">
+                        <i class="fa fa-download"></i> Import from CJ Dropshipping
+                    </a>
+                    <a href="{{ url_for('marketplaceproduct.index_view') }}" class="btn btn-secondary">
+                        <i class="fa fa-list"></i> Manage Products
+                    </a>
+                    <a href="{{ url_for('affiliatesale.index_view') }}" class="btn btn-info">
+                        <i class="fa fa-money"></i> Review Commissions
+                    </a>
+                    <a href="{{ url_for('withdrawalrequest.index_view') }}" class="btn btn-warning">
+                        <i class="fa fa-bank"></i> Process Withdrawals
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

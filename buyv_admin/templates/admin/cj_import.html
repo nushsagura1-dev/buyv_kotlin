@@ -1,0 +1,76 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <h1 class="mb-4">
+        <i class="fa fa-cloud-download"></i> Import Products from CJ Dropshipping
+    </h1>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Search CJ Catalog</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('cjimport.index') }}">
+                        <div class="form-group">
+                            <label for="search_query">Search Query</label>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="search_query" 
+                                name="search_query" 
+                                placeholder="e.g. iPhone 15, Laptop, Watch..."
+                                required
+                            >
+                            <small class="form-text text-muted">
+                                Search for products in the CJ Dropshipping catalog
+                            </small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa fa-search"></i> Search
+                        </button>
+                        <a href="{{ url_for('marketplaceproduct.index_view') }}" class="btn btn-secondary">
+                            <i class="fa fa-arrow-left"></i> Back to Products
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <h5><i class="fa fa-info-circle"></i> How to import products:</h5>
+                <ol>
+                    <li>Search for products using keywords (e.g., "iPhone", "Laptop")</li>
+                    <li>Browse the results from CJ Dropshipping</li>
+                    <li>Set a commission rate for each product</li>
+                    <li>Click "Import" to add the product to your marketplace</li>
+                    <li>The product will be automatically synced with CJ for pricing and stock</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Tips for Success</h5>
+                </div>
+                <div class="card-body">
+                    <ul>
+                        <li><strong>Commission Rates:</strong> Typical rates are 5-15% depending on product category</li>
+                        <li><strong>Featured Products:</strong> Mark high-margin products as "Featured" for better visibility</li>
+                        <li><strong>Categories:</strong> Organize products into categories for easier discovery</li>
+                        <li><strong>Sync:</strong> Products automatically sync prices and stock from CJ</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

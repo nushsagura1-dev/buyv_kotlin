@@ -1,0 +1,164 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="row mt-4">
+        <div class="col-12">
+            <h2>📊 Buyv Admin Dashboard</h2>
+            <p class="text-muted">Welcome back, {{ current_user.username }}!</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mt-4">
+        <!-- Users Card -->
+        <div class="col-md-3">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">👥 Users</h5>
+                    <h2>{{ stats.users.total }}</h2>
+                    <p class="mb-0">
+                        <small>✅ {{ stats.users.verified }} verified</small><br>
+                        <small>❌ {{ stats.users.unverified }} unverified</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Posts Card -->
+        <div class="col-md-3">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">📝 Content</h5>
+                    <h2>{{ stats.content.total_posts }}</h2>
+                    <p class="mb-0">
+                        <small>🎥 {{ stats.content.reels }} reels</small><br>
+                        <small>🛍️ {{ stats.content.products }} products</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders Card -->
+        <div class="col-md-3">
+            <div class="card text-white bg-warning mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">📦 Orders</h5>
+                    <h2>{{ stats.commerce.total_orders }}</h2>
+                    <p class="mb-0">
+                        <small>⏳ {{ stats.commerce.pending_orders }} pending</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenue Card -->
+        <div class="col-md-3">
+            <div class="card text-white bg-info mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">💰 Revenue</h5>
+                    <h2>${{ "%.2f"|format(stats.commerce.total_revenue) }}</h2>
+                    <p class="mb-0">
+                        <small>{{ stats.commerce.total_commissions }} commissions</small><br>
+                        <small>⏳ {{ stats.commerce.pending_commissions }} pending</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Stats -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">💬 Engagement</h5>
+                    <ul class="list-unstyled">
+                        <li>💬 Comments: <strong>{{ stats.content.comments }}</strong></li>
+                        <li>❤️ Likes: <strong>{{ stats.content.likes }}</strong></li>
+                        <li>👥 Follows: <strong>{{ stats.social.follows }}</strong></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">👤 Recent Users</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        {% for user in stats.recent_users %}
+                        <li class="mb-2">
+                            <strong>@{{ user.username }}</strong>
+                            {% if user.is_verified %}<span class="badge badge-success">✅</span>{% endif %}
+                            <br>
+                            <small class="text-muted">{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">📦 Recent Orders</h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.recent_orders %}
+                    <ul class="list-unstyled">
+                        {% for order in stats.recent_orders %}
+                        <li class="mb-2">
+                            <strong>#{{ order.order_number }}</strong>
+                            <span class="badge 
+                                {% if order.status == 'paid' or order.status == 'completed' %}badge-success
+                                {% elif order.status == 'pending' %}badge-warning
+                                {% else %}badge-danger{% endif %}">
+                                {{ order.status }}
+                            </span>
+                            <br>
+                            <small class="text-muted">${{ "%.2f"|format(order.total) }}</small><br>
+                            <small class="text-muted">{{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted">No recent orders</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">⚡ Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{{ url_for('user.index_view') }}" class="btn btn-primary">👥 Manage Users</a>
+                    <a href="{{ url_for('post.index_view') }}" class="btn btn-success">📝 Manage Posts</a>
+                    <a href="{{ url_for('order.index_view') }}" class="btn btn-warning">📦 View Orders</a>
+                    <a href="{{ url_for('commission.index_view') }}" class="btn btn-info">💰 Manage Commissions</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .card-body h2 {
+        font-weight: bold;
+        margin: 10px 0;
+    }
+</style>
+{% endblock %}
