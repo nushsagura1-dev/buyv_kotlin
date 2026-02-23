@@ -2,17 +2,28 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from .config import DATABASE_URL
 
-# Handle Railway/Render provided URLs which start with mysql://
-# We need to tell SQLAlchemy to use PyMySQL driver
-if DATABASE_URL.startswith("mysql://"):
-    DATABASE_URL = DATABASE_URL.replace("mysql://", "mysql+pymysql://")
+# ── Driver normalization ───────────────────────────────────────────────────────
+# Railway/Render sometimes provide mysql:// URLs → need PyMySQL driver
+_db_url = DATABASE_URL
+if _db_url.startswith("mysql://"):
+    _db_url = _db_url.replace("mysql://", "mysql+pymysql://", 1)
 
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+# ── Connection arguments ───────────────────────────────────────────────────────
+if _db_url.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+elif _db_url.startswith(("postgresql", "postgres")):
+    # Railway Postgres proxy works with SSL; prefer SSL but don't require it
+    # so local dev without SSL still works.
+    connect_args = {"sslmode": "prefer"}
+else:
+    connect_args = {}
 
 engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=3600,
+    _db_url,
+    pool_pre_ping=True,      # Reconnect on stale connections
+    pool_recycle=1800,       # Recycle connections every 30 min (Railway cuts idle at ~5 min)
+    pool_size=5,
+    max_overflow=10,
     echo=False,
     future=True,
     connect_args=connect_args,
@@ -30,3 +41,4 @@ def get_db():
         yield db
     finally:
         db.close()
+

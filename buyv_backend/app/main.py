@@ -30,8 +30,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create tables if not exist
-Base.metadata.create_all(bind=engine)
+# Create tables if not exist (safety net; primary init runs in railway_init.py)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    logger.warning(f"create_all skipped (tables may already exist or DB unavailable): {e}")
 
 # Initialize Firebase on startup (will skip if credentials not found)
 try:
@@ -62,6 +65,8 @@ _dev_origins = [
     "http://10.0.2.2:8000",
     "http://10.0.3.2",      # Genymotion
     "http://10.0.3.2:8000",
+    # Railway itself (health checks / admin calls)
+    "https://buyvkotlin-production.up.railway.app",
 ]
 
 # Production origins from environment (comma-separated)
