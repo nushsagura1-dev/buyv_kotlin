@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from .database import engine, Base
+from .database import engine, Base, SessionLocal
 from .auth import router as auth_router
 from .users import router as users_router
 from .follows import router as follows_router
@@ -102,6 +102,40 @@ def health():
         "version": APP_VERSION,
         "environment": "production" if IS_PRODUCTION else "development"
     }
+
+@app.get("/health/db")
+def health_db():
+    """Test live database connectivity — returns table counts for quick sanity check."""
+    from sqlalchemy import text, inspect
+    try:
+        with engine.connect() as conn:
+            # Basic ping
+            conn.execute(text("SELECT 1"))
+
+            # Count rows in key tables
+            inspector = inspect(engine)
+            existing_tables = inspector.get_table_names()
+
+            counts = {}
+            for table in ["users", "marketplace_products", "product_categories", "orders"]:
+                if table in existing_tables:
+                    row = conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
+                    counts[table] = row
+                else:
+                    counts[table] = "table not found"
+
+        return {
+            "status": "ok",
+            "db_reachable": True,
+            "counts": counts,
+        }
+    except Exception as e:
+        logger.error(f"DB health check failed: {e}")
+        return {
+            "status": "error",
+            "db_reachable": False,
+            "detail": str(e),
+        }
 
 app.include_router(auth_router)
 app.include_router(users_router)
