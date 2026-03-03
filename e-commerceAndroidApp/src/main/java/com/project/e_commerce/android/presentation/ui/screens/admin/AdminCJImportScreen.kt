@@ -43,6 +43,8 @@ import com.project.e_commerce.android.presentation.ui.composable.common.LoadingV
 import com.project.e_commerce.android.presentation.viewModel.admin.AdminCJImportUiState
 import com.project.e_commerce.android.presentation.viewModel.admin.AdminCJImportViewModel
 import com.project.e_commerce.android.presentation.viewModel.admin.CJCategories
+import com.project.e_commerce.android.presentation.viewModel.admin.CJWarehouses
+import com.project.e_commerce.android.presentation.viewModel.admin.CJShippingCountries
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -57,6 +59,13 @@ fun AdminCJImportScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val focusManager = LocalFocusManager.current
+    
+    // Load trending products on first open
+    LaunchedEffect(Unit) {
+        if (uiState.isInitialLoad) {
+            viewModel.loadTrendingProducts()
+        }
+    }
     
     // Detect when user scrolls to bottom
     val shouldLoadMore by remember {
@@ -106,6 +115,20 @@ fun AdminCJImportScreen(
                 }
             )
             
+            // Warehouse + Trending filter row
+            WarehouseFilterRow(
+                selectedWarehouse = uiState.selectedWarehouse,
+                sortByTrending = uiState.sortByTrending,
+                onWarehouseSelected = { viewModel.setWarehouse(it) },
+                onToggleTrending = { viewModel.toggleTrending() }
+            )
+            
+            // Shipping country filter row
+            ShippingCountryFilterRow(
+                selectedCountry = uiState.selectedShippingCountry,
+                onCountrySelected = { viewModel.setShippingCountry(it) }
+            )
+            
             // Content
             when {
                 uiState.isLoading -> {
@@ -126,6 +149,7 @@ fun AdminCJImportScreen(
                 }
                 
                 uiState.searchResults.isEmpty() -> {
+                    // isInitialLoad=false means trending load finished but returned nothing
                     CJWelcomeView()
                 }
                 
@@ -140,9 +164,16 @@ fun AdminCJImportScreen(
                         // Results count header
                         item {
                             Text(
-                                text = "${uiState.totalResults} products found",
+                                text = if (uiState.searchQuery.isBlank())
+                                    "🔥 Trending — ${uiState.totalResults} products"
+                                else
+                                    "${uiState.totalResults} products found",
                                 fontSize = 14.sp,
-                                color = Color.Gray,
+                                fontWeight = FontWeight.Medium,
+                                color = if (uiState.searchQuery.isBlank())
+                                    MaterialTheme.colors.primary
+                                else
+                                    Color.Gray,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                         }
@@ -786,6 +817,98 @@ private fun ImportSuccessDialog(
                 ) {
                     Text("Continue Importing")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WarehouseFilterRow(
+    selectedWarehouse: String?,
+    sortByTrending: Boolean,
+    onWarehouseSelected: (String?) -> Unit,
+    onToggleTrending: () -> Unit
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Trending sort chip
+        item {
+            Surface(
+                modifier = Modifier.clickable { onToggleTrending() },
+                shape = RoundedCornerShape(20.dp),
+                color = if (sortByTrending) Color(0xFFFF6F00) else Color.White,
+                elevation = if (sortByTrending) 4.dp else 1.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "🔥",
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        text = "Trending",
+                        color = if (sortByTrending) Color.White else Color.DarkGray,
+                        fontSize = 13.sp,
+                        fontWeight = if (sortByTrending) FontWeight.Medium else FontWeight.Normal
+                    )
+                }
+            }
+        }
+        
+        // Warehouse filter chips
+        items(CJWarehouses.warehouses) { (name, value) ->
+            val isSelected = selectedWarehouse == value
+            Surface(
+                modifier = Modifier.clickable { onWarehouseSelected(value) },
+                shape = RoundedCornerShape(20.dp),
+                color = if (isSelected) Color(0xFF1565C0) else Color.White,
+                elevation = if (isSelected) 4.dp else 1.dp
+            ) {
+                Text(
+                    text = name,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    color = if (isSelected) Color.White else Color.DarkGray,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShippingCountryFilterRow(
+    selectedCountry: String?,
+    onCountrySelected: (String?) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(CJShippingCountries.countries) { (name, value) ->
+            val isSelected = selectedCountry == value
+            Surface(
+                modifier = Modifier.clickable { onCountrySelected(value) },
+                shape = RoundedCornerShape(20.dp),
+                color = if (isSelected) Color(0xFF00695C) else Color.White,
+                elevation = if (isSelected) 4.dp else 1.dp
+            ) {
+                Text(
+                    text = name,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    color = if (isSelected) Color.White else Color.DarkGray,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+                )
             }
         }
     }

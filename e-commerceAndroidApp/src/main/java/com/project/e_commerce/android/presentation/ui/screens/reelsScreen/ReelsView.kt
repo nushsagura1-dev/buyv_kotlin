@@ -12,6 +12,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -87,6 +88,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import kotlinx.coroutines.flow.catch
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.mutableStateMapOf
@@ -440,6 +445,14 @@ fun ReelsView(
     val showSheet = remember { mutableStateOf(false) }
     val sheetTab = remember { mutableStateOf(SheetTab.Comments) }
     var currentReel by remember { mutableStateOf<Reels?>(null) }
+
+    // QA #20 / VIDEO-004: Intercept device back press when a sheet is open
+    // Prevents exiting the app when the buy or comments BottomSheet is visible
+    BackHandler(enabled = showSheet.value || showCommentsSheet) {
+        showSheet.value = false
+        showCommentsSheet = false
+        mainUiStateViewModel?.showBottomBar()
+    }
 
     // Tab change handler - only navigate to Explore, otherwise just change local selectedTab
     val onTabChange: (String) -> Unit = { newTab ->
@@ -929,7 +942,19 @@ fun ReelsList(
         // NEW: Per-reel heart animation state
         var showHeartForThisReel by remember(reel.id) { mutableStateOf(false) }
         var heartPositionForThisReel by remember(reel.id) { mutableStateOf(Offset.Zero) }
-        
+
+        // VIDEO-001: Play/Pause 1.5s tap-feedback overlay
+        var playOverlayTrigger by remember(reel.id) { mutableStateOf(0) }
+        var showPlayPauseOverlay by remember(reel.id) { mutableStateOf(false) }
+        var overlayShowsPlay by remember(reel.id) { mutableStateOf(true) }
+        LaunchedEffect(playOverlayTrigger) {
+            if (playOverlayTrigger > 0) {
+                showPlayPauseOverlay = true
+                delay(1500)
+                showPlayPauseOverlay = false
+            }
+        }
+
         // Phase 6: Track Reel view when visible
         val scope = rememberCoroutineScope()
         LaunchedEffect(page, currentPage, reel.id) {
@@ -980,6 +1005,9 @@ fun ReelsList(
                             "🎥 Video playback toggled for reel ${reel.id}: $isPlaying"
                         )
                         videoPlayStates[reel.id] = isPlaying
+                        // VIDEO-001: Show play/pause icon briefly on tap
+                        overlayShowsPlay = isPlaying
+                        playOverlayTrigger++
 
                         // If this video starts playing, pause all others
                         if (isPlaying) {
@@ -1114,6 +1142,23 @@ fun ReelsList(
                     iconPainter = painterResource(id = R.drawable.ic_love_checked),
                     onAnimationEnd = { showHeartForThisReel = false },
                     iconSize = 100.dp
+                )
+            }
+            // VIDEO-001: Play/Pause tap-feedback overlay (1.5s auto-dismiss)
+            AnimatedVisibility(
+                visible = showPlayPauseOverlay,
+                enter = fadeIn(animationSpec = tween(150)),
+                exit = fadeOut(animationSpec = tween(400)),
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                Icon(
+                    imageVector = if (overlayShowsPlay) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(Color.Black.copy(alpha = 0.40f), shape = CircleShape)
+                        .padding(16.dp)
                 )
             }
             // RequireLoginPrompt overlay

@@ -498,13 +498,23 @@ class AdminApiService {
     
     // MARK: - CJ Import
     
-    func searchCJProducts(query: String, category: String? = nil, page: Int = 1) async throws -> CJSearchResponse {
-        var queryItems = ["query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)", "page=\(page)"]
-        if let category = category, category != "All" {
-            queryItems.append("category=\(category.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? category)")
-        }
-        let queryString = queryItems.joined(separator: "&")
-        return try await get(path: "api/v1/admin/cj/search?\(queryString)")
+    func searchCJProducts(
+        query: String,
+        category: String? = nil,
+        page: Int = 1,
+        warehouse: String? = nil,
+        shippingCountry: String? = nil,
+        sortBy: String? = nil
+    ) async throws -> CJSearchResponse {
+        var queryItems = [
+            "query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)",
+            "page=\(page)"
+        ]
+        if let category = category { queryItems.append("category=\(category)") }
+        if let warehouse = warehouse { queryItems.append("warehouse=\(warehouse)") }
+        if let shippingCountry = shippingCountry { queryItems.append("shipping_to=\(shippingCountry)") }
+        if let sortBy = sortBy { queryItems.append("sort_by=\(sortBy)") }
+        return try await get(path: "api/v1/admin/cj/search?\(queryItems.joined(separator: "&"))")
     }
     
     func importCJProduct(request: CJImportRequest) async throws -> CJImportResponse {

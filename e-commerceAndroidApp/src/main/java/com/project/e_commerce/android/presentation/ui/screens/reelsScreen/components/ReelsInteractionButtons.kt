@@ -10,6 +10,13 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.airbnb.lottie.compose.LottieConstants
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,7 +61,8 @@ fun ReelsInteractionButtons(
     onClickMoreButton: (Reels) -> Unit,
     onClickBookmarkButton: (Reels) -> Unit,
     cartViewModel: CartViewModel,
-    reelsViewModel: ReelsScreenViewModel
+    reelsViewModel: ReelsScreenViewModel,
+    onDeletePost: (String) -> Unit = {}            // VIDEO-003: optional delete callback
 ) {
     val currentUserProvider: CurrentUserProvider = koinInject()
     var currentUserId by remember { mutableStateOf<String?>(null) }
@@ -64,8 +72,8 @@ fun ReelsInteractionButtons(
         currentUserId = user?.uid
     }
     val isOwner = currentUserId == reel.userId
-
-    // Get real cart state
+    // VIDEO-003: state for delete confirmation dialog
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val cartState by cartViewModel.state.collectAsState()
 
     LaunchedEffect(reel.id) {
@@ -95,100 +103,151 @@ fun ReelsInteractionButtons(
             navController = navController
         )
 
-        // Like button
-        InteractionButton(
-            painter = painterResource(
-                id = if (reel.love.isLoved) R.drawable.ic_love_checked else R.drawable.ic_love
-            ),
-            count = reel.love.number.toString(),
-            tint = if (reel.love.isLoved) Color.Red else Color.White,
-            onClick = onClickLoveButton
-        )
-
-        // Comment button
-        InteractionButton(
-            painter = painterResource(id = R.drawable.ic_comment),
-            count = reel.numberOfComments.toString(),
-            onClick = { onClickCommentButton(reel) }
-        )
-
-        // Cart button
-        InteractionButton(
-            painter = painterResource(
-                id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart_checked
-            ),
-            count = if (isInCart && cartState.items.isNotEmpty()) {
-                cartState.items.find { it.productId == reel.id }?.quantity?.toString() ?: "1"
-            } else {
-                "0"
-            },
-            tint = if (isInCart) Color(0xFFFFC107) else Color.White,
-            onClick = {
-                Log.d("InteractionButtons", "Cart icon pressed for product ${reel.id}")
-                if (isInCart) {
-                    cartViewModel.removeItem(reel.id)
-                    cartViewModel.refreshCart()
-                    reelsViewModel.checkCartStatus(reel.id)
-                } else {
-                    val cartItem = CartItemUi(
-                        productId = reel.id,
-                        name = reel.productName.ifEmpty { "Product" },
-                        price = reel.productPrice.toDoubleOrNull() ?: 0.0,
-                        imageUrl = reel.productImage.ifEmpty { "" },
-                        quantity = 1
-                    )
-                    cartViewModel.addToCart(cartItem)
-                    cartViewModel.refreshCart()
-                    reelsViewModel.checkCartStatus(reel.id)
+        // VIDEO-002/003: Owner sees Edit/Delete; non-owners see social actions
+        if (isOwner) {
+            // Edit post
+            InteractionButtonWithVector(
+                imageVector = Icons.Filled.Edit,
+                label = "Edit",
+                onClick = {
+                    navController.navigate(Screens.ProfileScreen.AddNewContentScreen.route)
                 }
-            }
-        )
-
-        // Share button
-        InteractionButton(
-            painter = painterResource(id = R.drawable.ic_share),
-            count = "Share",
-            onClick = { onClickMoreButton(reel) }
-        )
-
-        // Bookmark button
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.noRippleClickable { onClickBookmarkButton(reel) }
-        ) {
-            Icon(
-                imageVector = if (reel.isBookmarked) Icons.Filled.Bookmark else Icons.Default.BookmarkBorder,
-                contentDescription = "Bookmark",
-                tint = if (reel.isBookmarked) Color(0xFFFFC107) else Color.White,
-                modifier = Modifier.size(28.dp)
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = if (reel.isBookmarked) "Saved" else "Save",
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center
+            // Delete post — confirmed via dialog
+            InteractionButtonWithVector(
+                imageVector = Icons.Filled.Delete,
+                label = "Delete",
+                tint = Color(0xFFFF5252),
+                onClick = { showDeleteConfirm = true }
+            )
+        } else {
+            // Like button with Lottie heart animation (VIDEO-005)
+            val lottieComposition by rememberLottieComposition(
+                LottieCompositionSpec.Asset("lottie_heart_like.json")
+            )
+            val lottieProgress by animateLottieCompositionAsState(
+                composition = lottieComposition,
+                isPlaying = reel.love.isLoved,
+                iterations = 1,
+                restartOnPlay = false,
+                speed = 1.5f
+            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.noRippleClickable { onClickLoveButton() }
+            ) {
+                if (reel.love.isLoved) {
+                    LottieAnimation(
+                        composition = lottieComposition,
+                        progress = { lottieProgress },
+                        modifier = Modifier.size(36.dp)
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_love),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = reel.love.number.toString(),
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            // Comment button
+            InteractionButton(
+                painter = painterResource(id = R.drawable.ic_comment),
+                count = reel.numberOfComments.toString(),
+                onClick = { onClickCommentButton(reel) }
+            )
+
+            // Cart button (VIDEO-002: fix — ic_cart for empty, ic_cart_checked for added)
+            InteractionButton(
+                painter = painterResource(
+                    id = if (isInCart) R.drawable.ic_cart_checked else R.drawable.ic_cart
+                ),
+                count = if (isInCart && cartState.items.isNotEmpty()) {
+                    cartState.items.find { it.productId == reel.id }?.quantity?.toString() ?: "1"
+                } else {
+                    "0"
+                },
+                tint = if (isInCart) Color(0xFFFFC107) else Color.White,
+                onClick = {
+                    Log.d("InteractionButtons", "Cart icon pressed for product ${reel.id}")
+                    if (isInCart) {
+                        cartViewModel.removeItem(reel.id)
+                        cartViewModel.refreshCart()
+                        reelsViewModel.checkCartStatus(reel.id)
+                    } else {
+                        val cartItem = CartItemUi(
+                            productId = reel.id,
+                            name = reel.productName.ifEmpty { "Product" },
+                            price = reel.productPrice.toDoubleOrNull() ?: 0.0,
+                            imageUrl = reel.productImage.ifEmpty { "" },
+                            quantity = 1
+                        )
+                        cartViewModel.addToCart(cartItem)
+                        cartViewModel.refreshCart()
+                        reelsViewModel.checkCartStatus(reel.id)
+                        // SET-004: Auto-bookmark when adding to cart (Save = Cart unified)
+                        onClickBookmarkButton(reel)
+                    }
+                }
+            )
+
+            // Share button
+            InteractionButton(
+                painter = painterResource(id = R.drawable.ic_share),
+                count = "Share",
+                onClick = { onClickMoreButton(reel) }
+            )
+
+            // Music button
+            InteractionButton(
+                painter = painterResource(id = R.drawable.ic_music),
+                count = "",
+                iconSize = 32.dp,
+                onClick = {
+                    val videoUrl = reel.video?.toString() ?: ""
+                    val route = if (videoUrl.isNotEmpty()) {
+                        Screens.ReelsScreen.SoundPageScreen.createRoute(videoUrl)
+                    } else {
+                        Screens.ReelsScreen.SoundPageScreen.route
+                    }
+                    navController.navigate(route)
+                }
             )
         }
 
-        // Music button
-        InteractionButton(
-            painter = painterResource(id = R.drawable.ic_music),
-            count = "",
-            iconSize = 32.dp,
-            onClick = {
-                val videoUrl = reel.video?.toString() ?: ""
-                val route = if (videoUrl.isNotEmpty()) {
-                    Screens.ReelsScreen.SoundPageScreen.createRoute(videoUrl)
-                } else {
-                    Screens.ReelsScreen.SoundPageScreen.route
+        Spacer(modifier = Modifier.height(4.dp))
+    }
+
+    // VIDEO-003: Delete confirmation dialog
+    if (showDeleteConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { androidx.compose.material3.Text("Delete Post") },
+            text = { androidx.compose.material3.Text("Are you sure? This action cannot be undone.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDeletePost(reel.id)
+                }) {
+                    androidx.compose.material3.Text("Delete", color = Color(0xFFFF5252))
                 }
-                navController.navigate(route)
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showDeleteConfirm = false }) {
+                    androidx.compose.material3.Text("Cancel")
+                }
             }
         )
-
-        Spacer(modifier = Modifier.height(4.dp))
     }
 }
 
@@ -277,6 +336,38 @@ fun InteractionButton(
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = count,
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/**
+ * VIDEO-003: Bouton d'interaction propriétaire acceptée un ImageVector (Edit, Delete, etc.)
+ */
+@Composable
+private fun InteractionButtonWithVector(
+    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: Color = Color.White,
+    iconSize: Dp = 28.dp,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.noRippleClickable { onClick() }
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(iconSize)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
             color = Color.White,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,

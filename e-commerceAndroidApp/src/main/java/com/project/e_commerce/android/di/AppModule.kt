@@ -38,8 +38,6 @@ import com.project.e_commerce.android.domain.usecase.MarkAsReadUseCase
 import com.project.e_commerce.android.domain.usecase.CreateNotificationUseCase
 import com.project.e_commerce.android.presentation.services.NotificationManagerService
 import com.project.e_commerce.android.data.remote.api.CountriesApi
-import com.project.e_commerce.android.data.remote.interceptor.AuthInterceptor
-import com.project.e_commerce.data.remote.ApiEnvironment
 import com.project.e_commerce.android.domain.usecase.GetUserReelsUseCase
 import com.project.e_commerce.android.domain.usecase.UpdateUserProfileUseCase
 import com.project.e_commerce.android.domain.usecase.GetUserBookmarkedPostsUseCase
@@ -62,13 +60,11 @@ import com.project.e_commerce.android.presentation.viewModel.searchViewModel.Sea
 import com.project.e_commerce.android.presentation.viewModel.NotificationViewModel
 import com.project.e_commerce.android.presentation.viewModel.OrderHistoryViewModel
 import com.project.e_commerce.android.presentation.viewModel.RecentlyViewedViewModel
-import okhttp3.OkHttpClient
+import io.ktor.client.HttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 import org.koin.core.qualifier.named
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import com.project.e_commerce.android.domain.usecase.FCMTokenUseCase
 import com.project.e_commerce.android.domain.usecase.CreateOrderUseCase
 import com.project.e_commerce.android.domain.usecase.GetUserOrdersUseCase
@@ -79,7 +75,6 @@ import com.project.e_commerce.android.data.helper.GoogleSignInHelper
 
 import com.project.e_commerce.android.presentation.viewModel.SocialViewModel
 import com.project.e_commerce.android.presentation.viewModel.FavouritesViewModel
-import com.project.e_commerce.android.data.remote.security.CertificatePinningConfig
 
 val viewModelModule = module {
     try {
@@ -543,39 +538,8 @@ val viewModelModule = module {
             )
         }
 
-        // Retrofit - DEFAULT (For Backend)
         single {
-            val okHttp = OkHttpClient.Builder()
-                .addInterceptor(AuthInterceptor(get()))
-                .apply {
-                    // 🔒 Certificate Pinning (production only)
-                    CertificatePinningConfig.configurePinning(this)
-                }
-                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)  // 15s pour établir connexion
-                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)     // 30s pour lire les données
-                .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)    // 30s pour écrire les données
-                .callTimeout(30, java.util.concurrent.TimeUnit.SECONDS)     // 30s timeout total par appel
-                .build()
-            
-            android.util.Log.d("CrashDebug", "AppModule: OkHttpClient (Backend) created")
-            
-            Retrofit.Builder()
-                .client(okHttp)
-                .baseUrl(ApiEnvironment.baseUrl.trimEnd('/') + "/") // Dynamic: DEV=local, PROD=Railway
-                .addConverterFactory(GsonConverterFactory.create())
-                .build()
-        }
-
-        // Retrofit - COUNTRIES (Named)
-        single(named("countriesRetrofit")) {
-            Retrofit.Builder()
-                .baseUrl("https://restcountries.com/")
-                .addConverterFactory(GsonConverterFactory.create())
-                .build()
-        }
-
-        single {
-            val countriesApi = get<Retrofit>(named("countriesRetrofit")).create(CountriesApi::class.java)
+            val countriesApi = CountriesApi(get<HttpClient>(named("public")))
             android.util.Log.d("CrashDebug", "AppModule: CountriesApi created")
             countriesApi
         }

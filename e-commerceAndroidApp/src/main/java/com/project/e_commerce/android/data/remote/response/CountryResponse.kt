@@ -1,11 +1,12 @@
 package com.project.e_commerce.android.data.remote.response
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-
+@Serializable
 data class CountryResponse(
-    @SerializedName("name")
+    @SerialName("name")
     val name: Name,
-    @SerializedName("flags")
+    @SerialName("flags")
     val flags: Flags
 )

@@ -3,6 +3,7 @@ import AVKit
 
 struct VideoPlayerView: View {
     let url: String
+    var onPlayToggled: ((Bool) -> Void)? = nil   // VIDEO-001: play/pause callback
     @State private var player: AVPlayer?
     @State private var isPlaying = true
     
@@ -46,6 +47,7 @@ struct VideoPlayerView: View {
                     player.play()
                 }
                 isPlaying.toggle()
+                onPlayToggled?(isPlaying)   // VIDEO-001: report new state to parent
             }
         }
     }

@@ -1,13 +1,16 @@
 package com.project.e_commerce.android.data.model.admin
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 // Authentication
+@Serializable
 data class AdminLoginRequest(
     val username: String,
     val password: String
 )
 
+@Serializable
 data class AdminLoginResponse(
     val success: Boolean,
     val message: String,
@@ -15,96 +18,106 @@ data class AdminLoginResponse(
     val token: String?
 )
 
+@Serializable
 data class Admin(
     val id: Int,
     val username: String,
     val email: String,
     val role: String,
-    @SerializedName("created_at") val createdAt: String,
-    @SerializedName("updated_at") val updatedAt: String
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String
 )
 
 // Common Response
+@Serializable
 data class MessageResponse(
     val message: String,
     val success: Boolean = true
 )
 
 // Stats
+@Serializable
 data class DashboardStats(
-    @SerializedName("total_users") val totalUsers: Int,
-    @SerializedName("total_orders") val totalOrders: Int,
-    @SerializedName("total_revenue") val totalRevenue: Double,
-    @SerializedName("total_products") val totalProducts: Int,
-    @SerializedName("pending_withdrawals") val pendingWithdrawals: Int,
-    @SerializedName("active_commissions") val activeCommissions: Int
+    @SerialName("total_users") val totalUsers: Int,
+    @SerialName("total_orders") val totalOrders: Int,
+    @SerialName("total_revenue") val totalRevenue: Double,
+    @SerialName("total_products") val totalProducts: Int,
+    @SerialName("pending_withdrawals") val pendingWithdrawals: Int,
+    @SerialName("active_commissions") val activeCommissions: Int
 )
 
 // User Management
+@Serializable
 data class UserVerificationRequest(
-    @SerializedName("is_verified") val isVerified: Boolean
+    @SerialName("is_verified") val isVerified: Boolean
 )
 
 // Admin-specific Product
+@Serializable
 data class AdminProduct(
     val id: String,
     val name: String,
     val description: String?,
-    @SerializedName("main_image_url") val mainImage: String?,
+    @SerialName("main_image_url") val mainImage: String?,
     val images: List<String>?,
-    @SerializedName("selling_price") val sellingPrice: Double,
-    @SerializedName("commission_rate") val commissionRate: Double,
-    @SerializedName("category_id") val categoryId: String?,
-    @SerializedName("is_featured") val isFeatured: Boolean,
+    @SerialName("selling_price") val sellingPrice: Double,
+    @SerialName("commission_rate") val commissionRate: Double,
+    @SerialName("category_id") val categoryId: String?,
+    @SerialName("is_featured") val isFeatured: Boolean,
     val status: String,
-    @SerializedName("total_sales") val totalSales: Int,
-    @SerializedName("created_at") val createdAt: String?,
-    @SerializedName("original_price") val originalPrice: Double?
+    @SerialName("total_sales") val totalSales: Int,
+    @SerialName("created_at") val createdAt: String?,
+    @SerialName("original_price") val originalPrice: Double?
 )
 
 // CJ Dropshipping
+@Serializable
 data class CJSearchResponse(
     val products: List<CJProduct>,
     val total: Int,
     val page: Int,
-    @SerializedName("total_pages") val totalPages: Int
+    @SerialName("total_pages") val totalPages: Int
 )
 
+@Serializable
 data class CJProduct(
-    @SerializedName("cj_product_id") val cjProductId: String,
+    @SerialName("cj_product_id") val cjProductId: String,
     val name: String,
     val description: String?,
-    @SerializedName("main_image") val mainImage: String?,
+    @SerialName("main_image") val mainImage: String?,
     val images: List<String>,
     val price: Double,
     val category: String?,
-    @SerializedName("in_stock") val inStock: Boolean
+    @SerialName("in_stock") val inStock: Boolean
 )
 
+@Serializable
 data class CJImportRequest(
-    @SerializedName("cj_product_id") val cj_product_id: String,
-    @SerializedName("cj_variant_id") val cj_variant_id: String? = null,
-    @SerializedName("commission_rate") val commission_rate: Double,
-    @SerializedName("category_id") val category_id: String? = null,
-    @SerializedName("custom_description") val custom_description: String? = null
+    @SerialName("cj_product_id") val cj_product_id: String,
+    @SerialName("cj_variant_id") val cj_variant_id: String? = null,
+    @SerialName("commission_rate") val commission_rate: Double,
+    @SerialName("category_id") val category_id: String? = null,
+    @SerialName("custom_description") val custom_description: String? = null
 )
 
+@Serializable
 data class CJImportResponse(
     val id: String,
     val name: String,
-    @SerializedName("main_image_url") val mainImageUrl: String?,
-    @SerializedName("selling_price") val sellingPrice: Double,
-    @SerializedName("original_price") val originalPrice: Double,
-    @SerializedName("commission_rate") val commissionRate: Double,
-    @SerializedName("cj_product_id") val cjProductId: String?,
+    @SerialName("main_image_url") val mainImageUrl: String?,
+    @SerialName("selling_price") val sellingPrice: Double,
+    @SerialName("original_price") val originalPrice: Double,
+    @SerialName("commission_rate") val commissionRate: Double,
+    @SerialName("cj_product_id") val cjProductId: String?,
     val status: String,
     val message: String? = null
 )
 
+@Serializable
 data class AdminProductsResponse(
-    @SerializedName("items") val products: List<AdminProduct>,
+    @SerialName("items") val products: List<AdminProduct>,
     val total: Int,
     val page: Int,
     val limit: Int,
-    @SerializedName("total_pages") val totalPages: Int
+    @SerialName("total_pages") val totalPages: Int
 )

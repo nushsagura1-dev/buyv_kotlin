@@ -2,10 +2,10 @@ package com.project.e_commerce.android.presentation.viewModel.promoter
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.project.e_commerce.android.data.api.CommissionDto
-import com.project.e_commerce.android.data.api.CommissionsApi
 import com.project.e_commerce.data.local.CurrentUserProvider
 import com.project.e_commerce.data.local.TokenManager
+import com.project.e_commerce.data.remote.api.CommissionItemDto
+import com.project.e_commerce.data.remote.api.CommissionsApiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,10 +13,10 @@ import kotlinx.coroutines.launch
 
 /**
  * ViewModel for My Commissions Screen
- * Displays the promoter's earned commissions from affiliate sales
+ * MIGRATION 2.14: Retrofit CommissionsApi → Ktor CommissionsApiService (shared)
  */
 class MyCommissionsViewModel(
-    private val commissionsApi: CommissionsApi,
+    private val commissionsApi: CommissionsApiService,
     private val currentUserProvider: CurrentUserProvider,
     private val tokenManager: TokenManager
 ) : ViewModel() {
@@ -27,7 +27,6 @@ class MyCommissionsViewModel(
     private val _selectedFilter = MutableStateFlow<String?>(null)
     val selectedFilter: StateFlow<String?> = _selectedFilter.asStateFlow()
 
-    // Pagination
     private var currentPage = 0
     private val pageSize = 20
     private var hasMorePages = true
@@ -51,14 +50,8 @@ class MyCommissionsViewModel(
                     return@launch
                 }
 
-                val token = tokenManager.getAccessToken()
-                if (token == null) {
-                    _uiState.value = MyCommissionsUiState.Error("Token d'authentification manquant")
-                    return@launch
-                }
-
+                // Ktor authenticatedClient adds Bearer token automatically
                 val commissions = commissionsApi.getMyCommissions(
-                    token = "Bearer $token",
                     skip = 0,
                     limit = pageSize,
                     status = filter
@@ -93,23 +86,14 @@ class MyCommissionsViewModel(
 
     fun loadMoreCommissions() {
         if (isLoadingMore || !hasMorePages) return
-
-        val currentState = _uiState.value
-        if (currentState !is MyCommissionsUiState.Success) return
+        val currentState = _uiState.value as? MyCommissionsUiState.Success ?: return
 
         viewModelScope.launch {
             try {
                 isLoadingMore = true
                 currentPage++
 
-                val token = tokenManager.getAccessToken()
-                if (token == null) {
-                    isLoadingMore = false
-                    return@launch
-                }
-
                 val moreCommissions = commissionsApi.getMyCommissions(
-                    token = "Bearer $token",
                     skip = currentPage * pageSize,
                     limit = pageSize,
                     status = _selectedFilter.value
@@ -156,7 +140,7 @@ sealed class MyCommissionsUiState {
     object Loading : MyCommissionsUiState()
     object Empty : MyCommissionsUiState()
     data class Success(
-        val commissions: List<CommissionDto>,
+        val commissions: List<CommissionItemDto>,
         val totalEarned: Double,
         val pendingAmount: Double,
         val canLoadMore: Boolean

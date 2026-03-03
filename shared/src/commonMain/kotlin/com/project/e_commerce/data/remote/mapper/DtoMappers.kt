@@ -1,6 +1,7 @@
 package com.project.e_commerce.data.remote.mapper
 
 import com.project.e_commerce.data.remote.dto.*
+import com.project.e_commerce.data.util.HtmlSanitizer
 import com.project.e_commerce.domain.model.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -63,8 +64,8 @@ fun UserPostDto.toDomain(): UserPost {
         id = id,
         userId = userId,
         type = type.uppercase(),
-        title = caption ?: "",
-        description = caption ?: "",
+        title = HtmlSanitizer.toPlainText(caption),
+        description = HtmlSanitizer.toPlainText(caption),
         mediaUrl = videoUrl,
         thumbnailUrl = null, // Not in backend DTO
         images = emptyList(), // Not in backend DTO
@@ -97,8 +98,8 @@ fun PostDto.toProduct(): Product {
     return Product(
         id = id,
         userId = userId,
-        name = caption ?: "Unnamed Product",
-        description = caption ?: "",
+        name = HtmlSanitizer.toPlainText(caption).ifBlank { "Unnamed Product" },
+        description = HtmlSanitizer.toPlainText(caption),
         price = "0", // Price should be extracted from post metadata if available
         image = videoUrl ?: thumbnailUrl ?: "",
         reelVideoUrl = videoUrl ?: "",

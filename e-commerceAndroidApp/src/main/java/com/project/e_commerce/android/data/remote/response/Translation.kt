@@ -1,12 +1,13 @@
 package com.project.e_commerce.android.data.remote.response
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-
+@Serializable
 data class Translation(
-    @SerializedName("official")
+    @SerialName("official")
     val official: String,
 
-    @SerializedName("common")
+    @SerialName("common")
     val common: String
 )

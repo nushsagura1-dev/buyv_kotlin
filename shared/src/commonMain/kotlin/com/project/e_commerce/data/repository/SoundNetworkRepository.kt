@@ -5,6 +5,7 @@ import com.project.e_commerce.data.remote.dto.SoundDto
 import com.project.e_commerce.domain.model.Sound
 import com.project.e_commerce.domain.repository.SoundRepository
 import kotlinx.datetime.Clock
+import kotlinx.serialization.SerializationException
 
 /**
  * Network implementation of SoundRepository.
@@ -32,7 +33,17 @@ class SoundNetworkRepository(
     }
 
     override suspend fun getSoundByUid(soundUid: String): Sound {
-        return soundApiService.getSound(soundUid).toDomain()
+        return try {
+            soundApiService.getSound(soundUid).toDomain()
+        } catch (e: SerializationException) {
+            // Partial/missing fields from backend — return safe default instead of crash
+            Sound(
+                id = 0, uid = soundUid, title = "Original Sound",
+                artist = "Unknown", audioUrl = "", coverImageUrl = null,
+                duration = 0.0, genre = null, usageCount = 0,
+                isFeatured = false, createdAt = Clock.System.now().toEpochMilliseconds()
+            )
+        }
     }
 
     override suspend fun incrementUsage(soundUid: String) {

@@ -53,10 +53,10 @@ class TrackingRepository(
             )
             
             val response = trackingApi.trackReelView(request)
-            if (response.isSuccessful && response.body()?.success == true) {
-                Result.success(response.body()?.message ?: "View tracked")
+            if (response.success) {
+                Result.success(response.message ?: "View tracked")
             } else {
-                Result.failure(Exception("Failed to track view: ${response.message()}"))
+                Result.failure(Exception("Failed to track view: ${response.message}"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -95,10 +95,10 @@ class TrackingRepository(
             )
             
             val response = trackingApi.trackAffiliateClick(request)
-            if (response.isSuccessful && response.body()?.success == true) {
-                Result.success(response.body()?.message ?: "Click tracked")
+            if (response.success) {
+                Result.success(response.message ?: "Click tracked")
             } else {
-                Result.failure(Exception("Failed to track click: ${response.message()}"))
+                Result.failure(Exception("Failed to track click: ${response.message}"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -119,10 +119,10 @@ class TrackingRepository(
             )
             
             val response = trackingApi.trackConversion(request)
-            if (response.isSuccessful && response.body()?.success == true) {
-                Result.success(response.body()?.message ?: "Conversion tracked")
+            if (response.success) {
+                Result.success(response.message ?: "Conversion tracked")
             } else {
-                Result.failure(Exception("Failed to track conversion: ${response.message()}"))
+                Result.failure(Exception("Failed to track conversion: ${response.message}"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -138,12 +138,7 @@ class TrackingRepository(
         days: Int = 30
     ): Result<PromoterAnalyticsResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = trackingApi.getPromoterAnalytics(promoterUid, days)
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
-            } else {
-                Result.failure(Exception("Failed to get analytics: ${response.message()}"))
-            }
+            Result.success(trackingApi.getPromoterAnalytics(promoterUid, days))
         } catch (e: Exception) {
             Result.failure(e)
         }

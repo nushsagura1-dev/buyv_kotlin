@@ -1,67 +1,86 @@
 package com.project.e_commerce.android.data.api
 
-import retrofit2.Response
-import retrofit2.http.*
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import kotlinx.serialization.Serializable
 
 /**
  * Phase 8: Withdrawal API
  * Handles withdrawal requests for promoters and admin management
  */
-interface WithdrawalApi {
-    
+class WithdrawalApi(private val httpClient: HttpClient) {
+
     // ============ Promoter Endpoints ============
-    
-    @POST("api/marketplace/withdrawal/request")
-    suspend fun createWithdrawalRequest(@Body request: CreateWithdrawalRequest): Response<WithdrawalRequestResponse>
-    
-    @GET("api/marketplace/withdrawal/history")
-    suspend fun getWithdrawalHistory(): Response<WithdrawalHistoryResponse>
-    
-    @GET("api/marketplace/withdrawal/stats")
-    suspend fun getWithdrawalStats(): Response<WithdrawalStatsResponse>
-    
+
+    suspend fun createWithdrawalRequest(request: CreateWithdrawalRequest): WithdrawalRequestResponse =
+        httpClient.post("api/marketplace/withdrawal/request") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun getWithdrawalHistory(): WithdrawalHistoryResponse =
+        httpClient.get("api/marketplace/withdrawal/history").body()
+
+    suspend fun getWithdrawalStats(): WithdrawalStatsResponse =
+        httpClient.get("api/marketplace/withdrawal/stats").body()
+
     // ============ Admin Endpoints ============
-    
-    @GET("api/marketplace/withdrawal/admin/list")
-    suspend fun adminListWithdrawals(
-        @Query("status_filter") statusFilter: String? = null
-    ): Response<WithdrawalHistoryResponse>
-    
-    @POST("api/marketplace/withdrawal/admin/{withdrawal_id}/approve")
+
+    suspend fun adminListWithdrawals(statusFilter: String? = null): WithdrawalHistoryResponse =
+        httpClient.get("api/marketplace/withdrawal/admin/list") {
+            statusFilter?.let { parameter("status_filter", it) }
+        }.body()
+
     suspend fun adminApproveWithdrawal(
-        @Path("withdrawal_id") withdrawalId: Int,
-        @Body request: ApproveWithdrawalRequest
-    ): Response<WithdrawalRequestResponse>
-    
-    @POST("api/marketplace/withdrawal/admin/{withdrawal_id}/reject")
+        withdrawalId: Int,
+        request: ApproveWithdrawalRequest
+    ): WithdrawalRequestResponse =
+        httpClient.post("api/marketplace/withdrawal/admin/$withdrawalId/approve") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
     suspend fun adminRejectWithdrawal(
-        @Path("withdrawal_id") withdrawalId: Int,
-        @Body request: RejectWithdrawalRequest
-    ): Response<WithdrawalRequestResponse>
-    
-    @POST("api/marketplace/withdrawal/admin/{withdrawal_id}/complete")
+        withdrawalId: Int,
+        request: RejectWithdrawalRequest
+    ): WithdrawalRequestResponse =
+        httpClient.post("api/marketplace/withdrawal/admin/$withdrawalId/reject") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
     suspend fun adminCompleteWithdrawal(
-        @Path("withdrawal_id") withdrawalId: Int,
-        @Body request: CompleteWithdrawalRequest
-    ): Response<WithdrawalRequestResponse>
+        withdrawalId: Int,
+        request: CompleteWithdrawalRequest
+    ): WithdrawalRequestResponse =
+        httpClient.post("api/marketplace/withdrawal/admin/$withdrawalId/complete") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
 }
 
 // ============ Request Models ============
 
+@Serializable
 data class CreateWithdrawalRequest(
     val amount: Double,
     val payment_method: String,  // "paypal" or "bank_transfer"
     val payment_details: Map<String, String>
 )
 
+@Serializable
 data class ApproveWithdrawalRequest(
     val admin_notes: String? = null
 )
 
+@Serializable
 data class RejectWithdrawalRequest(
     val admin_notes: String
 )
 
+@Serializable
 data class CompleteWithdrawalRequest(
     val transaction_id: String,
     val admin_notes: String? = null
@@ -69,6 +88,7 @@ data class CompleteWithdrawalRequest(
 
 // ============ Response Models ============
 
+@Serializable
 data class WithdrawalRequestResponse(
     val id: Int,
     val promoter_uid: String,
@@ -86,11 +106,13 @@ data class WithdrawalRequestResponse(
     val promoter_name: String? = null
 )
 
+@Serializable
 data class WithdrawalHistoryResponse(
     val total: Int,
     val requests: List<WithdrawalRequestResponse>
 )
 
+@Serializable
 data class WithdrawalStatsResponse(
     val available_balance: Double,
     val pending_balance: Double,

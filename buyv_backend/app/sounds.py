@@ -180,6 +180,124 @@ def toggle_featured(
     return {"message": f"Sound {'featured' if sound.is_featured else 'unfeatured'}", "is_featured": sound.is_featured}
 
 
+# ============================================================
+# Audio Extraction from Video
+# ============================================================
+
+@router.post("/extract")
+async def extract_audio_from_video(
+    video_url: str = Query(..., description="Public URL of the source video"),
+    title: Optional[str] = Query(None, description="Title for the extracted sound"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Download a video from *video_url* and extract its audio track using FFmpeg.
+
+    Returns a URL to the extracted audio file (uploaded to Cloudinary when configured,
+    otherwise served from /tmp as a base64 data-URI fallback).
+
+    Requires FFmpeg installed on the server.
+    """
+    import subprocess
+    import tempfile
+    import os
+    import base64
+    import mimetypes
+    import httpx as _httpx
+
+    # ---- Download source video ----
+    try:
+        async with _httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+            video_resp = await client.get(video_url)
+        if video_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Could not download video (HTTP {video_resp.status_code})")
+        video_bytes = video_resp.content
+    except _httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f"Network error downloading video: {exc}")
+
+    # ---- Write to temp file ----
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_video:
+        tmp_video.write(video_bytes)
+        tmp_video_path = tmp_video.name
+
+    tmp_audio_path = tmp_video_path.replace(".mp4", "_audio.aac")
+
+    try:
+        # ---- Run FFmpeg ----
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", tmp_video_path,
+                "-vn", "-acodec", "aac", "-b:a", "128k",
+                tmp_audio_path,
+            ],
+            capture_output=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            # Fallback: copy audio stream without re-encoding
+            result2 = subprocess.run(
+                ["ffmpeg", "-y", "-i", tmp_video_path, "-vn", "-acodec", "copy", tmp_audio_path],
+                capture_output=True,
+                timeout=120,
+            )
+            if result2.returncode != 0:
+                raise HTTPException(status_code=500, detail="FFmpeg failed to extract audio")
+
+        # ---- Probe duration ----
+        probe = subprocess.run(
+            [
+                "ffprobe", "-v", "quiet", "-print_format", "json",
+                "-show_format", tmp_audio_path,
+            ],
+            capture_output=True,
+            timeout=30,
+        )
+        duration: Optional[float] = None
+        if probe.returncode == 0:
+            import json as _json
+            probe_data = _json.loads(probe.stdout)
+            try:
+                duration = float(probe_data["format"]["duration"])
+            except (KeyError, ValueError):
+                duration = None
+
+        # ---- Upload or encode ----
+        cloudinary_url = os.getenv("CLOUDINARY_URL")
+        audio_url: str
+
+        if cloudinary_url:
+            import cloudinary
+            import cloudinary.uploader
+            upload_result = cloudinary.uploader.upload(
+                tmp_audio_path,
+                resource_type="video",  # Cloudinary uses "video" for audio files
+                folder="sounds/extracted",
+                format="aac",
+            )
+            audio_url = upload_result.get("secure_url", upload_result["url"])
+        else:
+            # Fallback: return base64 data-URI (MVP — not suitable for large files)
+            with open(tmp_audio_path, "rb") as f:
+                audio_b64 = base64.b64encode(f.read()).decode()
+            audio_url = f"data:audio/aac;base64,{audio_b64}"
+
+    finally:
+        for path in (tmp_video_path, tmp_audio_path):
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+    return {
+        "audio_url": audio_url,
+        "duration": duration,
+        "source_video_url": video_url,
+        "title": title or "Extracted Sound",
+        "message": "Audio extracted successfully",
+    }
+
+
 # ============ Helpers ============
 
 def _sound_to_out(sound: Sound) -> SoundOut:

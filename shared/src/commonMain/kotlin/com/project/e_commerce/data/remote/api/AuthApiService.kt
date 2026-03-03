@@ -1,6 +1,8 @@
 package com.project.e_commerce.data.remote.api
 
+import com.project.e_commerce.data.remote.dto.AppleSignInRequestDto
 import com.project.e_commerce.data.remote.dto.AuthResponseDto
+import com.project.e_commerce.data.remote.dto.FacebookSignInRequestDto
 import com.project.e_commerce.data.remote.dto.GoogleSignInRequestDto
 import com.project.e_commerce.data.remote.dto.LoginRequestDto
 import com.project.e_commerce.data.remote.dto.MessageResponseDto
@@ -115,6 +117,26 @@ class AuthApiService(
     suspend fun googleSignIn(idToken: String): AuthResponseDto {
         return publicClient.post("auth/google-signin") {
             setBody(GoogleSignInRequestDto(idToken))
+        }.body()
+    }
+
+    /**
+     * Apple Sign-In — authenticate or register via Apple identity token (AUTH-001)
+     * POST /auth/apple-signin
+     */
+    suspend fun appleSignIn(idToken: String, authorizationCode: String, fullName: String? = null): AuthResponseDto {
+        return publicClient.post("auth/apple-signin") {
+            setBody(AppleSignInRequestDto(idToken, authorizationCode, fullName))
+        }.body()
+    }
+
+    /**
+     * Facebook Sign-In — authenticate or register via Facebook access token (AUTH-002)
+     * POST /auth/facebook-signin
+     */
+    suspend fun facebookSignIn(accessToken: String): AuthResponseDto {
+        return publicClient.post("auth/facebook-signin") {
+            setBody(FacebookSignInRequestDto(accessToken))
         }.body()
     }
 }

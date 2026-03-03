@@ -58,6 +58,7 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.java.KoinJavaComponent
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -388,6 +389,10 @@ class MainActivity : ComponentActivity() {
                                 startDestination = initialRoute, // Utiliser la destination déterminée dynamiquement
                                 mainUiStateViewModel = mainUiStateViewModel
                             )
+                            // VIDEO-004: Intercept back press to dismiss sheet instead of killing the app
+                            BackHandler(enabled = isAddToCartSheetVisible) {
+                                mainUiStateViewModel.hideAddToCartSheet()
+                            }
                             // BuyBottomSheet
                             if (isAddToCartSheetVisible && selectedReelForCart != null) {
                                 // Ensure cart is initialized before showing BuyBottomSheet

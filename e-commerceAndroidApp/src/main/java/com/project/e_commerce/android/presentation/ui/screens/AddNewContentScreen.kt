@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -306,7 +307,12 @@ private fun saveContentToBackend(
 }
 
 @Composable
-fun AddNewContentScreen(navController: NavHostController, preSelectedProductId: String? = null, onPostCreated: (() -> Unit)? = null) {
+fun AddNewContentScreen(
+    navController: NavHostController,
+    preSelectedProductId: String? = null,
+    preSelectedSoundUid: String? = null,
+    onPostCreated: (() -> Unit)? = null
+) {
     // ✅ MIGRATED: Get dependencies from Koin in Composable context
     val currentUserProvider: CurrentUserProvider = koinInject()
     val createPostUseCase: CreatePostUseCase = koinInject()
@@ -348,6 +354,9 @@ fun AddNewContentScreen(navController: NavHostController, preSelectedProductId: 
             }
         }
     }
+
+    // SOUND-002: Persist pre-selected sound UID across recompositions
+    val activeSoundUid = remember(preSelectedSoundUid) { mutableStateOf(preSelectedSoundUid) }
 
     // Auto-fill when user selects a product via ProductSelectionBottomSheet
     LaunchedEffect(selectedMarketplaceProduct) {
@@ -425,6 +434,41 @@ fun AddNewContentScreen(navController: NavHostController, preSelectedProductId: 
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        // SOUND-002: Show selected sound chip when navigating from SoundPageScreen
+        if (activeSoundUid.value != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFFFF3E0), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = Color(0xFFFF6F00),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Sound attached",
+                    color = Color(0xFFE65100),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Remove sound",
+                    tint = Color(0xFF9E9E9E),
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clickable { activeSoundUid.value = null }
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         // Upload Reel
         Text("Upload Product Reel", fontWeight = FontWeight.SemiBold, color = Color(0xFF0066CC))

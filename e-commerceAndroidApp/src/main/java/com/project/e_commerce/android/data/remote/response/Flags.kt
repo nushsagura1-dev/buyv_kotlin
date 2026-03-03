@@ -1,12 +1,13 @@
 package com.project.e_commerce.android.data.remote.response
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-
+@Serializable
 data class Flags(
-    @SerializedName("png")
+    @SerialName("png")
     val png: String,
 
-    @SerializedName("svg")
+    @SerialName("svg")
     val svg: String
 )

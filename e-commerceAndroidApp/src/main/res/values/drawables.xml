@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Drawable alias so that R.drawable.buyv_logo resolves correctly.
+        CategoryIcons uses this as a fallback when no category slug matches.
+    -->
+    <drawable name="buyv_logo">@drawable/logo_v3</drawable>
+</resources>

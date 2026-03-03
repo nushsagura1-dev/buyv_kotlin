@@ -48,12 +48,15 @@ import com.project.e_commerce.android.presentation.ui.navigation.Screens
 import com.project.e_commerce.data.local.TokenManager
 import com.project.e_commerce.data.local.CurrentUserProvider
 import org.koin.compose.koinInject
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 
 // SettingsScreen.kt
 @Composable
 fun SettingsScreen(navController: NavHostController) {
 
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     
     // Inject backend auth dependencies
     val tokenManager: TokenManager = koinInject()
@@ -122,7 +125,7 @@ fun SettingsScreen(navController: NavHostController) {
         Spacer(modifier = Modifier.height(16.dp))
         SettingsItem("Location", R.drawable.ic_location){}
         Spacer(modifier = Modifier.height(16.dp))
-        SettingsItem("Language", R.drawable.ic_language){}
+        SettingsItem("Language", R.drawable.ic_language){ showLanguageDialog = true }
         Spacer(modifier = Modifier.height(16.dp))
         SettingsItem("Blocked Users", R.drawable.ic_profile) {
             navController.navigate(Screens.ProfileScreen.BlockedUsersScreen.route)
@@ -154,6 +157,40 @@ fun SettingsScreen(navController: NavHostController) {
         SettingsItem("Logout", R.drawable.ic_logout) {
             showLogoutDialog = true
         }
+    }
+
+    // SET-005: Working language selector dialog
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text("Language / اللغة / Langue") },
+            text = {
+                Column {
+                    listOf(
+                        "🇸🇦 العربية" to "ar",
+                        "🇬🇧 English" to "en",
+                        "🇫🇷 Français" to "fr"
+                    ).forEach { (label, code) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val locale = LocaleListCompat.forLanguageTags(code)
+                                    AppCompatDelegate.setApplicationLocales(locale)
+                                    showLanguageDialog = false
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp)
+                        ) {
+                            Text(label, fontSize = 16.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showLanguageDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     if (showLogoutDialog) {

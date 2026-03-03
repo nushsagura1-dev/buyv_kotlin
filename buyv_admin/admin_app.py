@@ -44,7 +44,8 @@ from views import (
 from marketplace_views import (
     ProductCategoryAdminView, MarketplaceProductAdminView,
     AffiliateSaleAdminView, PromoterWalletAdminView,
-    WithdrawalRequestAdminView, CJImportView, MarketplaceDashboardView
+    WithdrawalRequestAdminView, CJImportView, MarketplaceDashboardView,
+    PromotionalBannerAdminView
 )
 
 # Flask app configuration
@@ -261,6 +262,7 @@ admin.add_view(CJImportView(name='Import from CJ', endpoint='cjimport', category
 admin.add_view(AffiliateSaleAdminView(db_session, name='Affiliate Sales', endpoint='affiliatesale', category='Marketplace'))
 admin.add_view(PromoterWalletAdminView(db_session, name='Promoter Wallets', endpoint='promoterwallet', category='Marketplace'))
 admin.add_view(WithdrawalRequestAdminView(db_session, name='Withdrawal Requests', endpoint='withdrawalrequest', category='Marketplace'))
+admin.add_view(PromotionalBannerAdminView(db_session, name='Banners', endpoint='promotionalbanner', category='Marketplace'))
 
 admin.add_view(NotificationAdminView(models.Notification, db_session, name='Notifications', category='System'))
 

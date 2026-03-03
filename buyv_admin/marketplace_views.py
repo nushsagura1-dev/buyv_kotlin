@@ -21,7 +21,7 @@ from decimal import Decimal
 # Import des models marketplace
 from app.marketplace.models import (
     ProductCategory, MarketplaceProduct, ProductPromotion,
-    AffiliateSale, PromoterWallet, WithdrawalRequest
+    AffiliateSale, PromoterWallet, WithdrawalRequest, PromotionalBanner
 )
 from app.marketplace.cj_service import CJDropshippingService
 
@@ -426,6 +426,21 @@ class MarketplaceDashboardView(BaseView):
             return self.render('admin/marketplace_dashboard.html', stats={})
         finally:
             db.close()
+
+
+class PromotionalBannerAdminView(SecureModelView):
+    """Admin pour les bannières promotionnelles de l'app mobile."""
+    column_list = ['title', 'subtitle', 'is_active', 'display_order', 'start_date', 'end_date', 'created_at']
+    column_searchable_list = ['title', 'subtitle']
+    column_filters = ['is_active', 'link_type']
+    column_sortable_list = ['display_order', 'is_active', 'created_at']
+    form_columns = [
+        'title', 'subtitle', 'image_url', 'link_url', 'link_type',
+        'is_active', 'display_order', 'start_date', 'end_date',
+    ]
+
+    def __init__(self, session, **kwargs):
+        super(PromotionalBannerAdminView, self).__init__(PromotionalBanner, session, **kwargs)
 
 
 def _get_status_color(status):

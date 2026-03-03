@@ -1,23 +1,26 @@
 package com.project.e_commerce.data.mappers
 
+import com.project.e_commerce.data.util.HtmlSanitizer
 import com.project.e_commerce.domain.model.Product
 import com.project.e_commerce.domain.model.marketplace.MarketplaceProduct
 
 /**
  * Convertit un produit du marketplace (DTO backend) vers le modèle de domaine Product (UI).
+ * HTML in description/caption is sanitized before mapping (PROD-002, UPLOAD-002).
  */
 fun MarketplaceProduct.toProduct(): Product {
     return Product(
         id = id,
         userId = promoterUserId ?: "", // UID du promoteur pour le split de commission
         name = name,
-        description = description ?: "",
+        description = HtmlSanitizer.toPlainText(description),
         price = sellingPrice.toString(),
         categoryId = categoryId ?: "",
         categoryName = categoryName ?: "",
         quantity = "100", // Par défaut pour CJ
         rating = averageRating,
-        productImages = images,
+        productImages = if (images.isNotEmpty()) images
+                        else HtmlSanitizer.extractImageUrls(description),
         image = mainImageUrl ?: images.firstOrNull() ?: "",
         reelTitle = name, // Fallback
         reelVideoUrl = reelVideoUrl ?: "", // URL vidéo Cloudinary du promoteur
@@ -25,7 +28,7 @@ fun MarketplaceProduct.toProduct(): Product {
         tags = tags.joinToString(","),
         sizeColorData = emptyList(), // CJ gère les variantes différemment, à implémenter si besoin
         createdAt = try {
-            0L 
+            0L
         } catch (e: Exception) { 0L },
         originalPrice = originalPrice,
         commissionRate = commissionRate,

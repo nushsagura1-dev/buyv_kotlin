@@ -339,7 +339,14 @@ fun SoundPageScreen(
             }
             Spacer(modifier = Modifier.width(12.dp))
             Button(
-                onClick = { /* Use Sound */ },
+                onClick = {
+                    // SOUND-002: Increment usage count and navigate to Create Post with this sound pre-selected
+                    viewModel.useSound(videoUrl)
+                    navController.navigate(
+                        com.project.e_commerce.android.presentation.ui.navigation.Screens
+                            .ProfileScreen.AddNewContentScreen.createRoute(soundUid = videoUrl)
+                    )
+                },
                 modifier = Modifier
                     .weight(1f)
                     .height(42.dp),

@@ -18,6 +18,10 @@ class UserNetworkRepository(
 ) : UserRepository {
     
     override suspend fun getUserProfile(userId: String): Result<UserProfile> {
+        // Guard: prevent NullPointerException crash when navigating to creator profile
+        if (userId.isBlank()) {
+            return Result.Error(ApiError.ValidationError("Invalid user ID"))
+        }
         return try {
             val userDto = userApi.getUserById(userId)
             Result.Success(userDto.toDomain())

@@ -110,9 +110,12 @@ class AdminRepository @Inject constructor(
         token: String,
         query: String,
         category: String? = null,
-        page: Int = 1
+        page: Int = 1,
+        warehouse: String? = null,
+        shippingCountry: String? = null,
+        sortBy: String? = null
     ): CJSearchResponse {
-        return adminApi.searchCJProducts("Bearer $token", query, category, page)
+        return adminApi.searchCJProducts("Bearer $token", query, category, page, warehouse, shippingCountry, sortBy)
     }
     
     suspend fun importCJProduct(

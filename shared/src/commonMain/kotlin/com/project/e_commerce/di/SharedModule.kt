@@ -9,6 +9,8 @@ import com.project.e_commerce.data.remote.api.CommentsApiService
 import com.project.e_commerce.data.remote.api.OrderApiService
 import com.project.e_commerce.data.remote.api.PostApiService
 import com.project.e_commerce.data.remote.api.BlockedUserApiService
+import com.project.e_commerce.data.remote.api.CommissionsApiService
+import com.project.e_commerce.data.remote.api.PaymentsApiService
 import com.project.e_commerce.data.remote.api.SoundApiService
 import com.project.e_commerce.data.remote.api.TrackingApiService
 import com.project.e_commerce.data.remote.api.UserApiService
@@ -48,6 +50,7 @@ import com.project.e_commerce.domain.usecase.cart.AddToCartUseCase
 import com.project.e_commerce.domain.usecase.cart.ClearCartUseCase
 import com.project.e_commerce.domain.usecase.cart.GetCartUseCase
 import com.project.e_commerce.domain.usecase.cart.RemoveFromCartUseCase
+import com.project.e_commerce.domain.usecase.cart.SaveAndCartUseCase
 import com.project.e_commerce.domain.usecase.cart.UpdateCartItemUseCase
 import com.project.e_commerce.domain.usecase.comment.AddCommentUseCase
 import com.project.e_commerce.domain.usecase.comment.DeleteCommentUseCase
@@ -144,6 +147,9 @@ val networkModule = module {
     single { BlockedUserApiService(get(named("authenticated"))) }
     single { SoundApiService(get(named("authenticated"))) }
     single { TrackingApiService(get(named("authenticated"))) }
+    // 2.14: Migrated from Retrofit → Ktor
+    single { PaymentsApiService(get(named("authenticated"))) }
+    single { CommissionsApiService(get(named("authenticated"))) }
 }
 
 // firebaseModule removed - Migration to backend completed
@@ -267,6 +273,8 @@ val useCaseModule = module {
     single { UpdateCartItemUseCase(get()) }
     single { RemoveFromCartUseCase(get()) }
     single { ClearCartUseCase(get()) }
+    // Unified Save + Cart action (SET-004)
+    single { SaveAndCartUseCase(addToCart = get(), bookmarkPost = get()) }
     
     // Order Use Cases
     single { CreateOrderUseCase(get()) }

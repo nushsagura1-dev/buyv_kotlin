@@ -422,12 +422,12 @@ struct PostThumbnailView: View {
             } placeholder: {
                 Color.gray.opacity(0.3)
             }
-            .frame(height: 120)
+            .aspectRatio(9.0/16.0, contentMode: .fill)
             .clipped()
         } else {
             Rectangle()
                 .fill(Color.gray.opacity(0.3))
-                .frame(height: 120)
+                .aspectRatio(9.0/16.0, contentMode: .fill)
         }
     }
 }

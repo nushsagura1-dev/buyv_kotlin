@@ -14,10 +14,19 @@ struct AdminCJImportView: View {
             // Category Chips
             categoryChips
             
+            // Warehouse + Trending filter
+            warehouseFilterRow
+            
+            // Shipping country filter
+            shippingCountryFilterRow
+            
             // Content
             contentSection
         }
         .navigationTitle("CJ Import")
+        .task {
+            await viewModel.loadTrendingProducts()
+        }
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $viewModel.showImportDialog) {
             importDialog
@@ -127,6 +136,82 @@ struct AdminCJImportView: View {
         .padding(.bottom, 4)
     }
     
+    // MARK: - Warehouse Filter
+    private var warehouseFilterRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // Trending sort chip
+                Button(action: { viewModel.toggleTrending() }) {
+                    HStack(spacing: 4) {
+                        Text("🔥")
+                        Text("Trending")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(viewModel.sortByTrending ? Color.orange.opacity(0.2) : Color(.systemGray6))
+                    .foregroundColor(viewModel.sortByTrending ? .orange : .secondary)
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(viewModel.sortByTrending ? Color.orange : .clear, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                
+                ForEach(viewModel.warehouses, id: \.label) { item in
+                    Button(action: { viewModel.setWarehouse(item.value) }) {
+                        Text(item.label)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(viewModel.selectedWarehouse == item.value
+                                        ? Color.blue.opacity(0.2) : Color(.systemGray6))
+                            .foregroundColor(viewModel.selectedWarehouse == item.value ? .blue : .secondary)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(viewModel.selectedWarehouse == item.value ? Color.blue : .clear, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.bottom, 4)
+    }
+    
+    // MARK: - Shipping Country Filter
+    private var shippingCountryFilterRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(viewModel.shippingCountries, id: \.label) { item in
+                    Button(action: { viewModel.setShippingCountry(item.value) }) {
+                        Text(item.label)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(viewModel.selectedShippingCountry == item.value
+                                        ? Color.teal.opacity(0.2) : Color(.systemGray6))
+                            .foregroundColor(viewModel.selectedShippingCountry == item.value ? .teal : .secondary)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(viewModel.selectedShippingCountry == item.value ? Color.teal : .clear, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.bottom, 4)
+    }
+    
     // MARK: - Content
     private var contentSection: some View {
         Group {
@@ -156,7 +241,7 @@ struct AdminCJImportView: View {
                 }
                 .padding()
                 Spacer()
-            } else if viewModel.searchResults.isEmpty && viewModel.searchQuery.isEmpty {
+            } else if viewModel.searchResults.isEmpty && viewModel.isInitialLoad {
                 welcomeView
             } else if viewModel.searchResults.isEmpty {
                 Spacer()
@@ -214,9 +299,12 @@ struct AdminCJImportView: View {
         VStack(spacing: 0) {
             // Results count
             HStack {
-                Text("\(viewModel.totalResults) products found")
+                Text(viewModel.searchQuery.isEmpty
+                     ? "🔥 Trending — \(viewModel.totalResults) products"
+                     : "\(viewModel.totalResults) products found")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .fontWeight(viewModel.searchQuery.isEmpty ? .medium : .regular)
+                    .foregroundColor(viewModel.searchQuery.isEmpty ? .orange : .secondary)
                 Spacer()
             }
             .padding(.horizontal)

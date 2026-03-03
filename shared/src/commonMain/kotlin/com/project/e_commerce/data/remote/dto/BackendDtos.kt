@@ -501,20 +501,22 @@ data class BlockStatusDto(
 
 /**
  * Sound from backend (SoundOut).
+ * All fields have default values to prevent MissingFieldException when the
+ * backend returns a partial response (e.g. post-extracted "original sound").
  */
 @Serializable
 data class SoundDto(
-    @SerialName("id") val id: Int,
-    @SerialName("uid") val uid: String,
-    @SerialName("title") val title: String,
-    @SerialName("artist") val artist: String,
-    @SerialName("audioUrl") val audioUrl: String,
+    @SerialName("id") val id: Int = 0,
+    @SerialName("uid") val uid: String = "",
+    @SerialName("title") val title: String = "Original Sound",
+    @SerialName("artist") val artist: String = "Unknown",
+    @SerialName("audioUrl") val audioUrl: String = "",
     @SerialName("coverImageUrl") val coverImageUrl: String? = null,
     @SerialName("duration") val duration: Double = 0.0,
     @SerialName("genre") val genre: String? = null,
     @SerialName("usageCount") val usageCount: Int = 0,
     @SerialName("isFeatured") val isFeatured: Boolean = false,
-    @SerialName("createdAt") val createdAt: String
+    @SerialName("createdAt") val createdAt: String = ""
 )
 
 /**
@@ -583,4 +585,26 @@ data class TrackingResponseDto(
 data class PasswordResetConfirmDto(
     @SerialName("token") val token: String,
     @SerialName("new_password") val newPassword: String
+)
+
+// ==================== Social Auth DTOs ====================
+
+/**
+ * Request for Apple Sign-In (AUTH-001)
+ * POST /auth/apple-signin
+ */
+@Serializable
+data class AppleSignInRequestDto(
+    @SerialName("id_token") val idToken: String,
+    @SerialName("authorization_code") val authorizationCode: String,
+    @SerialName("full_name") val fullName: String? = null
+)
+
+/**
+ * Request for Facebook Sign-In (AUTH-002)
+ * POST /auth/facebook-signin
+ */
+@Serializable
+data class FacebookSignInRequestDto(
+    @SerialName("access_token") val accessToken: String
 )

@@ -14,6 +14,7 @@ struct SoundPageView: View {
     @State private var rotationAngle: Double = 0
     @State private var showReportAlert = false
     @State private var showReportSuccess = false
+    @State private var showCreatePost = false
     
     var body: some View {
         ZStack {
@@ -86,6 +87,9 @@ struct SoundPageView: View {
         }
         .onAppear {
             viewModel.loadReels()
+        }
+        .sheet(isPresented: $showCreatePost) {
+            CreatePostView()
         }
         .alert("Report Sound", isPresented: $showReportAlert) {
             Button("Report", role: .destructive) {
@@ -221,7 +225,7 @@ struct SoundPageView: View {
             }
             
             actionButton(icon: "music.note.list", label: "Use Sound", color: AppColors.primary) {
-                // Navigate to create post with this sound
+                showCreatePost = true
             }
         }
         .padding()

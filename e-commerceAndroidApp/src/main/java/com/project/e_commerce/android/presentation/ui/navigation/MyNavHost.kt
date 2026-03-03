@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.produceState
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -85,6 +86,7 @@ import com.project.e_commerce.android.presentation.ui.screens.admin.AdminCategor
 import com.project.e_commerce.android.presentation.ui.screens.admin.AdminAffiliateSalesScreen
 import com.project.e_commerce.android.presentation.ui.screens.admin.AdminPromoterWalletsScreen
 import com.project.e_commerce.android.presentation.ui.screens.admin.AdminNotificationsScreen
+import com.project.e_commerce.android.presentation.ui.screens.camera.CameraScreen
 
 import android.util.Log
 import androidx.compose.ui.Alignment
@@ -104,6 +106,8 @@ fun MyNavHost(
     val productViewModel: ProductViewModel = koinViewModel()
     val cartViewModel: CartViewModel = koinViewModel()
     val reelsScreenViewModel: ReelsScreenViewModel = koinViewModel()
+    // AUTH-003/004: Resolve auth state from shared CurrentUserProvider instead of hardcoded true
+    val currentUserProvider: CurrentUserProvider = koinInject()
 
     NavHost(
         navController = navController,
@@ -128,11 +132,15 @@ fun MyNavHost(
             Log.d("MyNavHost", "🎬 ReelsScreen route composable started")
             Log.d("MyNavHost", "🎬 Creating ReelsView with reelsScreenViewModel: $reelsScreenViewModel")
             
+            // AUTH-003: Resolve guest mode from CurrentUserProvider (suspend)
+            val isLoggedIn by produceState(initialValue = false) {
+                value = currentUserProvider.isAuthenticated()
+            }
             ReelsView(
                 navController = navController,
                 viewModel = reelsScreenViewModel,
                 cartViewModel = cartViewModel,
-                isLoggedIn = true, // TODO: Get actual login state
+                isLoggedIn = isLoggedIn,
                 onShowSheet = { sheetType, reel ->
                     Log.d("MyNavHost", "🎬 onShowSheet called with type: $sheetType, reel: ${reel?.id}")
                     when (sheetType) {
@@ -169,12 +177,16 @@ fun MyNavHost(
             deepLinks = listOf(navDeepLink { uriPattern = "${DeepLinkConfig.SCHEME}://${DeepLinkConfig.HOST}/${DeepLinkConfig.Paths.POST}/{reelId}" })
         ) { backStackEntry ->
             val reelId = backStackEntry.arguments?.getString("reelId") ?: ""
+            // isAuthenticated() is suspend — resolve via produceState (AUTH-003)
+            val isLoggedIn by produceState(initialValue = false) {
+                value = currentUserProvider.isAuthenticated()
+            }
             // Navigate to reels screen with specific reel ID
             ReelsView(
                 navController = navController,
                 viewModel = reelsScreenViewModel,
                 cartViewModel = cartViewModel,
-                isLoggedIn = true, // TODO: Get actual login state
+                isLoggedIn = isLoggedIn,
                 targetReelId = reelId,
                 onShowSheet = { sheetType, reel ->
                     when (sheetType) {
@@ -286,13 +298,20 @@ fun MyNavHost(
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
+                },
+                navArgument("soundUid") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 }
             )
         ) { backStackEntry ->
             val preSelectedProductId = backStackEntry.arguments?.getString("productId")
+            val preSelectedSoundUid = backStackEntry.arguments?.getString("soundUid")
             AddNewContentScreen(
                 navController = navController,
                 preSelectedProductId = preSelectedProductId,
+                preSelectedSoundUid = preSelectedSoundUid,
                 onPostCreated = {
                     // Refresh product feed and reels after creating a new post
                     productViewModel.refreshProducts()
@@ -479,6 +498,20 @@ fun MyNavHost(
         composable(Screens.AdminAffiliateSales.route) { AdminAffiliateSalesScreen(navController) }
         composable(Screens.AdminPromoterWallets.route) { AdminPromoterWalletsScreen(navController) }
         composable(Screens.AdminNotifications.route) { AdminNotificationsScreen(navController) }
+
+        // 2.18 — In-App Camera
+        composable(Screens.CameraScreen.route) {
+            CameraScreen(
+                onVideoReady = { uri ->
+                    // Navigate back to AddNewContent with the captured video URI
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("capturedVideoUri", uri)
+                    navController.popBackStack()
+                },
+                onDismiss = { navController.popBackStack() }
+            )
+        }
 
     }
 }

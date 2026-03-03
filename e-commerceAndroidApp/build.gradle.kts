@@ -35,6 +35,8 @@ android {
         val cloudinaryApiSecret = localProperties.getProperty("cloudinary.api.secret", "")
         buildConfigField("String", "CLOUDINARY_API_KEY", "\"$cloudinaryApiKey\"")
         buildConfigField("String", "CLOUDINARY_API_SECRET", "\"$cloudinaryApiSecret\"")
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -127,12 +129,17 @@ dependencies {
     implementation("io.insert-koin:koin-android:3.5.3")
     implementation("io.insert-koin:koin-androidx-compose:3.5.3")
 
-    // Retrofit + Coroutines
-    implementation("com.squareup.retrofit2:retrofit:3.0.0")
-    implementation("com.squareup.retrofit2:converter-gson:3.0.0")
+    // Ktor (shared module uses implementation(), not api(), so redeclare here)
+    implementation("io.ktor:ktor-client-core:2.3.7")
+    implementation("io.ktor:ktor-client-okhttp:2.3.7")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
+    implementation("io.ktor:ktor-client-logging:2.3.7")
+    implementation("io.ktor:ktor-client-auth:2.3.7")
+
+    // OkHttp (used by Coil3) + Coroutines
     implementation("com.squareup.okhttp3:okhttp:5.1.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.1.0")
-    implementation("com.jakewharton.retrofit:retrofit2-kotlin-coroutines-adapter:0.9.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
@@ -167,6 +174,19 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-dash:1.2.1")
     implementation("androidx.media3:media3-ui:1.2.1")
 
+    // 2.18 — CameraX (video capture + preview)
+    implementation("androidx.camera:camera-core:1.3.4")
+    implementation("androidx.camera:camera-camera2:1.3.4")
+    implementation("androidx.camera:camera-lifecycle:1.3.4")
+    implementation("androidx.camera:camera-video:1.3.4")
+    implementation("androidx.camera:camera-view:1.3.4")
+    // 2.18 — GPUImage real-time GPU filters
+    implementation("jp.co.cyberagent.android:gpuimage:2.1.0")
+
+    // EmojiCompat - consistent emoji rendering across Android versions
+    implementation("androidx.emoji2:emoji2:1.5.0")
+    implementation("androidx.emoji2:emoji2-bundled:1.5.0")
+
     // Core
     implementation("androidx.core:core-ktx:1.17.0")
     
@@ -179,4 +199,13 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.9")
     testImplementation("app.cash.turbine:turbine:1.0.0")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
+
+    // Compose UI Tests (Instrumented)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.9.0")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation("io.insert-koin:koin-test:3.5.3")
+    androidTestImplementation("io.insert-koin:koin-test-junit4:3.5.3")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.9.0")
 }

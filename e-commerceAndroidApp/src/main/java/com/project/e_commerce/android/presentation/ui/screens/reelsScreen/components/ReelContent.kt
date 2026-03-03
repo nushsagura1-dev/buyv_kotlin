@@ -5,7 +5,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.*
@@ -195,16 +194,14 @@ fun UserInfo(
             }
         )
 
-        // Only show follow button if NOT owner AND reel has a valid backend user ID
-        if (!isOwner && reel.userId.isNotBlank()) {
+        // SET-003: Follow button hides completely after following (does not gray out)
+        // Only show when NOT owner, has valid userId, and NOT already following
+        if (!isOwner && reel.userId.isNotBlank() && !isFollowing) {
             Box(
                 modifier = Modifier
                     .shadow(elevation = 6.dp, shape = RoundedCornerShape(8.dp), clip = false)
                     .background(
-                        brush = if (!isFollowing)
-                            Brush.horizontalGradient(listOf(Color(0xFFf8a714), Color(0xFFed380a)))
-                        else
-                            Brush.horizontalGradient(listOf(Color(0xFF9E9E9E), Color(0xFF757575))),
+                        brush = Brush.horizontalGradient(listOf(Color(0xFFf8a714), Color(0xFFed380a))),
                         shape = RoundedCornerShape(8.dp)
                     )
                     .clickable {
@@ -233,7 +230,7 @@ fun UserInfo(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (!isFollowing) "Follow +" else "Following",
+                    text = "Follow +",
                     color = Color.White,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold
@@ -278,6 +275,7 @@ fun OfferCard(
     Row(
         modifier = Modifier
             .offset(x = (-12f).dp)
+            .widthIn(max = 160.dp)
             .background(Color(0xCC222222), shape = RoundedCornerShape(16.dp))
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -289,8 +287,8 @@ fun OfferCard(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
             )
         } else {
             Image(
@@ -298,43 +296,50 @@ fun OfferCard(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
             )
         }
         Spacer(modifier = Modifier.width(6.dp))
 
-        Column(verticalArrangement = Arrangement.Center) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
             Text(
                 text = displayName,
                 color = Color.White,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = cleanProductPrice,
+                color = Color(0xFFFFEB3B),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Box(
+                modifier = Modifier
+                    .shadow(elevation = 4.dp, shape = RoundedCornerShape(6.dp), clip = false)
+                    .background(
+                        brush = Brush.horizontalGradient(colors = listOf(Color(0xFFf8a714), Color(0xFFed380a))),
+                        shape = RoundedCornerShape(6.dp)
+                    )
+                    .clickable { onViewClick() }
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
                 Text(
-                    text = cleanProductPrice,
-                    color = Color(0xFFFFEB3B),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "Tap for details",
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
                 )
-                Spacer(modifier = Modifier.width(16.dp))
-                Box(
-                    modifier = Modifier
-                        .shadow(elevation = 4.dp, shape = RoundedCornerShape(8.dp), clip = false)
-                        .background(
-                            brush = Brush.horizontalGradient(colors = listOf(Color(0xFFf8a714), Color(0xFFed380a))),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .clickable { onViewClick() }
-                        .padding(horizontal = 10.dp, vertical = 3.dp)
-                ) {
-                    Text(text = "View", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
             }
         }
     }

@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.project.e_commerce.android.data.api.CommissionDto
+import com.project.e_commerce.data.remote.api.CommissionItemDto
 import com.project.e_commerce.android.presentation.viewModel.promoter.MyCommissionsUiState
 import com.project.e_commerce.android.presentation.viewModel.promoter.MyCommissionsViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -286,7 +286,7 @@ private fun SummaryCard(
 }
 
 @Composable
-private fun CommissionCard(commission: CommissionDto) {
+private fun CommissionCard(commission: CommissionItemDto) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)

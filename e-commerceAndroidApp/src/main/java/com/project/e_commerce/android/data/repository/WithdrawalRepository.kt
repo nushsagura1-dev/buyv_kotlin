@@ -40,19 +40,7 @@ class WithdrawalRepository(
                 payment_method = paymentMethod,
                 payment_details = paymentDetails
             )
-            
-            val response = withdrawalApi.createWithdrawalRequest(request)
-            
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
-            } else {
-                val errorMsg = when (response.code()) {
-                    400 -> "Insufficient balance or invalid request"
-                    404 -> "Promoter wallet not found"
-                    else -> "Failed to create withdrawal request: ${response.message()}"
-                }
-                Result.failure(Exception(errorMsg))
-            }
+            Result.success(withdrawalApi.createWithdrawalRequest(request))
         } catch (e: Exception) {
             Result.failure(Exception("Network error: ${e.message}"))
         }
@@ -65,13 +53,7 @@ class WithdrawalRepository(
      */
     suspend fun getWithdrawalHistory(): Result<WithdrawalHistoryResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = withdrawalApi.getWithdrawalHistory()
-            
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
-            } else {
-                Result.failure(Exception("Failed to get withdrawal history: ${response.message()}"))
-            }
+            Result.success(withdrawalApi.getWithdrawalHistory())
         } catch (e: Exception) {
             Result.failure(Exception("Network error: ${e.message}"))
         }
@@ -84,13 +66,7 @@ class WithdrawalRepository(
      */
     suspend fun getWithdrawalStats(): Result<WithdrawalStatsResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = withdrawalApi.getWithdrawalStats()
-            
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
-            } else {
-                Result.failure(Exception("Failed to get withdrawal stats: ${response.message()}"))
-            }
+            Result.success(withdrawalApi.getWithdrawalStats())
         } catch (e: Exception) {
             Result.failure(Exception("Network error: ${e.message}"))
         }
@@ -108,13 +84,7 @@ class WithdrawalRepository(
         statusFilter: String? = null
     ): Result<WithdrawalHistoryResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = withdrawalApi.adminListWithdrawals(statusFilter)
-            
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
-            } else {
-                Result.failure(Exception("Failed to list withdrawals: ${response.message()}"))
-            }
+            Result.success(withdrawalApi.adminListWithdrawals(statusFilter))
         } catch (e: Exception) {
             Result.failure(Exception("Network error: ${e.message}"))
         }
@@ -133,18 +103,7 @@ class WithdrawalRepository(
     ): Result<WithdrawalRequestResponse> = withContext(Dispatchers.IO) {
         try {
             val request = ApproveWithdrawalRequest(admin_notes = adminNotes)
-            val response = withdrawalApi.adminApproveWithdrawal(withdrawalId, request)
-            
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
-            } else {
-                val errorMsg = when (response.code()) {
-                    404 -> "Withdrawal request not found"
-                    400 -> "Cannot approve request in current status"
-                    else -> "Failed to approve withdrawal: ${response.message()}"
-                }
-                Result.failure(Exception(errorMsg))
-            }
+            Result.success(withdrawalApi.adminApproveWithdrawal(withdrawalId, request))
         } catch (e: Exception) {
             Result.failure(Exception("Network error: ${e.message}"))
         }
@@ -163,18 +122,7 @@ class WithdrawalRepository(
     ): Result<WithdrawalRequestResponse> = withContext(Dispatchers.IO) {
         try {
             val request = RejectWithdrawalRequest(admin_notes = adminNotes)
-            val response = withdrawalApi.adminRejectWithdrawal(withdrawalId, request)
-            
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
-            } else {
-                val errorMsg = when (response.code()) {
-                    404 -> "Withdrawal request not found"
-                    400 -> "Cannot reject request in current status"
-                    else -> "Failed to reject withdrawal: ${response.message()}"
-                }
-                Result.failure(Exception(errorMsg))
-            }
+            Result.success(withdrawalApi.adminRejectWithdrawal(withdrawalId, request))
         } catch (e: Exception) {
             Result.failure(Exception("Network error: ${e.message}"))
         }
@@ -198,18 +146,7 @@ class WithdrawalRepository(
                 transaction_id = transactionId,
                 admin_notes = adminNotes
             )
-            val response = withdrawalApi.adminCompleteWithdrawal(withdrawalId, request)
-            
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
-            } else {
-                val errorMsg = when (response.code()) {
-                    404 -> "Withdrawal request not found"
-                    400 -> "Cannot complete request in current status"
-                    else -> "Failed to complete withdrawal: ${response.message()}"
-                }
-                Result.failure(Exception(errorMsg))
-            }
+            Result.success(withdrawalApi.adminCompleteWithdrawal(withdrawalId, request))
         } catch (e: Exception) {
             Result.failure(Exception("Network error: ${e.message}"))
         }

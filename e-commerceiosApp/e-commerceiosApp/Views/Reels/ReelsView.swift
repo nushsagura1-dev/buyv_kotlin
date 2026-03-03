@@ -158,6 +158,9 @@ struct ReelItemView: View {
     @State private var showHeartAnimation = false
     @State private var heartAnimationScale: CGFloat = 0.0
     @State private var heartAnimationOpacity: Double = 0.0
+    // VIDEO-001: Play/Pause 1.5s tap-feedback overlay
+    @State private var showPlayPauseOverlay = false
+    @State private var isPausedByUser = false
     
     private let reelId: String
     
@@ -171,11 +174,17 @@ struct ReelItemView: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             // Video Layer
-            VideoPlayerView(url: reel.reelVideoUrl)
-                .ignoresSafeArea()
-                .onTapGesture(count: 2) {
-                    handleDoubleTap()
+            VideoPlayerView(url: reel.reelVideoUrl, onPlayToggled: { nowPlaying in
+                isPausedByUser = !nowPlaying
+                showPlayPauseOverlay = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    showPlayPauseOverlay = false
                 }
+            })
+            .ignoresSafeArea()
+            .onTapGesture(count: 2) {
+                handleDoubleTap()
+            }
             
             // Overlay Gradient
             LinearGradient(
@@ -198,6 +207,19 @@ struct ReelItemView: View {
                     .scaleEffect(heartAnimationScale)
                     .opacity(heartAnimationOpacity)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
+            // VIDEO-001: Play/Pause tap-feedback overlay (1.5s)
+            if showPlayPauseOverlay {
+                Image(systemName: isPausedByUser ? "pause.fill" : "play.fill")
+                    .font(.system(size: 56))
+                    .foregroundColor(.white.opacity(0.85))
+                    .padding(18)
+                    .background(Color.black.opacity(0.40))
+                    .clipShape(Circle())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.2), value: showPlayPauseOverlay)
             }
             
             // Interactions (Right Side)
@@ -358,44 +380,37 @@ struct ReelItemView: View {
                 }
                 
                 // Price & Product Link
-                HStack(spacing: 12) {
+                HStack(spacing: 8) {
                     // Price badge
                     HStack(spacing: 4) {
                         Text("$")
-                            .font(.system(size: 14))
+                            .font(.system(size: 12))
                             .foregroundColor(.orange)
                         Text(String(format: "%.2f", Double(reel.price) ?? 0.0))
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.orange)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
                     .background(Color.black.opacity(0.5))
-                    .cornerRadius(16)
-                    
-                    // Original price (if discounted)
-                    if reel.originalPrice > 0 && reel.originalPrice > (Double(reel.price) ?? 0.0) {
-                        Text("$\(String(format: "%.2f", reel.originalPrice))")
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.5))
-                            .strikethrough()
-                    }
+                    .cornerRadius(10)
                     
                     NavigationLink(destination: ProductDetailView(productId: reelId)) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 3) {
                             Image(systemName: "bag.fill")
-                                .font(.caption)
-                            Text("View Product")
-                                .font(.caption)
-                                .fontWeight(.medium)
+                                .font(.system(size: 9))
+                            Text("Tap for details")
+                                .font(.system(size: 10, weight: .medium))
+                                .lineLimit(1)
                         }
                         .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                         .background(AppColors.primary.opacity(0.8))
-                        .cornerRadius(16)
+                        .cornerRadius(10)
                     }
                 }
+                .frame(maxWidth: 160, alignment: .leading)
                 
                 // Tags
                 if !reel.tags.isEmpty {

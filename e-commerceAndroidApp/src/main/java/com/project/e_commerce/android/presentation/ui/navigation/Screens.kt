@@ -64,10 +64,14 @@ sealed class Screens(val route: String, val title : String? = null, val icon : I
 
         object RecentlyScreen  : Screens(route = "recently_screen")
 
-        object AddNewContentScreen: Screens(route = "add_new_content_screen?productId={productId}") {
-            fun createRoute(productId: String? = null): String {
-                return if (productId != null) "add_new_content_screen?productId=$productId"
-                else "add_new_content_screen"
+        object AddNewContentScreen: Screens(route = "add_new_content_screen?productId={productId}&soundUid={soundUid}") {
+            fun createRoute(productId: String? = null, soundUid: String? = null): String {
+                val base = "add_new_content_screen"
+                val params = listOfNotNull(
+                    productId?.let { "productId=$it" },
+                    soundUid?.let { "soundUid=$it" }
+                )
+                return if (params.isEmpty()) base else "$base?${params.joinToString("&")}"
             }
         }
 
@@ -91,6 +95,9 @@ sealed class Screens(val route: String, val title : String? = null, val icon : I
         fun createRoute(username: String, startTab: Int, showFriendsTab: Boolean) =
             "follow_list_screen/$username?startTab=$startTab&showFriendsTab=$showFriendsTab"
     }
+
+    // 2.18 — In-App Camera
+    object CameraScreen : Screens(route = "camera_screen")
 
     object BuyScreen : Screens(route = "buy_screen")
 

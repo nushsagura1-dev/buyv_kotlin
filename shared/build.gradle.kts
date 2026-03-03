@@ -55,11 +55,6 @@ kotlin {
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
                 implementation("io.ktor:ktor-client-logging:2.3.7")
                 implementation("io.ktor:ktor-client-auth:2.3.7")
-                
-                // Firebase KMP (pour notifications uniquement maintenant)
-                implementation("dev.gitlive:firebase-auth:2.1.0")
-                implementation("dev.gitlive:firebase-firestore:2.1.0")
-                implementation("dev.gitlive:firebase-storage:2.1.0")
             }
         }
         val androidMain by getting {
@@ -69,6 +64,15 @@ kotlin {
                 implementation("io.ktor:ktor-client-okhttp:2.3.7")
                 // Encrypted Storage
                 implementation("androidx.security:security-crypto:1.1.0-alpha06")
+                // CameraX (CameraController.android.kt)
+                implementation("androidx.camera:camera-core:1.3.4")
+                implementation("androidx.camera:camera-camera2:1.3.4")
+                implementation("androidx.camera:camera-lifecycle:1.3.4")
+                implementation("androidx.camera:camera-video:1.3.4")
+                implementation("androidx.camera:camera-view:1.3.4")
+                implementation("androidx.concurrent:concurrent-futures-ktx:1.1.0")
+                // GPUImage real-time filters
+                implementation("jp.co.cyberagent.android:gpuimage:2.1.0")
             }
         }
         val iosMain by getting {

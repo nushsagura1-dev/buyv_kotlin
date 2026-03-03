@@ -687,3 +687,213 @@ def cleanup_expired_revoked_tokens(
     ).delete()
     db.commit()
     return {"message": f"Cleaned up {deleted} expired revoked tokens"}
+
+
+# ============================================================
+# Apple Sign-In
+# ============================================================
+
+class AppleSignInRequest(BaseModel):
+    identity_token: str  # JWT issued by Apple
+
+
+@router.post("/apple-signin", response_model=AuthResponse)
+@limiter.limit("10/minute")
+async def apple_signin(request: Request, payload: AppleSignInRequest, db: Session = Depends(get_db)):
+    """
+    Authenticate or register a user via Sign in with Apple.
+
+    1. Fetch Apple's public JWKS, verify the identity_token JWT signature
+    2. Extract email from token claims
+    3. Find or create the user (email-only lookup)
+    """
+    import base64
+    import json as _json
+    from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import serialization
+    from jose import jwt as jose_jwt, JWTError as JoseJWTError
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            jwks_resp = await client.get("https://appleid.apple.com/auth/keys")
+        if jwks_resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="Could not fetch Apple JWKS")
+        jwks = jwks_resp.json()
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail="Network error contacting Apple")
+
+    # Decode header to get kid
+    try:
+        header_segment = payload.identity_token.split(".")[0]
+        # Add padding
+        padded = header_segment + "=" * (-len(header_segment) % 4)
+        header = _json.loads(base64.urlsafe_b64decode(padded))
+        kid = header.get("kid")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Apple identity_token format")
+
+    # Find matching key
+    apple_key = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
+    if not apple_key:
+        raise HTTPException(status_code=401, detail="Apple public key not found for kid")
+
+    # Build RSA public key
+    try:
+        def _b64_to_int(val: str) -> int:
+            padded = val + "=" * (-len(val) % 4)
+            return int.from_bytes(base64.urlsafe_b64decode(padded), "big")
+
+        pub_numbers = RSAPublicNumbers(e=_b64_to_int(apple_key["e"]), n=_b64_to_int(apple_key["n"]))
+        pub_key = pub_numbers.public_key(default_backend())
+        pub_pem = pub_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode()
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to build Apple RSA key")
+
+    # Verify JWT
+    try:
+        claims = jose_jwt.decode(
+            payload.identity_token,
+            pub_pem,
+            algorithms=["RS256"],
+            audience=None,   # Skip audience check — varies per client
+            options={"verify_aud": False},
+        )
+    except JoseJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired Apple identity_token")
+
+    apple_email = claims.get("email")
+    apple_sub = claims.get("sub", "")
+
+    # Derive email if Apple relays a private relay address
+    if not apple_email:
+        apple_email = f"apple_{apple_sub}@privaterelay.appleid.com"
+
+    # Find or create user
+    user = db.query(models.User).filter(models.User.email == apple_email).first()
+    if user:
+        if user.role == "admin":
+            raise HTTPException(status_code=403, detail="Admin accounts must use credential login")
+    else:
+        base_username = apple_email.split("@")[0][:40]
+        username = base_username
+        counter = 1
+        while db.query(models.User).filter(models.User.username == username).first():
+            username = f"{base_username}_{counter}"
+            counter += 1
+
+        import secrets as _secrets
+        try:
+            user = models.User(
+                email=apple_email,
+                username=username,
+                display_name=claims.get("name", username),
+                password_hash=pwd_context.hash(_secrets.token_urlsafe(32)),
+                role="user",
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        except IntegrityError:
+            db.rollback()
+            user = db.query(models.User).filter(models.User.email == apple_email).first()
+            if not user:
+                raise HTTPException(status_code=500, detail="Registration failed")
+
+    token_data = {"sub": user.uid, "role": user.role}
+    token, expires_in = create_access_token(token_data)
+    refresh_token = create_refresh_token(token_data)
+    return AuthResponse(
+        access_token=token,
+        expires_in=expires_in,
+        user=user_to_out(user),
+        refresh_token=refresh_token,
+    )
+
+
+# ============================================================
+# Facebook Sign-In
+# ============================================================
+
+class FacebookSignInRequest(BaseModel):
+    access_token: str  # Short-lived user access token from Facebook SDK
+
+
+@router.post("/facebook-signin", response_model=AuthResponse)
+@limiter.limit("10/minute")
+async def facebook_signin(request: Request, payload: FacebookSignInRequest, db: Session = Depends(get_db)):
+    """
+    Authenticate or register a user via Facebook Login.
+
+    1. Exchange the access token for user profile via Graph API
+    2. Use returned email for user lookup / creation
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://graph.facebook.com/me",
+                params={"fields": "id,email,name,picture.type(large)", "access_token": payload.access_token},
+            )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=401, detail="Invalid Facebook access token")
+        fb_data = resp.json()
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail="Network error contacting Facebook")
+
+    if "error" in fb_data:
+        raise HTTPException(status_code=401, detail=fb_data["error"].get("message", "Facebook auth error"))
+
+    fb_id = fb_data.get("id", "")
+    fb_name = fb_data.get("name", "")
+    fb_email = fb_data.get("email") or f"facebook_{fb_id}@facebook.placeholder"
+    fb_picture = fb_data.get("picture", {}).get("data", {}).get("url") if isinstance(fb_data.get("picture"), dict) else None
+
+    # Find or create user
+    user = db.query(models.User).filter(models.User.email == fb_email).first()
+    if user:
+        if user.role == "admin":
+            raise HTTPException(status_code=403, detail="Admin accounts must use credential login")
+        if not user.profile_image_url and fb_picture:
+            user.profile_image_url = fb_picture
+            user.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(user)
+    else:
+        base_username = (fb_name.replace(" ", "_").lower()[:40] if fb_name else fb_email.split("@")[0])
+        username = base_username
+        counter = 1
+        while db.query(models.User).filter(models.User.username == username).first():
+            username = f"{base_username}_{counter}"
+            counter += 1
+
+        import secrets as _secrets
+        try:
+            user = models.User(
+                email=fb_email,
+                username=username,
+                display_name=fb_name or username,
+                password_hash=pwd_context.hash(_secrets.token_urlsafe(32)),
+                profile_image_url=fb_picture or None,
+                role="user",
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        except IntegrityError:
+            db.rollback()
+            user = db.query(models.User).filter(models.User.email == fb_email).first()
+            if not user:
+                raise HTTPException(status_code=500, detail="Registration failed")
+
+    token_data = {"sub": user.uid, "role": user.role}
+    token, expires_in = create_access_token(token_data)
+    refresh_token = create_refresh_token(token_data)
+    return AuthResponse(
+        access_token=token,
+        expires_in=expires_in,
+        user=user_to_out(user),
+        refresh_token=refresh_token,
+    )

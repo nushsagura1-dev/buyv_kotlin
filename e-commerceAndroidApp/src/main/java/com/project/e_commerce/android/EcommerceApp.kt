@@ -8,12 +8,15 @@ import coil3.util.DebugLogger
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import okio.Path.Companion.toOkioPath
+import androidx.emoji2.bundled.BundledEmojiCompatConfig
+import androidx.emoji2.text.EmojiCompat
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import com.project.e_commerce.android.data.remote.CloudinaryConfig
 import com.project.e_commerce.data.remote.ApiEnvironment
 import com.project.e_commerce.android.di.viewModelModule
 import com.project.e_commerce.android.di.marketplaceModule
+import com.project.e_commerce.android.di.cameraModule
 import com.project.e_commerce.android.domain.repository.NotificationRepository
 import com.project.e_commerce.android.presentation.utils.VideoPlayerCache
 import kotlinx.coroutines.CoroutineScope
@@ -44,6 +47,10 @@ class EcommerceApp : Application() {
             android.util.Log.e("ECOMMERCE_APP", "🔥 Initializing Firebase")
             FirebaseApp.initializeApp(this)
             android.util.Log.e("ECOMMERCE_APP", "✅ Firebase initialized")
+
+            // Initialize EmojiCompat for consistent emoji rendering on all Android versions
+            EmojiCompat.init(BundledEmojiCompatConfig(this))
+            android.util.Log.e("ECOMMERCE_APP", "✅ EmojiCompat initialized")
 
             android.util.Log.e("ECOMMERCE_APP", "🔧 Initializing CloudinaryConfig")
             CloudinaryConfig.init(this)
@@ -83,7 +90,7 @@ class EcommerceApp : Application() {
             startKoin {
                 androidContext(this@EcommerceApp)
                 modules(
-                    com.project.e_commerce.di.sharedModules + viewModelModule + marketplaceModule
+                    com.project.e_commerce.di.sharedModules + viewModelModule + marketplaceModule + cameraModule
                 )
             }
             android.util.Log.e("ECOMMERCE_APP", "✅ Koin started successfully")

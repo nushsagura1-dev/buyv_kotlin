@@ -1,249 +1,332 @@
 package com.project.e_commerce.android.data.api
 
 import com.project.e_commerce.android.data.model.admin.*
-import com.google.gson.annotations.SerializedName
-import retrofit2.http.*
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-interface AdminApi {
-    
+class AdminApi(private val httpClient: HttpClient) {
+
     // Authentication
-    @POST("auth/admin/login")
-    suspend fun adminLogin(@Body request: AdminLoginRequest): AdminLoginResponse
-    
+    suspend fun adminLogin(request: AdminLoginRequest): AdminLoginResponse =
+        httpClient.post("auth/admin/login") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
     // Dashboard
-    @GET("api/admin/dashboard/stats")
-    suspend fun getDashboardStats(
-        @Header("Authorization") token: String
-    ): DashboardStatsResponse
-    
-    @GET("api/admin/dashboard/recent-users")
-    suspend fun getRecentUsers(
-        @Header("Authorization") token: String,
-        @Query("limit") limit: Int = 10
-    ): List<RecentUserResponse>
-    
-    @GET("api/admin/dashboard/recent-orders")
-    suspend fun getRecentOrders(
-        @Header("Authorization") token: String,
-        @Query("limit") limit: Int = 10
-    ): List<RecentOrderResponse>
-    
+    suspend fun getDashboardStats(token: String): DashboardStatsResponse =
+        httpClient.get("api/admin/dashboard/stats") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
+
+    suspend fun getRecentUsers(token: String, limit: Int = 10): List<RecentUserResponse> =
+        httpClient.get("api/admin/dashboard/recent-users") {
+            header(HttpHeaders.Authorization, token)
+            parameter("limit", limit)
+        }.body()
+
+    suspend fun getRecentOrders(token: String, limit: Int = 10): List<RecentOrderResponse> =
+        httpClient.get("api/admin/dashboard/recent-orders") {
+            header(HttpHeaders.Authorization, token)
+            parameter("limit", limit)
+        }.body()
+
     // User Management
-    @GET("api/admin/users")
     suspend fun getUsers(
-        @Header("Authorization") token: String,
-        @Query("search") search: String? = null,
-        @Query("is_verified") isVerified: Boolean? = null,
-        @Query("limit") limit: Int = 50,
-        @Query("offset") offset: Int = 0
-    ): List<UserManagementResponse>
-    
-    @POST("api/admin/users/verify")
-    suspend fun verifyUsers(
-        @Header("Authorization") token: String,
-        @Body request: UserActionRequest
-    ): MessageResponse
-    
-    @POST("api/admin/users/unverify")
-    suspend fun unverifyUsers(
-        @Header("Authorization") token: String,
-        @Body request: UserActionRequest
-    ): MessageResponse
-    
-    @DELETE("api/admin/users/{user_uid}")
-    suspend fun deleteUser(
-        @Header("Authorization") token: String,
-        @Path("user_uid") userUid: String
-    ): MessageResponse
-    
+        token: String,
+        search: String? = null,
+        isVerified: Boolean? = null,
+        limit: Int = 50,
+        offset: Int = 0
+    ): List<UserManagementResponse> =
+        httpClient.get("api/admin/users") {
+            header(HttpHeaders.Authorization, token)
+            search?.let { parameter("search", it) }
+            isVerified?.let { parameter("is_verified", it) }
+            parameter("limit", limit)
+            parameter("offset", offset)
+        }.body()
+
+    suspend fun verifyUsers(token: String, request: UserActionRequest): MessageResponse =
+        httpClient.post("api/admin/users/verify") {
+            header(HttpHeaders.Authorization, token)
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun unverifyUsers(token: String, request: UserActionRequest): MessageResponse =
+        httpClient.post("api/admin/users/unverify") {
+            header(HttpHeaders.Authorization, token)
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun deleteUser(token: String, userUid: String): MessageResponse =
+        httpClient.delete("api/admin/users/$userUid") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
+
     // Order Management
-    @GET("api/orders/admin/all")
-    suspend fun getAllOrders(
-        @Header("Authorization") token: String
-    ): List<com.project.e_commerce.android.data.model.Order>
-    
-    @GET("api/orders/admin/status")
+    suspend fun getAllOrders(token: String): List<com.project.e_commerce.android.data.model.Order> =
+        httpClient.get("api/orders/admin/all") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
+
     suspend fun getOrdersByStatus(
-        @Header("Authorization") token: String,
-        @Query("status") status: String
-    ): List<com.project.e_commerce.android.data.model.Order>
-    
-    @PATCH("api/orders/{order_id}/status")
+        token: String,
+        status: String
+    ): List<com.project.e_commerce.android.data.model.Order> =
+        httpClient.get("api/orders/admin/status") {
+            header(HttpHeaders.Authorization, token)
+            parameter("status", status)
+        }.body()
+
     suspend fun updateOrderStatus(
-        @Header("Authorization") token: String,
-        @Path("order_id") orderId: Int,
-        @Body request: StatusUpdateRequest
-    ): MessageResponse
+        token: String,
+        orderId: Int,
+        request: StatusUpdateRequest
+    ): MessageResponse =
+        httpClient.patch("api/orders/$orderId/status") {
+            header(HttpHeaders.Authorization, token)
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
 
     // Product Management
-    @GET("api/v1/marketplace/products")
     suspend fun getProducts(
-        @Query("page") page: Int = 1,
-        @Query("limit") limit: Int = 20,
-        @Query("search") search: String? = null,
-        @Query("sort_by") sortBy: String? = null
-    ): AdminProductsResponse
+        page: Int = 1,
+        limit: Int = 20,
+        search: String? = null,
+        sortBy: String? = null
+    ): AdminProductsResponse =
+        httpClient.get("api/v1/marketplace/products") {
+            parameter("page", page)
+            parameter("limit", limit)
+            search?.let { parameter("search", it) }
+            sortBy?.let { parameter("sort_by", it) }
+        }.body()
 
-    @PUT("api/v1/admin/marketplace/products/{product_id}")
     suspend fun updateProduct(
-        @Header("Authorization") token: String,
-        @Path("product_id") productId: String,
-        @Body request: ProductUpdateRequest
-    ): ProductUpdateResponse
+        token: String,
+        productId: String,
+        request: ProductUpdateRequest
+    ): ProductUpdateResponse =
+        httpClient.put("api/v1/admin/marketplace/products/$productId") {
+            header(HttpHeaders.Authorization, token)
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
 
-    @DELETE("api/v1/admin/marketplace/products/{product_id}")
-    suspend fun deleteProduct(
-        @Header("Authorization") token: String,
-        @Path("product_id") productId: String
-    ): MessageResponse
-    
+    suspend fun deleteProduct(token: String, productId: String): MessageResponse =
+        httpClient.delete("api/v1/admin/marketplace/products/$productId") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
+
     // Commission Management
-    @GET("api/commissions/admin/all")
-    suspend fun getAllCommissions(
-        @Header("Authorization") token: String
-    ): List<com.project.e_commerce.domain.model.Commission>
+    suspend fun getAllCommissions(token: String): List<com.project.e_commerce.domain.model.Commission> =
+        httpClient.get("api/commissions/admin/all") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
 
-    @GET("api/commissions/admin/status")
     suspend fun getCommissionsByStatus(
-        @Header("Authorization") token: String,
-        @Query("status") status: String
-    ): List<com.project.e_commerce.domain.model.Commission>
+        token: String,
+        status: String
+    ): List<com.project.e_commerce.domain.model.Commission> =
+        httpClient.get("api/commissions/admin/status") {
+            header(HttpHeaders.Authorization, token)
+            parameter("status", status)
+        }.body()
 
-    @PATCH("api/commissions/{commission_id}/status")
     suspend fun updateCommissionStatus(
-        @Header("Authorization") token: String,
-        @Path("commission_id") commissionId: Int,
-        @Body request: StatusUpdateRequest
-    ): MessageResponse
+        token: String,
+        commissionId: Int,
+        request: StatusUpdateRequest
+    ): MessageResponse =
+        httpClient.patch("api/commissions/$commissionId/status") {
+            header(HttpHeaders.Authorization, token)
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
 
     // CJ Dropshipping Import
-    @GET("api/v1/admin/cj/search")
     suspend fun searchCJProducts(
-        @Header("Authorization") token: String,
-        @Query("query") query: String,
-        @Query("category") category: String? = null,
-        @Query("page") page: Int = 1
-    ): CJSearchResponse
+        token: String,
+        query: String,
+        category: String? = null,
+        page: Int = 1,
+        warehouse: String? = null,
+        shippingCountry: String? = null,
+        sortBy: String? = null
+    ): CJSearchResponse =
+        httpClient.get("api/v1/admin/cj/search") {
+            header(HttpHeaders.Authorization, token)
+            parameter("query", query)
+            category?.let { parameter("category", it) }
+            parameter("page", page)
+            warehouse?.let { parameter("warehouse", it) }
+            shippingCountry?.let { parameter("shipping_to", it) }
+            sortBy?.let { parameter("sort_by", it) }
+        }.body()
 
-    @POST("api/v1/admin/cj/import")
-    suspend fun importCJProduct(
-        @Header("Authorization") token: String,
-        @Body request: CJImportRequest
-    ): CJImportResponse
+    suspend fun importCJProduct(token: String, request: CJImportRequest): CJImportResponse =
+        httpClient.post("api/v1/admin/cj/import") {
+            header(HttpHeaders.Authorization, token)
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
 
-    @POST("api/v1/admin/cj/sync/{product_id}")
-    suspend fun syncCJProduct(
-        @Header("Authorization") token: String,
-        @Path("product_id") productId: String
-    ): MessageResponse
+    suspend fun syncCJProduct(token: String, productId: String): MessageResponse =
+        httpClient.post("api/v1/admin/cj/sync/$productId") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
 
     // Post Management
-    @GET("api/admin/posts")
     suspend fun getAdminPosts(
-        @Header("Authorization") token: String,
-        @Query("search") search: String? = null,
-        @Query("post_type") postType: String? = null,
-        @Query("limit") limit: Int = 50,
-        @Query("offset") offset: Int = 0
-    ): List<AdminPostResponse>
+        token: String,
+        search: String? = null,
+        postType: String? = null,
+        limit: Int = 50,
+        offset: Int = 0
+    ): List<AdminPostResponse> =
+        httpClient.get("api/admin/posts") {
+            header(HttpHeaders.Authorization, token)
+            search?.let { parameter("search", it) }
+            postType?.let { parameter("post_type", it) }
+            parameter("limit", limit)
+            parameter("offset", offset)
+        }.body()
 
-    @DELETE("api/admin/posts/{post_uid}")
-    suspend fun deletePost(
-        @Header("Authorization") token: String,
-        @Path("post_uid") postUid: String
-    ): MessageResponse
+    suspend fun deletePost(token: String, postUid: String): MessageResponse =
+        httpClient.delete("api/admin/posts/$postUid") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
 
     // Comment Management
-    @GET("api/admin/comments")
     suspend fun getAdminComments(
-        @Header("Authorization") token: String,
-        @Query("search") search: String? = null,
-        @Query("limit") limit: Int = 50,
-        @Query("offset") offset: Int = 0
-    ): List<AdminCommentResponse>
+        token: String,
+        search: String? = null,
+        limit: Int = 50,
+        offset: Int = 0
+    ): List<AdminCommentResponse> =
+        httpClient.get("api/admin/comments") {
+            header(HttpHeaders.Authorization, token)
+            search?.let { parameter("search", it) }
+            parameter("limit", limit)
+            parameter("offset", offset)
+        }.body()
 
-    @DELETE("api/admin/comments/{comment_id}")
-    suspend fun deleteComment(
-        @Header("Authorization") token: String,
-        @Path("comment_id") commentId: Int
-    ): MessageResponse
+    suspend fun deleteComment(token: String, commentId: Int): MessageResponse =
+        httpClient.delete("api/admin/comments/$commentId") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
 
     // Follow Stats
-    @GET("api/admin/follows/stats")
-    suspend fun getFollowStats(
-        @Header("Authorization") token: String
-    ): FollowStatsResponse
+    suspend fun getFollowStats(token: String): FollowStatsResponse =
+        httpClient.get("api/admin/follows/stats") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
 
     // Notification Management
-    @GET("api/admin/notifications")
     suspend fun getAdminNotifications(
-        @Header("Authorization") token: String,
-        @Query("limit") limit: Int = 50,
-        @Query("offset") offset: Int = 0
-    ): List<AdminNotificationResponse>
+        token: String,
+        limit: Int = 50,
+        offset: Int = 0
+    ): List<AdminNotificationResponse> =
+        httpClient.get("api/admin/notifications") {
+            header(HttpHeaders.Authorization, token)
+            parameter("limit", limit)
+            parameter("offset", offset)
+        }.body()
 
-    @POST("api/admin/notifications/send")
     suspend fun sendNotification(
-        @Header("Authorization") token: String,
-        @Body request: SendNotificationRequest
-    ): MessageResponse
+        token: String,
+        request: SendNotificationRequest
+    ): MessageResponse =
+        httpClient.post("api/admin/notifications/send") {
+            header(HttpHeaders.Authorization, token)
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
 
     // Category Management
-    @GET("api/v1/marketplace/categories")
-    suspend fun getCategories(
-        @Query("parent_id") parentId: String? = null
-    ): List<AdminCategoryResponse>
+    suspend fun getCategories(parentId: String? = null): List<AdminCategoryResponse> =
+        httpClient.get("api/v1/marketplace/categories") {
+            parentId?.let { parameter("parent_id", it) }
+        }.body()
 
-    @POST("api/v1/admin/marketplace/categories")
     suspend fun createCategory(
-        @Header("Authorization") token: String,
-        @Body request: CategoryCreateRequest
-    ): AdminCategoryResponse
+        token: String,
+        request: CategoryCreateRequest
+    ): AdminCategoryResponse =
+        httpClient.post("api/v1/admin/marketplace/categories") {
+            header(HttpHeaders.Authorization, token)
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
 
-    @PUT("api/v1/admin/marketplace/categories/{category_id}")
     suspend fun updateCategory(
-        @Header("Authorization") token: String,
-        @Path("category_id") categoryId: String,
-        @Body request: CategoryUpdateRequest
-    ): AdminCategoryResponse
+        token: String,
+        categoryId: String,
+        request: CategoryUpdateRequest
+    ): AdminCategoryResponse =
+        httpClient.put("api/v1/admin/marketplace/categories/$categoryId") {
+            header(HttpHeaders.Authorization, token)
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
 
-    @DELETE("api/v1/admin/marketplace/categories/{category_id}")
-    suspend fun deleteCategory(
-        @Header("Authorization") token: String,
-        @Path("category_id") categoryId: String
-    ): MessageResponse
+    suspend fun deleteCategory(token: String, categoryId: String): MessageResponse =
+        httpClient.delete("api/v1/admin/marketplace/categories/$categoryId") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
 
     // Affiliate Sales Management (Admin)
-    @GET("api/v1/admin/sales")
     suspend fun getAdminAffiliateSales(
-        @Header("Authorization") token: String,
-        @Query("status") status: String? = null,
-        @Query("limit") limit: Int = 50,
-        @Query("offset") offset: Int = 0
-    ): List<AdminAffiliateSaleResponse>
+        token: String,
+        status: String? = null,
+        limit: Int = 50,
+        offset: Int = 0
+    ): List<AdminAffiliateSaleResponse> =
+        httpClient.get("api/v1/admin/sales") {
+            header(HttpHeaders.Authorization, token)
+            status?.let { parameter("status", it) }
+            parameter("limit", limit)
+            parameter("offset", offset)
+        }.body()
 
-    @PATCH("api/v1/admin/sales/{sale_id}/status")
     suspend fun updateAffiliateSaleStatus(
-        @Header("Authorization") token: String,
-        @Path("sale_id") saleId: String,
-        @Body request: SaleStatusUpdateRequest
-    ): AdminAffiliateSaleResponse
+        token: String,
+        saleId: String,
+        request: SaleStatusUpdateRequest
+    ): AdminAffiliateSaleResponse =
+        httpClient.patch("api/v1/admin/sales/$saleId/status") {
+            header(HttpHeaders.Authorization, token)
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
 }
-
 // Request models
+@Serializable
 data class AdminLoginRequest(
     val email: String,
     val password: String
 )
 
+@Serializable
 data class UserActionRequest(
     val user_ids: List<String>
 )
 
+@Serializable
 data class StatusUpdateRequest(
     val status: String
 )
 
+@Serializable
 data class ProductUpdateRequest(
     val name: String? = null,
     val description: String? = null,
@@ -262,22 +345,24 @@ data class ProductUpdateRequest(
     val is_choice: Boolean? = null
 )
 
+@Serializable
 data class ProductUpdateResponse(
     val id: String,
     val name: String,
     val description: String?,
-    @SerializedName("main_image_url") val mainImageUrl: String?,
+    @SerialName("main_image_url") val mainImageUrl: String?,
     val images: List<String>,
-    @SerializedName("original_price") val originalPrice: Double,
-    @SerializedName("selling_price") val sellingPrice: Double,
-    @SerializedName("commission_rate") val commissionRate: Double,
-    @SerializedName("category_name") val categoryName: String?,
-    @SerializedName("is_featured") val isFeatured: Boolean,
-    @SerializedName("is_active") val isActive: Boolean,
-    @SerializedName("total_sales") val totalSales: Int
+    @SerialName("original_price") val originalPrice: Double,
+    @SerialName("selling_price") val sellingPrice: Double,
+    @SerialName("commission_rate") val commissionRate: Double,
+    @SerialName("category_name") val categoryName: String?,
+    @SerialName("is_featured") val isFeatured: Boolean,
+    @SerialName("is_active") val isActive: Boolean,
+    @SerialName("total_sales") val totalSales: Int
 )
 
 // Response models
+@Serializable
 data class AdminLoginResponse(
     val access_token: String,
     val token_type: String,
@@ -285,6 +370,7 @@ data class AdminLoginResponse(
     val admin: AdminInfo
 )
 
+@Serializable
 data class AdminInfo(
     val id: Int,
     val username: String,
@@ -292,6 +378,7 @@ data class AdminInfo(
     val role: String
 )
 
+@Serializable
 data class DashboardStatsResponse(
     val total_users: Int,
     val verified_users: Int,
@@ -312,6 +399,7 @@ data class DashboardStatsResponse(
     val pending_withdrawals_amount: Double
 )
 
+@Serializable
 data class RecentUserResponse(
     val id: String,
     val username: String,
@@ -321,6 +409,7 @@ data class RecentUserResponse(
     val created_at: String
 )
 
+@Serializable
 data class RecentOrderResponse(
     val id: Int,
     val buyer_email: String,
@@ -329,6 +418,7 @@ data class RecentOrderResponse(
     val created_at: String
 )
 
+@Serializable
 data class UserManagementResponse(
     val id: String,
     val username: String,
@@ -341,12 +431,14 @@ data class UserManagementResponse(
     val created_at: String
 )
 
+@Serializable
 data class MessageResponse(
     val message: String,
     val count: Int? = null
 )
 
 // CJ Dropshipping Models
+@Serializable
 data class CJProduct(
     val product_id: String,
     val product_name: String,
@@ -359,6 +451,7 @@ data class CJProduct(
     val variants: List<CJVariant>? = null
 )
 
+@Serializable
 data class CJVariant(
     val variant_id: String,
     val variant_name: String,
@@ -367,6 +460,7 @@ data class CJVariant(
     val stock: Int? = null
 )
 
+@Serializable
 data class CJSearchResponse(
     val products: List<CJProduct>,
     val total: Int,
@@ -374,6 +468,7 @@ data class CJSearchResponse(
     val page_size: Int
 )
 
+@Serializable
 data class CJImportRequest(
     val cj_product_id: String,
     val cj_variant_id: String? = null,
@@ -383,6 +478,7 @@ data class CJImportRequest(
     val selling_price: Double? = null
 )
 
+@Serializable
 data class CJImportResponse(
     val id: String,
     val name: String,
@@ -396,6 +492,7 @@ data class CJImportResponse(
 )
 
 // Admin Post Management Models
+@Serializable
 data class AdminPostResponse(
     val id: Int,
     val uid: String,
@@ -413,6 +510,7 @@ data class AdminPostResponse(
 )
 
 // Admin Comment Management Models
+@Serializable
 data class AdminCommentResponse(
     val id: Int,
     val username: String,
@@ -423,6 +521,7 @@ data class AdminCommentResponse(
 )
 
 // Admin Follow Stats Models
+@Serializable
 data class FollowStatsResponse(
     val total_follows: Int,
     val new_follows_today: Int,
@@ -430,6 +529,7 @@ data class FollowStatsResponse(
     val top_followed_users: List<TopFollowedUser>
 )
 
+@Serializable
 data class TopFollowedUser(
     val uid: String,
     val username: String,
@@ -438,6 +538,7 @@ data class TopFollowedUser(
 )
 
 // Admin Notification Models
+@Serializable
 data class AdminNotificationResponse(
     val id: Int,
     val user_uid: String,
@@ -449,6 +550,7 @@ data class AdminNotificationResponse(
     val created_at: String
 )
 
+@Serializable
 data class SendNotificationRequest(
     val title: String,
     val body: String,
@@ -457,6 +559,7 @@ data class SendNotificationRequest(
 )
 
 // Category Management Models
+@Serializable
 data class AdminCategoryResponse(
     val id: String,
     val name: String,
@@ -469,6 +572,7 @@ data class AdminCategoryResponse(
     val created_at: String
 )
 
+@Serializable
 data class CategoryCreateRequest(
     val name: String,
     val name_ar: String? = null,
@@ -479,6 +583,7 @@ data class CategoryCreateRequest(
     val is_active: Boolean = true
 )
 
+@Serializable
 data class CategoryUpdateRequest(
     val name: String? = null,
     val name_ar: String? = null,
@@ -488,6 +593,7 @@ data class CategoryUpdateRequest(
 )
 
 // Affiliate Sales Admin Models
+@Serializable
 data class AdminAffiliateSaleResponse(
     val id: String,
     val order_id: String,
@@ -506,8 +612,10 @@ data class AdminAffiliateSaleResponse(
     val created_at: String
 )
 
+@Serializable
 data class SaleStatusUpdateRequest(
     val status: String,
     val payment_reference: String? = null,
     val payment_notes: String? = null
 )
+

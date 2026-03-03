@@ -287,3 +287,26 @@ from app.models import WithdrawalRequest
 #     
 #     # Relation
 #     wallet = relationship("PromoterWallet", back_populates="withdrawal_requests")
+
+
+class PromotionalBanner(Base):
+    """Bannières promotionnelles affichées dans l'app mobile."""
+    __tablename__ = "promotional_banners"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uid = Column(UUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4)
+    title = Column(String(200), nullable=False)
+    subtitle = Column(String(500))
+    image_url = Column(String(500), nullable=False)
+    link_url = Column(String(500))
+    # 'product' | 'category' | 'external'
+    link_type = Column(String(50), default="product")
+    is_active = Column(Boolean, default=True, nullable=False)
+    display_order = Column(Integer, default=0, nullable=False)
+    start_date = Column(DateTime(timezone=True))
+    end_date = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<PromotionalBanner id={self.id} title={self.title!r} active={self.is_active}>"

@@ -12,6 +12,7 @@ import com.project.e_commerce.domain.usecase.marketplace.CreatePromotionUseCase
 import com.project.e_commerce.domain.usecase.marketplace.GetMyWalletUseCase
 import com.project.e_commerce.domain.usecase.marketplace.GetProductByIdUseCase
 import com.project.e_commerce.domain.usecase.marketplace.GetProductsUseCase
+import io.ktor.client.HttpClient
 // Phase 10: Admin imports
 import com.project.e_commerce.android.data.api.AdminApi
 import com.project.e_commerce.android.data.repository.AdminRepository
@@ -33,7 +34,7 @@ import com.project.e_commerce.android.presentation.viewModel.admin.AdminAffiliat
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
-import retrofit2.Retrofit
+import org.koin.core.qualifier.named
 
 /**
  * Module Koin pour la fonctionnalité Marketplace
@@ -65,7 +66,7 @@ val marketplaceModule = module {
     
     // Phase 6: Tracking API & Repository
     single {
-        get<Retrofit>().create(TrackingApi::class.java)
+        TrackingApi(get<HttpClient>(named("authenticated")))
     }
     
     single {
@@ -78,7 +79,7 @@ val marketplaceModule = module {
     
     // Phase 8: Withdrawal API & Repository
     single {
-        get<Retrofit>().create(WithdrawalApi::class.java)
+        WithdrawalApi(get<HttpClient>(named("authenticated")))
     }
     
     single {
@@ -95,8 +96,8 @@ val marketplaceModule = module {
     }
     
     // Phase 10: Admin API & Repository
-    single<AdminApi> {
-        get<Retrofit>().create(AdminApi::class.java)
+    single {
+        AdminApi(get<HttpClient>(named("public")))
     }
     
     single {
@@ -111,25 +112,20 @@ val marketplaceModule = module {
         )
     }
     
-    // Payments API (Task 3.2: Stripe Integration)
-    single<com.project.e_commerce.android.data.api.PaymentsApi> {
-        get<Retrofit>().create(com.project.e_commerce.android.data.api.PaymentsApi::class.java)
-    }
-    
-    // Notifications API (100% Connectivity)
-    single<com.project.e_commerce.android.data.api.NotificationsApi> {
-        get<Retrofit>().create(com.project.e_commerce.android.data.api.NotificationsApi::class.java)
-    }
-    
-    // Commissions API (100% Connectivity)
-    single<com.project.e_commerce.android.data.api.CommissionsApi> {
-        get<Retrofit>().create(com.project.e_commerce.android.data.api.CommissionsApi::class.java)
-    }
+    // Payments API (Task 3.2: Stripe Integration) — MIGRATED to Ktor shared service (2.14)
+    // PaymentsApiService is registered in SharedModule.kt networkModule
+    // single<com.project.e_commerce.android.data.api.PaymentsApi> { ... } // REMOVED
+
+    // Notifications API — REMOVED (dead code, no ViewModel injects it)
+
+    // Commissions API (100% Connectivity) — MIGRATED to Ktor shared service (2.14)
+    // CommissionsApiService is registered in SharedModule.kt networkModule
+    // single<com.project.e_commerce.android.data.api.CommissionsApi> { ... } // REMOVED
     
     // ViewModels
     viewModel {
         com.project.e_commerce.android.presentation.viewModel.payment.PaymentViewModel(
-            paymentsApi = get(),
+            paymentsApiService = get(), // 2.14: now uses shared KMP PaymentsApiService (Ktor)
             currentUserProvider = get(),
             tokenManager = get()
         )
@@ -144,7 +140,7 @@ val marketplaceModule = module {
     
     viewModel {
         com.project.e_commerce.android.presentation.viewModel.promoter.MyCommissionsViewModel(
-            commissionsApi = get(),
+            commissionsApi = get(), // 2.14: now uses shared KMP CommissionsApiService (Ktor)
             currentUserProvider = get(),
             tokenManager = get()
         )
