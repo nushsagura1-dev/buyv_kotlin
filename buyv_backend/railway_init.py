@@ -65,26 +65,35 @@ except Exception as e:
 logger.info("Step 2/2 – Resetting PostgreSQL sequences …")
 
 integer_id_tables = [
+    # Core social
     "users",
-    "reels",
-    "likes",
+    "posts",
     "comments",
     "follows",
+    "post_likes",
+    "comment_likes",
+    "post_bookmarks",
+    "post_views",
+    "reel_views",
     "notifications",
+    "reports",
+    "blocked_users",
+    "revoked_tokens",
+    # Commerce
     "products",
     "orders",
     "order_items",
-    "categories",
-    "carts",
-    "cart_items",
-    "addresses",
-    "reviews",
-    "payments",
-    "wishlists",
-    "wishlist_items",
+    "commissions",
+    "payout_requests",
+    # Marketplace / affiliate
+    "affiliate_clicks",
+    "promoter_wallets",
+    "wallet_transactions",
+    "wallets",
+    # Media
     "sounds",
-    "reports",
-    "blocked_users",
+    # Banners
+    "promotional_banners",
 ]
 
 fixed = 0

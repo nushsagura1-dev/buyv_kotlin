@@ -693,7 +693,7 @@ def cleanup_expired_revoked_tokens(
 # Apple Sign-In
 # ============================================================
 
-class AppleSignInRequest(BaseModel):
+class AppleSignInRequest(_PydanticBase):
     identity_token: str  # JWT issued by Apple
 
 
@@ -818,7 +818,7 @@ async def apple_signin(request: Request, payload: AppleSignInRequest, db: Sessio
 # Facebook Sign-In
 # ============================================================
 
-class FacebookSignInRequest(BaseModel):
+class FacebookSignInRequest(_PydanticBase):
     access_token: str  # Short-lived user access token from Facebook SDK
 
 
