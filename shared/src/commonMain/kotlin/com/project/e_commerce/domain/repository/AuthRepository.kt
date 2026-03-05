@@ -44,6 +44,14 @@ interface AuthRepository {
      * @return Result contenant le UserProfile ou une erreur
      */
     suspend fun signInWithGoogle(idToken: String = ""): Result<UserProfile>
+
+    /**
+     * Connecte un utilisateur avec Facebook.
+     *
+     * @param accessToken Le token d'accès Facebook obtenu côté client
+     * @return Result contenant le UserProfile ou une erreur
+     */
+    suspend fun signInWithFacebook(accessToken: String): Result<UserProfile>
     
     /**
      * Déconnecte l'utilisateur actuel.

@@ -1,6 +1,7 @@
 package com.project.e_commerce.android.presentation.ui.screens.loginScreen
 
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -33,6 +34,7 @@ import com.project.e_commerce.android.presentation.ui.utail.ErrorPrimaryColor
 import com.project.e_commerce.android.presentation.viewModel.AuthEffect
 import com.project.e_commerce.android.presentation.viewModel.AuthViewModel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -47,6 +49,7 @@ fun LoginScreen(navController: NavController) {
     val s by vm.state.collectAsState()
     Log.d("CrashDebug", "LoginScreen: collected state loading=${s.loading} email=${s.email}")
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     // Google Sign-In Launcher
     val googleSignInLauncher = rememberLauncherForActivityResult(
@@ -273,6 +276,31 @@ fun LoginScreen(navController: NavController) {
                     val signInIntent = vm.getGoogleSignInIntent()
                     signInIntent?.let { intent ->
                         googleSignInLauncher.launch(intent)
+                    }
+                }
+            )
+
+            // AUTH-002: Facebook Sign-In button
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.width(16.dp))
+            SocialLoginButton(
+                iconResId = R.drawable.ic_facebook,
+                isLoading = s.loading,
+                onClick = {
+                    val activity = context as? ComponentActivity
+                    val facebookHelper = vm.getFacebookSignInHelper()
+                    if (activity != null && facebookHelper != null) {
+                        scope.launch {
+                            val result = facebookHelper.signIn(activity)
+                            result.onSuccess { token ->
+                                vm.handleFacebookSignInResult(token)
+                            }.onFailure { error ->
+                                if (error.message?.contains("cancelled", ignoreCase = true) == false) {
+                                    Toast.makeText(context, error.message ?: "Facebook sign-in failed", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    } else {
+                        Toast.makeText(context, "Facebook Sign-In not available", Toast.LENGTH_SHORT).show()
                     }
                 }
             )

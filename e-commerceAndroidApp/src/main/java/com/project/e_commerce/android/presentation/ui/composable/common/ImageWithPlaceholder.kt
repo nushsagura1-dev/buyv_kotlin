@@ -108,7 +108,7 @@ private fun PlaceholderContent(
     modifier: Modifier = Modifier
 ) {
     val icon: ImageVector = when (imageType) {
-        ImageType.PRODUCT -> Icons.Default.ShoppingCart
+        ImageType.PRODUCT -> Icons.Default.Image
         ImageType.PROFILE -> Icons.Default.Person
         ImageType.POST -> Icons.Default.Image
         ImageType.GENERIC -> Icons.Default.Image

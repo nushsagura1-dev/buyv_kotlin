@@ -51,4 +51,8 @@
     <string name="how_was_your_experience_with_product">How was your experience with the product?</string>
     <string name="payment_status">Payment status</string>
     <string name="edit_account_information">Edit account information</string>
+    <!-- Facebook SDK (AUTH-002) — replace PLACEHOLDER with your Facebook App ID from developers.facebook.com -->
+    <string name="facebook_app_id">PLACEHOLDER_FACEBOOK_APP_ID</string>
+    <string name="fb_login_protocol_scheme">fbPLACEHOLDER_FACEBOOK_APP_ID</string>
+    <string name="facebook_client_token">PLACEHOLDER_FACEBOOK_CLIENT_TOKEN</string>
 </resources>

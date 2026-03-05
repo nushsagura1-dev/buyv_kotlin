@@ -52,6 +52,10 @@ private class FakeAuthRepository(
         return googleSignInResult
     }
 
+    override suspend fun signInWithFacebook(accessToken: String): Result<UserProfile> {
+        return googleSignInResult // reuse same result for simplicity in tests
+    }
+
     override suspend fun signOut(): Result<Unit> {
         signOutCalled = true
         return signOutResult

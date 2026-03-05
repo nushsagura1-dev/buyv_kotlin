@@ -10,6 +10,8 @@ import com.project.e_commerce.android.domain.usecase.CheckMatchedPasswordUseCase
 import com.project.e_commerce.android.domain.usecase.CheckPasswordValidation
 import com.project.e_commerce.android.domain.usecase.GoogleSignInUseCase
 import com.project.e_commerce.android.data.helper.GoogleSignInHelper
+import com.project.e_commerce.android.data.helper.FacebookSignInHelper
+import com.project.e_commerce.domain.usecase.auth.FacebookSignInUseCase
 import com.project.e_commerce.domain.usecase.auth.LoginUseCase
 import com.project.e_commerce.domain.usecase.auth.RegisterUseCase
 import com.project.e_commerce.domain.usecase.auth.LogoutUseCase
@@ -48,6 +50,8 @@ class AuthViewModel(
     private val checkMatchedPassword: CheckMatchedPasswordUseCase,
     private val googleSignInUseCase: GoogleSignInUseCase? = null, // TODO: Implement in backend
     private val googleSignInHelper: GoogleSignInHelper,
+    private val facebookSignInUseCase: FacebookSignInUseCase? = null, // AUTH-002
+    private val facebookSignInHelper: FacebookSignInHelper? = null, // AUTH-002
     private val loginUseCase: LoginUseCase,
     private val registerUseCase: RegisterUseCase,
     private val logoutUseCase: LogoutUseCase,
@@ -207,11 +211,43 @@ class AuthViewModel(
         )
     }
 
+    /**
+     * AUTH-002 — Handle Facebook Sign-In result.
+     * Called from LoginScreen after the Facebook login flow completes.
+     * @param accessToken The Facebook access token obtained from FacebookSignInHelper.
+     */
+    fun handleFacebookSignInResult(accessToken: String) = viewModelScope.launch {
+        _state.value = _state.value.copy(loading = true, generalError = null)
+
+        val useCase = facebookSignInUseCase
+        if (useCase == null) {
+            _state.value = _state.value.copy(loading = false, generalError = "Facebook Sign-In not configured")
+            _effect.trySend(AuthEffect.Toast("Facebook Sign-In temporarily unavailable"))
+            return@launch
+        }
+
+        when (val result = useCase(accessToken)) {
+            is Result.Success -> {
+                _state.value = _state.value.copy(loading = false, isLoggedIn = true)
+                _effect.trySend(AuthEffect.NavigateToHome)
+            }
+            is Result.Error -> {
+                _state.value = _state.value.copy(loading = false, generalError = result.error.message)
+                _effect.trySend(AuthEffect.Toast(result.error.message ?: "Facebook sign in failed"))
+            }
+            is Result.Loading -> {}
+        }
+    }
+
+    fun getFacebookSignInHelper(): FacebookSignInHelper? = facebookSignInHelper
+
     fun signOut() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true)
 
         // Sign out from Google
         googleSignInHelper.signOut()
+        // Sign out from Facebook if used
+        facebookSignInHelper?.signOut()
 
         // Use KMP LogoutUseCase
         when (val result = logoutUseCase()) {

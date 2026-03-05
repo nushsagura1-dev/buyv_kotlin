@@ -242,6 +242,19 @@ class MarketplaceService:
         # Récupérer les détails du produit CJ
         cj_data = await self.cj_service.get_product_details(cj_product_id)
         parsed_data = self.cj_service.parse_product_data(cj_data)
+
+        # Auto-detect category from CJ category name if none provided by the admin
+        if category_id is None:
+            cj_slug = parsed_data.pop("category_slug", None)
+            if cj_slug:
+                auto_cat = self.db.query(ProductCategory).filter(
+                    ProductCategory.slug == cj_slug
+                ).first()
+                if auto_cat:
+                    category_id = auto_cat.id
+                    logger.info(f"[CAT-002] Auto-assigned category '{cj_slug}' → {category_id}")
+        else:
+            parsed_data.pop("category_slug", None)  # remove it so ProductCreate doesn't get confused
         
         # Créer le produit dans notre DB
         product_data = ProductCreate(

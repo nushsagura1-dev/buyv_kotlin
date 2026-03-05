@@ -101,7 +101,7 @@ fun AppBottomBar(
                             Material3Icon(
                                 painter = painterResource(id = icons.getOrNull(0)!!),
                                 contentDescription = null,
-                                tint = if (selectedTab == 0) Color(0xFF176DBA) else Color(0xD8000000),
+                                tint = if (selectedTab == 0) Color(0xFFFF6F00) else Color(0xD8000000),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -128,7 +128,7 @@ fun AppBottomBar(
                         text = titles.getOrNull(0) ?: "",
                         fontSize = 10.sp,
                         fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selectedTab == 0) Color(0xFF176DBA) else Color(0xD8000000),
+                        color = if (selectedTab == 0) Color(0xFFFF6F00) else Color(0xD8000000),
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(top = 2.dp)
                     )
@@ -149,7 +149,7 @@ fun AppBottomBar(
                             Material3Icon(
                                 painter = painterResource(id = icons.getOrNull(1)!!),
                                 contentDescription = null,
-                                tint = if (selectedTab == 1) Color(0xFF176DBA) else Color(0xD8000000),
+                                tint = if (selectedTab == 1) Color(0xFFFF6F00) else Color(0xD8000000),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -176,7 +176,7 @@ fun AppBottomBar(
                         text = titles.getOrNull(1) ?: "",
                         fontSize = 10.sp,
                         fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selectedTab == 1) Color(0xFF176DBA) else Color(0xD8000000),
+                        color = if (selectedTab == 1) Color(0xFFFF6F00) else Color(0xD8000000),
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(top = 2.dp)
                     )
@@ -197,7 +197,7 @@ fun AppBottomBar(
                             Material3Icon(
                                 painter = painterResource(id = icons.getOrNull(2)!!),
                                 contentDescription = null,
-                                tint = if (selectedTab == 2) Color(0xFF176DBA) else Color(0xD8000000),
+                                tint = if (selectedTab == 2) Color(0xFFFF6F00) else Color(0xD8000000),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -224,7 +224,7 @@ fun AppBottomBar(
                         text = titles.getOrNull(2) ?: "",
                         fontSize = 10.sp,
                         fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selectedTab == 2) Color(0xFF176DBA) else Color(0xD8000000),
+                        color = if (selectedTab == 2) Color(0xFFFF6F00) else Color(0xD8000000),
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(top = 2.dp)
                     )
@@ -245,7 +245,7 @@ fun AppBottomBar(
                             Material3Icon(
                                 painter = painterResource(id = icons.getOrNull(3)!!),
                                 contentDescription = null,
-                                tint = if (selectedTab == 3) Color(0xFF176DBA) else Color(0xD8000000),
+                                tint = if (selectedTab == 3) Color(0xFFFF6F00) else Color(0xD8000000),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -272,7 +272,7 @@ fun AppBottomBar(
                         text = titles.getOrNull(3) ?: "",
                         fontSize = 10.sp,
                         fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selectedTab == 3) Color(0xFF176DBA) else Color(0xD8000000),
+                        color = if (selectedTab == 3) Color(0xFFFF6F00) else Color(0xD8000000),
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(top = 2.dp)
                     )

@@ -459,7 +459,7 @@ private fun ProductCard(
                     imageType = ImageType.PRODUCT,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
+                        .height(140.dp)
                         .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
                     contentScale = ContentScale.Crop
                 )
@@ -489,10 +489,10 @@ private fun ProductCard(
                 // Nom
                 Text(
                     text = product.name,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color.Black,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = 18.sp
                 )

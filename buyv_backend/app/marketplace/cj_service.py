@@ -243,6 +243,39 @@ class CJDropshippingService:
             return data.get("data", {})
         raise Exception(f"CJ order creation failed: {data.get('message')}")
     
+    # Mapping CJ category names → BuyV category slugs
+    _CJ_CATEGORY_MAP: Dict[str, str] = {
+        "clothing": "fashion",
+        "women's clothing": "women-fashion",
+        "men's clothing": "men-fashion",
+        "3c products": "electronics",
+        "phones & telecommunications": "phones",
+        "computer & office": "computers",
+        "beauty & health": "beauty",
+        "skin care": "skincare",
+        "home & garden": "home",
+        "furniture": "furniture",
+        "kitchen, dining & bar": "kitchen",
+        "sports & entertainment": "sports",
+        "toys & hobbies": "toys",
+        "baby & kids": "baby",
+        "jewelry & accessories": "accessories",
+        "watches": "watches",
+        "food": "food",
+        "health care": "health",
+        "automobiles & motorcycles": "auto",
+        "tools & home improvement": "tools",
+        "bags & luggage": "bags",
+        "shoes": "shoes",
+    }
+
+    def _map_cj_category(self, cj_category_name: str) -> Optional[str]:
+        """Map a CJ category name to a BuyV category slug."""
+        if not cj_category_name:
+            return None
+        key = cj_category_name.strip().lower()
+        return self._CJ_CATEGORY_MAP.get(key)
+
     def parse_product_data(self, cj_product: Dict[str, Any]) -> Dict[str, Any]:
         """
         Parser les données CJ en format utilisable.
@@ -318,5 +351,6 @@ class CJDropshippingService:
             "cj_product_id": cj_product.get("pid", ""),
             "cj_variant_id": cj_product.get("vid"),
             "cj_product_data": cj_product,
-            "tags": cj_product.get("categoryName", "").split() if cj_product.get("categoryName") else []
+            "tags": cj_product.get("categoryName", "").split() if cj_product.get("categoryName") else [],
+            "category_slug": self._map_cj_category(cj_product.get("categoryName", ""))
         }

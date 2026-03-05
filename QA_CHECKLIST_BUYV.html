@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BuyV — Checklist QA Interactive</title>
+<style>
+  :root {
+    --primary: #FF6D00;
+    --primary-light: #fff3e0;
+    --done: #2e7d32;
+    --done-bg: #f1f8e9;
+    --partial: #f57f17;
+    --partial-bg: #fffde7;
+    --pending: #b71c1c;
+    --pending-bg: #ffebee;
+    --border: #e0e0e0;
+    --text: #212121;
+    --text-muted: #757575;
+    --header-bg: #1a1a2e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f5f5; color: var(--text); }
+
+  .header {
+    background: var(--header-bg);
+    color: white;
+    padding: 28px 40px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  .header h1 { font-size: 1.5rem; font-weight: 700; }
+  .header h1 span { color: var(--primary); }
+  .header-meta { font-size: 0.8rem; color: #aaa; }
+
+  .stats-bar {
+    background: white;
+    padding: 16px 40px;
+    display: flex; gap: 24px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 77px; z-index: 99;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .stat { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+  .stat-count { font-weight: 700; font-size: 1.1rem; }
+  .stat-done   { color: var(--done); }
+  .stat-partial{ color: var(--partial); }
+  .stat-pending{ color: var(--pending); }
+  .stat-total  { color: #37474f; }
+  .progress-bar { flex: 1; min-width: 200px; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--done), #66bb6a); border-radius: 4px; transition: width 0.4s; }
+
+  .container { max-width: 1200px; margin: 32px auto; padding: 0 24px; }
+
+  .module { background: white; border-radius: 12px; margin-bottom: 28px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); overflow: hidden; }
+  .module-header {
+    padding: 18px 24px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: white;
+    display: flex; align-items: center; gap: 12px; cursor: pointer;
+    user-select: none;
+  }
+  .module-header h2 { font-size: 1rem; font-weight: 600; flex: 1; }
+  .module-icon { font-size: 1.4rem; }
+  .module-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+  .badge-critical { background: #b71c1c; color: white; }
+  .badge-high     { background: #e65100; color: white; }
+  .badge-medium   { background: #f57f17; color: #333; }
+  .badge-low      { background: #37474f; color: white; }
+  .collapse-arrow { font-size: 0.8rem; transition: transform 0.3s; }
+  .module.collapsed .collapse-arrow { transform: rotate(-90deg); }
+  .module-body { display: block; }
+  .module.collapsed .module-body { display: none; }
+
+  .ticket {
+    border-bottom: 1px solid var(--border);
+    padding: 0;
+    transition: background 0.2s;
+  }
+  .ticket:last-child { border-bottom: none; }
+
+  .ticket-header {
+    display: grid;
+    grid-template-columns: 36px 80px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 24px;
+    cursor: pointer;
+  }
+  .ticket-header:hover { background: #fafafa; }
+
+  .ticket-checkbox { width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); }
+  
+  .ticket-id { font-size: 0.72rem; font-weight: 700; padding: 3px 7px; border-radius: 5px; background: #eceff1; color: #546e7a; white-space: nowrap; }
+
+  .ticket-title { font-size: 0.92rem; font-weight: 500; }
+  .ticket-title small { display: block; font-size: 0.78rem; color: var(--text-muted); font-weight: 400; margin-top: 2px; }
+
+  .status-badge {
+    font-size: 0.7rem; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+    white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .status-done     { background: var(--done-bg);    color: var(--done);    border: 1px solid #a5d6a7; }
+  .status-partial  { background: var(--partial-bg); color: var(--partial); border: 1px solid #ffe082; }
+  .status-pending  { background: var(--pending-bg); color: var(--pending); border: 1px solid #ef9a9a; }
+
+  .ticket-detail {
+    display: none;
+    padding: 0 24px 20px 72px;
+    background: #fafafa;
+    border-top: 1px dashed #e0e0e0;
+  }
+  .ticket.open .ticket-detail { display: block; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+    margin-top: 16px;
+  }
+  @media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } }
+
+  .detail-box { padding: 14px; border-radius: 8px; border-left: 4px solid; }
+  .box-problem  { background: #fff3f3; border-color: #ef5350; }
+  .box-fix      { background: #f3f8f0; border-color: #66bb6a; }
+  .box-test     { background: #f0f4ff; border-color: #5c6bc0; }
+
+  .detail-box h4 { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--text-muted); }
+  .detail-box p, .detail-box ul { font-size: 0.83rem; line-height: 1.6; }
+  .detail-box ul { padding-left: 16px; }
+  .detail-box li { margin-bottom: 3px; }
+
+  .obs-section { margin-top: 14px; }
+  .obs-section h4 { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: #ff6d00; }
+  .obs-textarea {
+    width: 100%; min-height: 80px; border: 1px solid var(--border); border-radius: 7px;
+    padding: 10px 14px; font-size: 0.85rem; font-family: inherit; resize: vertical;
+    background: white; color: var(--text); transition: border 0.2s;
+  }
+  .obs-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255,109,0,0.1); }
+  .obs-textarea::placeholder { color: #bdbdbd; }
+
+  .client-obs { margin-top: 12px; }
+  .client-obs label { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #5c6bc0; margin-bottom: 6px; }
+  
+  .priority-tag { display: inline-block; font-size: 0.68rem; padding: 1px 7px; border-radius: 4px; font-weight: 600; margin-left: 8px; }
+  .prio-critical { background: #b71c1c; color: white; }
+  .prio-high     { background: #e65100; color: white; }
+  .prio-medium   { background: #f9a825; color: #333; }
+  .prio-low      { background: #546e7a; color: white; }
+
+  .client-feedback {
+    background: #fff8e1; border: 1px solid #ffe082;
+    border-radius: 6px; padding: 10px 14px; margin-bottom: 10px;
+    font-size: 0.82rem; font-style: italic; color: #5d4037;
+  }
+  .client-feedback strong { display: block; font-size: 0.7rem; margin-bottom: 4px; color: #8d6e63; font-style: normal; }
+
+  .fab-group {
+    position: fixed; bottom: 24px; right: 24px;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+    z-index: 200;
+  }
+  .export-btn {
+    background: var(--primary); color: white;
+    border: none; border-radius: 50px; padding: 14px 24px;
+    font-size: 0.9rem; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(255,109,0,0.4);
+    display: flex; align-items: center; gap: 8px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .export-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,109,0,0.5); }
+  .save-btn {
+    background: #1565c0; color: white;
+    border: none; border-radius: 50px; padding: 11px 20px;
+    font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(21,101,192,0.4);
+    display: flex; align-items: center; gap: 7px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .save-btn:hover { transform: translateY(-2px); }
+  .save-btn.connected { background: #2e7d32; box-shadow: 0 4px 14px rgba(46,125,50,0.4); }
+  .save-indicator {
+    font-size: 0.72rem; color: #aaa; text-align: right;
+    padding-right: 4px;
+  }
+  .save-indicator.ok { color: #66bb6a; }
+
+  .filter-bar {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    padding: 14px 40px;
+    background: white; border-bottom: 1px solid var(--border);
+  }
+  .filter-btn {
+    padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border);
+    background: white; cursor: pointer; font-size: 0.8rem; font-weight: 500;
+    transition: all 0.2s;
+  }
+  .filter-btn:hover, .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+  .divider { border: none; border-top: 1px dashed var(--border); margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>BuyV — Checklist QA <span>Interactive</span></h1>
+    <div class="header-meta">Version 0.4 &nbsp;|&nbsp; Android + iOS + Backend &nbsp;|&nbsp; 32 tickets &nbsp;|&nbsp; Généré le 5 Mars 2026</div>
+  </div>
+  <div style="font-size:0.8rem;color:#aaa;text-align:right;">
+    🟢 Implémenté &nbsp; 🟡 Partiel &nbsp; 🔴 Pending
+  </div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat stat-done">✅ <span class="stat-count" id="cnt-done">0</span> Implémentés</div>
+  <div class="stat stat-partial">🟡 <span class="stat-count" id="cnt-partial">0</span> Partiels</div>
+  <div class="stat stat-pending">🔴 <span class="stat-count" id="cnt-pending">0</span> Pending</div>
+  <div class="stat stat-total">📋 <span class="stat-count" id="cnt-total">0</span> Total</div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  <span style="font-size:0.8rem;color:var(--text-muted)" id="progress-pct">0%</span>
+</div>
+
+<div class="filter-bar">
+  <button class="filter-btn active" onclick="filterStatus('all')">Tous</button>
+  <button class="filter-btn" onclick="filterStatus('done')">✅ Implémentés</button>
+  <button class="filter-btn" onclick="filterStatus('partial')">🟡 Partiels</button>
+  <button class="filter-btn" onclick="filterStatus('pending')">🔴 Pending</button>
+  <button class="filter-btn" onclick="filterStatus('critical')">🔴 CRITICAL</button>
+  <button class="filter-btn" onclick="filterStatus('high')">🟠 HIGH</button>
+  <button class="filter-btn" onclick="expandAll()">📂 Tout dérouler</button>
+  <button class="filter-btn" onclick="collapseAll()">📁 Tout replier</button>
+</div>
+
+<div class="container" id="checklist-root">
+
+<!-- ===== MODULE: AUTHENTICATION & ONBOARDING ===== -->
+<div class="module" id="mod-auth">
+  <div class="module-header" onclick="toggleModule('mod-auth')">
+    <span class="module-icon">🔐</span>
+    <h2>Authentication & Onboarding</h2>
+    <span class="module-badge badge-critical">4 tickets</span>
+    <span class="collapse-arrow">▼</span>
+  </div>
+  <div class="module-body">
+
+    <!-- AUTH-001 -->
+    <div class="ticket" data-status="pending" data-prio="critical" id="AUTH-001">
+      <div class="ticket-header" onclick="toggleTicket('AUTH-001')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">AUTH-001</span>
+        <div class="ticket-title">
+          Google Sign-In — Erreur SHA-1 Firebase
+          <span class="priority-tag prio-critical">CRITICAL</span>
+          <small>"التسجيل بالجميل... الخروج الكراش" — Erreur Developer Error: Check SHA-1 fingerprint</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 7)</strong>"التسجيل بالجميل و نضيف حسابات ابل وفيسبوك... الخروج الكراش" — Toast "Developer Error: Check SHA-1 fingerprint" bloquant</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>La clé SHA-1 du build debug/release n'est pas configurée dans Firebase Console. Google Sign-In retourne "Developer Error" et crashe.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⚠️ Action manuelle requise : Ajouter SHA-1 + SHA-256 du keystore dans Firebase Console</li><li>Re-télécharger <code>google-services.json</code></li><li>Redéployer APK</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir l'app → Écran login</li><li>Appuyer "Sign in with Google"</li><li>Sélectionner un compte Gmail</li><li>✅ Connexion réussie, accès au feed</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Google sign-in fonctionne correctement / Erreur persistante..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- AUTH-002 -->
+    <div class="ticket" data-status="partial" data-prio="high" id="AUTH-002">
+      <div class="ticket-header" onclick="toggleTicket('AUTH-002')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">AUTH-002</span>
+        <div class="ticket-title">
+          Apple Sign-In + Facebook Sign-In
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"نضيف حسابات ابل وفيسبوك" — Connexion via Apple/Facebook</small>
+        </div>
+        <span class="status-badge status-partial">Partiel — Backend ✅ / SDK Android ⏳</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 7)</strong>"نضيف حسابات ابل وفيسبوك" — Ajouter connexion Apple et Facebook</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Seul Google Sign-In était disponible. Apple et Facebook manquaient.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Backend : <code>POST /auth/apple-signin</code> (vérification JWKS RS256)</li><li>✅ Backend : <code>POST /auth/facebook-signin</code> (Graph API)</li><li>⏳ Android : intégration SDK côté app</li><li>⏳ iOS : bouton Sign in with Apple natif</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Appuyer "Sign in with Facebook" → flow Facebook OAuth</li><li>✅ Connexion réussie, profil créé automatiquement</li><li>Appuyer "Sign in with Apple" (iOS uniquement)</li><li>✅ Connexion réussie</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Facebook OK / Apple non disponible sur Android (normal)..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- AUTH-003 -->
+    <div class="ticket" data-status="done" data-prio="high" id="AUTH-003">
+      <div class="ticket-header" onclick="toggleTicket('AUTH-003')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">AUTH-003</span>
+        <div class="ticket-title">
+          Skip Onboarding — Accès direct au contenu
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"نتخلص من كل الصفحات التوضيحية... الواحد اول مايدخل التطبيق يظهر معاه المحتوى"</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photos 19, 21)</strong>"Supprimer tous les écrans d'introduction. L'utilisateur voit le contenu dès l'ouverture."</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Flux bloquant : Splash → Onboarding → Login avant d'accéder au contenu.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Navigation directe vers le feed dès l'ouverture</li><li>✅ <code>isLoggedIn</code> vérifié localement (SharedPreferences)</li><li>✅ Onboarding accessible via Settings uniquement</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Désinstaller / vider les données de l'app</li><li>Lancer l'app</li><li>✅ Le feed de vidéos s'affiche directement</li><li>✅ Pas d'écran d'onboarding ou login imposé</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Feed s'affiche directement ✅ / Onboarding ne s'affiche plus ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- AUTH-004 -->
+    <div class="ticket" data-status="done" data-prio="high" id="AUTH-004">
+      <div class="ticket-header" onclick="toggleTicket('AUTH-004')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">AUTH-004</span>
+        <div class="ticket-title">
+          Lazy Auth — Login demandé seulement lors d'une interaction
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"أثناء محاولة التفاعل يطلب منه التسجيل" — Login déclenché à l'action</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photos 19, 21)</strong>"L'utilisateur browse le contenu, le login est demandé uniquement lors d'une interaction (Like, Comment, Follow…)"</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>L'app forçait la connexion avant toute interaction.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ AuthGuard sur Like, Comment, Follow, Cart, Upload</li><li>✅ <code>if (!isLoggedIn) showLoginDialog()</code> avant chaque action sensible</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Lancer l'app sans compte connecté</li><li>Faire défiler le feed librement ✅</li><li>Appuyer sur "Like" → dialog de connexion apparaît ✅</li><li>Se connecter → Like est effectué ✅</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Browse OK sans login ✅ / Dialog login apparaît au like ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== MODULE: VIDEO PLAYER ===== -->
+<div class="module" id="mod-video">
+  <div class="module-header" onclick="toggleModule('mod-video')">
+    <span class="module-icon">🎬</span>
+    <h2>Video Player</h2>
+    <span class="module-badge badge-critical">6 tickets</span>
+    <span class="collapse-arrow">▼</span>
+  </div>
+  <div class="module-body">
+
+    <!-- VIDEO-001 -->
+    <div class="ticket" data-status="done" data-prio="high" id="VIDEO-001">
+      <div class="ticket-header" onclick="toggleTicket('VIDEO-001')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">VIDEO-001</span>
+        <div class="ticket-title">
+          Icône Pause persistante — disparaît après 1.5s
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"علامة توقف الفيديو تبقى" — L'icône pause reste visible</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photos 4, 12)</strong>"علامة توقف الفيديو تبقى" — L'icône pause reste à l'écran même après reprise de la lecture</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>L'overlay pause/play restait visible en permanence, masquant le contenu vidéo.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Overlay masqué automatiquement après 1500ms via <code>Handler.postDelayed</code></li><li>✅ Animation fade-out alpha 1→0</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Appuyer sur une vidéo en lecture → icône Pause apparaît</li><li>Attendre 1.5 secondes sans toucher l'écran</li><li>✅ L'icône disparaît automatiquement</li><li>Appuyer pour mettre en pause → icône apparaît, disparaît après 1.5s</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Overlay disparaît bien après 1.5s ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- VIDEO-002 -->
+    <div class="ticket" data-status="done" data-prio="medium" id="VIDEO-002">
+      <div class="ticket-header" onclick="toggleTicket('VIDEO-002')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">VIDEO-002</span>
+        <div class="ticket-title">
+          Icône Play visible pendant la lecture
+          <span class="priority-tag prio-medium">MEDIUM</span>
+          <small>Icône ▶ persistante même quand la vidéo joue</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Observé (Photo 22)</strong>Icône Play (▶) visible au centre même quand la vidéo est en lecture</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>L'icône Play ne se cachait pas lors du démarrage de la lecture.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ <code>View.GONE</code> sur l'icône play dès la reprise de lecture</li><li>✅ Même logique 1500ms que VIDEO-001</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir le feed</li><li>La vidéo démarre automatiquement</li><li>✅ Aucune icône Play visible pendant la lecture</li><li>Mettre en pause → icône Pause apparaît brièvement</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Plus d'icône play pendant lecture ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- VIDEO-003 -->
+    <div class="ticket" data-status="done" data-prio="high" id="VIDEO-003">
+      <div class="ticket-header" onclick="toggleTicket('VIDEO-003')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">VIDEO-003</span>
+        <div class="ticket-title">
+          Owner Mode — Boutons interaction remplacés par Edit/Delete
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"كل أزرار التفاعل تختفي ويبقى مستطيل لحذف او تعديل"</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 12)</strong>"لما اضغط عليه وندخل الى المحتوى الفيديو كل أزرار التفاعل تختفي ويبقى مستطيل لحذف او تعديل"</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Sur ses propres vidéos, l'utilisateur voyait toujours les boutons Like/Comment/Share au lieu des contrôles d'édition.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Détection <code>currentUserId == reel.userId</code></li><li>✅ Mode owner : affiche Edit + Delete uniquement</li><li>✅ Mode non-owner : affiche Like, Comment, Cart, Share</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Connecté avec un compte ayant des vidéos publiées</li><li>Aller sur ses propres vidéos dans le feed</li><li>✅ Boutons Like/Comment/Share ne sont pas visibles</li><li>✅ Boutons Edit ✏️ et Delete 🗑️ sont visibles</li><li>Sur une vidéo d'un autre : boutons sociaux normaux ✅</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Owner mode OK ✅ / Boutons edit/delete fonctionnels..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- VIDEO-004 -->
+    <div class="ticket" data-status="done" data-prio="critical" id="VIDEO-004">
+      <div class="ticket-header" onclick="toggleTicket('VIDEO-004')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">VIDEO-004</span>
+        <div class="ticket-title">
+          Back Press sur BottomSheet Buy — quittait l'app
+          <span class="priority-tag prio-critical">CRITICAL</span>
+          <small>"زر الرجوع للخلف في الهاتف يسبب الخروج من التطبيق كله"</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 20)</strong>"لما نكون في قائمة زر buy المنبثقة ونحاول الخروج منها بواسطة زر الرجوع للخلف في الهاتف... يسبب الخروج من التطبيق كله"</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Appui sur le bouton retour physique du téléphone depuis le BottomSheet Buy fermait toute l'application.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ <code>OnBackPressedDispatcher</code> intercepte le retour</li><li>✅ Si BottomSheet visible → <code>dismiss()</code></li><li>✅ Si BottomSheet fermé → comportement normal</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir le BottomSheet Buy (bouton orange)</li><li>Appuyer sur le bouton retour du téléphone</li><li>✅ Le BottomSheet se ferme, l'app reste ouverte</li><li>Appuyer à nouveau sur retour → navigation normale</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: BottomSheet se ferme correctement ✅ / App ne quitte plus ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- VIDEO-005 -->
+    <div class="ticket" data-status="done" data-prio="medium" id="VIDEO-005">
+      <div class="ticket-header" onclick="toggleTicket('VIDEO-005')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">VIDEO-005</span>
+        <div class="ticket-title">
+          Icônes sociales — Contours creux (Outlined)
+          <span class="priority-tag prio-medium">MEDIUM</span>
+          <small>"نخليها خطوط مجوفة بدلا من شكل ممتلئ يغطي على الفيديو"</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 3)</strong>"تغير بسيط في ازرار التفاعل... نخليها خطوط مجوفة بدلا من شكل ممتلئ يغطي على الفيديو"</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Icônes sociales (cœur, commentaire, panier, partage) avec fond plein/opaque masquant le contenu vidéo.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Remplacement par icônes <code>ic_love</code> (outlined), <code>ic_comment</code>, <code>ic_share</code></li><li>✅ Fond transparent, légère ombre portée pour lisibilité</li><li>✅ Icône cœur rouge <code>ic_love_checked</code> quand liké</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir le feed de vidéos</li><li>✅ Icônes Like/Comment/Cart en contours (non opaques)</li><li>✅ La vidéo est visible à travers les icônes</li><li>Liker une vidéo → cœur devient rouge plein</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Icônes en outline visibles ✅ / Vidéo non masquée ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- VIDEO-006 -->
+    <div class="ticket" data-status="done" data-prio="medium" id="VIDEO-006">
+      <div class="ticket-header" onclick="toggleTicket('VIDEO-006')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">VIDEO-006</span>
+        <div class="ticket-title">
+          Animation cœur — Lottie 60fps
+          <span class="priority-tag prio-medium">MEDIUM</span>
+          <small>"جودة القلب و الانميشن غير جيدة" — Animation cœur de mauvaise qualité</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 6)</strong>"جودة القلب و الانميشن غير جيدة" — Qualité du cœur et animation mauvaise, saccadée</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Animation PNG frame-by-frame saccadée. Cœur en basse résolution.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Remplacement par animation Lottie (<code>lottie_heart_like.json</code>)</li><li>✅ Bibliothèque <code>lottie-compose:6.6.7</code></li><li>✅ Animation fluide : scale 0→130%→90%→100%</li><li>✅ <code>LottieAnimation</code> quand liké, icône outline quand non liké</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir le feed</li><li>Appuyer sur le bouton Like</li><li>✅ Animation cœur fluide (pas de saccades)</li><li>✅ Cœur "pulse" avec un effet de rebond</li><li>Unlike → icône outline correcte</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Animation Lottie fluide ✅ / Effet rebond visible ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== MODULE: UPLOAD & CONTENT CREATION ===== -->
+<div class="module" id="mod-upload">
+  <div class="module-header" onclick="toggleModule('mod-upload')">
+    <span class="module-icon">📤</span>
+    <h2>Upload & Création de Contenu</h2>
+    <span class="module-badge badge-high">4 tickets</span>
+    <span class="collapse-arrow">▼</span>
+  </div>
+  <div class="module-body">
+
+    <!-- UPLOAD-001 -->
+    <div class="ticket" data-status="pending" data-prio="high" id="UPLOAD-001">
+      <div class="ticket-header" onclick="toggleTicket('UPLOAD-001')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">UPLOAD-001</span>
+        <div class="ticket-title">
+          CTA Upload non intuitif
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"هو انا مش عارف كيف ارفع محتوى" — Je ne sais pas comment uploader du contenu</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 1)</strong>"هو انا مش عارف كيف ارفع محتوى" — Le flux de création de contenu n'est pas intuitif</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Pas de CTA (bouton +) visible et central sur l'écran principal pour créer du contenu. L'utilisateur ne trouve pas comment uploader.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ FloatingActionButton "+" central dans la Bottom Nav</li><li>⏳ Ou BottomSheet de sélection type de contenu</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir l'app (connecté)</li><li>✅ Un bouton "+" évident est visible</li><li>Appuyer → options : Vidéo / Photo / Produit</li><li>✅ Navigation vers l'écran de création</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Bouton + visible dans la nav bar ✅ / Manquant encore..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- UPLOAD-002 -->
+    <div class="ticket" data-status="done" data-prio="critical" id="UPLOAD-002">
+      <div class="ticket-header" onclick="toggleTicket('UPLOAD-002')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">UPLOAD-002</span>
+        <div class="ticket-title">
+          HTML brut visible dans Caption / Description produit
+          <span class="priority-tag prio-critical">CRITICAL</span>
+          <small>Balises &lt;img&gt;, &lt;b&gt;, &lt;br/&gt; visibles en texte brut</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Observé (Photos 23, 25)</strong>URL d'image CJ et balises HTML visibles dans la description produit et le champ caption</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Le HTML brut des descriptions CJ était affiché directement à l'utilisateur : <code>&lt;img src="https://..."&gt;</code>, <code>&lt;br/&gt;</code>, etc.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ <code>HtmlSanitizer</code> dans <code>DtoMappers.kt</code></li><li>✅ Suppression des balises <code>&lt;img&gt;</code>, <code>&lt;p&gt;</code>, <code>&lt;b&gt;</code>, <code>&lt;br&gt;</code></li><li>✅ Conversion <code>&lt;br&gt;</code> → retour à la ligne</li><li>✅ Texte propre affiché</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir un produit importé depuis CJ</li><li>Voir la description</li><li>✅ Texte propre, sans balises HTML</li><li>✅ Pas d'URL d'image visible en texte</li><li>Vérifier aussi le champ caption de Promote Product</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Description CJ propre ✅ / Plus de balises HTML ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- UPLOAD-003 -->
+    <div class="ticket" data-status="pending" data-prio="high" id="UPLOAD-003">
+      <div class="ticket-header" onclick="toggleTicket('UPLOAD-003')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">UPLOAD-003</span>
+        <div class="ticket-title">
+          Séparation zones Upload vidéo + photos
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"مكان مخصص لرفع صورة او فيديو" — Zones séparées pour vidéo et photos</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 25)</strong>"لما يكون شخص حاب يروح لمنتج معين... يظهر له مكان مخصص لرفع صورة او فيديو"</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>L'écran Promote Product n'a pas de zones clairement séparées et dédiées pour l'upload vidéo vs photos.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ Section "Upload Product Reel" (vidéo MP4/MOV max 60s, 50MB)</li><li>⏳ Section "Upload Product Images" (JPEG/PNG max 25MB)</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Aller sur Promote Product</li><li>✅ 2 zones distinctes : Vidéo + Photos</li><li>Upload une vidéo → prévisualisation</li><li>Upload des photos → galerie miniatures</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: 2 zones visibles ✅ / Upload vidéo fonctionne..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- UPLOAD-004 -->
+    <div class="ticket" data-status="done" data-prio="high" id="UPLOAD-004">
+      <div class="ticket-header" onclick="toggleTicket('UPLOAD-004')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">UPLOAD-004</span>
+        <div class="ticket-title">
+          Auth Guard avant Upload — Message "Not authenticated"
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"لما نحاول نرفع محتوى يظهر الاشعار التالي" — Message d'erreur non descriptif</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 8)</strong>"لما نحاول نرفع محتوى يظهر الاشعار التالي" — Message "User not authenticated" / "Select Product" bloquant</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Utilisateur non connecté tente d'uploader et reçoit un message d'erreur technique non descriptif.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Vérification <code>isLoggedIn</code> avant l'écran upload</li><li>✅ Redirection vers login si non connecté</li><li>✅ Message d'erreur clair si produit non sélectionné</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Sans être connecté, tenter d'uploader du contenu</li><li>✅ Dialog login apparaît (pas d'erreur technique)</li><li>Connecté, tenter d'uploader sans sélectionner de produit</li><li>✅ Message clair : "Veuillez sélectionner un produit"</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Redirection login correcte ✅ / Messages d'erreur clairs ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== MODULE: SOUND & MUSIC ===== -->
+<div class="module" id="mod-sound">
+  <div class="module-header" onclick="toggleModule('mod-sound')">
+    <span class="module-icon">🎵</span>
+    <h2>Sound & Music</h2>
+    <span class="module-badge badge-critical">3 tickets</span>
+    <span class="collapse-arrow">▼</span>
+  </div>
+  <div class="module-body">
+
+    <!-- SOUND-001 -->
+    <div class="ticket" data-status="pending" data-prio="critical" id="SOUND-001">
+      <div class="ticket-header" onclick="toggleTicket('SOUND-001')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">SOUND-001</span>
+        <div class="ticket-title">
+          Crash — Erreur désérialisation SoundDto
+          <span class="priority-tag prio-critical">CRITICAL</span>
+          <small>Fields [id, uid, title, artist, audioUrl, createdAt] are required but missing</small>
+        </div>
+        <span class="status-badge status-pending">Pending — Fix Android DTO requis</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Observé (Photo 26)</strong>Erreur Kotlinx.serialization visible à l'écran : "Fields [id, uid, title, artist, audioUrl, createdAt] are required but missing"</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Le DTO Android <code>SoundDto</code> exige des champs obligatoires que l'API ne retourne pas toujours. Erreur de désérialisation affichée à l'utilisateur.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ Rendre tous les champs optionnels avec valeurs par défaut dans <code>SoundDto</code></li><li>⏳ Catch <code>SerializationException</code></li><li>⏳ Message user-friendly "Son non disponible"</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Appuyer sur l'icône 🎵 d'une vidéo</li><li>✅ Écran Sound s'affiche sans erreur</li><li>✅ "Original Sound" / "Unknown" par défaut si données manquantes</li><li>✅ Aucun stacktrace visible</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Erreur toujours visible / DTO corrigé ✅..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- SOUND-002 -->
+    <div class="ticket" data-status="done" data-prio="high" id="SOUND-002">
+      <div class="ticket-header" onclick="toggleTicket('SOUND-002')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">SOUND-002</span>
+        <div class="ticket-title">
+          Bouton "Use Sound" — Navigation vers création de post
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"قصدي كان عن هذا الزر" — Le bouton Use Sound doit ouvrir la création de post</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 16)</strong>"الجزئية الي تحدثت انت عنها... قصدي كان عن هذا الزر" — Bouton "Use Sound 🎵" doit naviguer vers la création</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Le bouton "Use Sound" existait mais son action était vide (commentaire <code>// Navigate to create post</code>).</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Android : <code>SoundPageScreen</code> navigue vers <code>AddNewContentScreen</code> avec le <code>soundUid</code> pré-sélectionné</li><li>✅ iOS : <code>SoundPageView</code> ouvre <code>CreatePostView</code> via <code>.sheet</code></li><li>✅ Backend : endpoint <code>POST /api/sounds/extract</code> (FFmpeg)</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Appuyer sur l'icône 🎵 d'une vidéo → écran Sound</li><li>Appuyer sur "Use Sound 🎵"</li><li>✅ Écran de création de post s'ouvre</li><li>✅ Le son est pré-sélectionné dans le créateur</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Navigation OK ✅ / Son pré-sélectionné ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- SOUND-003 -->
+    <div class="ticket" data-status="done" data-prio="high" id="SOUND-003">
+      <div class="ticket-header" onclick="toggleTicket('SOUND-003')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">SOUND-003</span>
+        <div class="ticket-title">
+          Extraction audio depuis vidéo — POST /api/sounds/extract
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"استخدام موسيقى الفيديو المرفوع" — Réutiliser l'audio d'une vidéo</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 26)</strong>"استخدام موسيقى الفيديو هذا... مهمة حتى نعتمد على موسيقى الفيديو المرفوع"</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Impossible d'extraire ou réutiliser l'audio d'une vidéo existante.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ <code>POST /api/sounds/extract?video_url=...</code></li><li>✅ Téléchargement vidéo via <code>httpx</code></li><li>✅ Extraction audio FFmpeg (<code>-vn -acodec aac</code>)</li><li>✅ Upload Cloudinary si configuré</li><li>✅ Retourne <code>audio_url</code> + <code>duration</code></li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Appeler <code>POST /api/sounds/extract?video_url=XXX</code></li><li>✅ Réponse JSON avec <code>audio_url</code> et <code>duration</code></li><li>✅ Fichier audio accessible</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: API extraction fonctionne ✅ / FFmpeg disponible sur Railway..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== MODULE: SETTINGS & PROFILE ===== -->
+<div class="module" id="mod-settings">
+  <div class="module-header" onclick="toggleModule('mod-settings')">
+    <span class="module-icon">⚙️</span>
+    <h2>Settings & Profil</h2>
+    <span class="module-badge badge-high">4 tickets</span>
+    <span class="collapse-arrow">▼</span>
+  </div>
+  <div class="module-body">
+
+    <!-- SET-001 -->
+    <div class="ticket" data-status="done" data-prio="high" id="SET-001">
+      <div class="ticket-header" onclick="toggleTicket('SET-001')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">SET-001</span>
+        <div class="ticket-title">
+          Sélecteur de langue non fonctionnel
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"اللغة غير شغالة" — Le changement de langue ne fonctionne pas</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 5)</strong>"قائمة الاعدادات... اللغة غير شغالة" — Le bouton Langue dans les paramètres est inactif (dead click)</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>L'option "Language" dans Settings était cliquable mais ne faisait rien.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Dialog de sélection de langue (AR/EN/FR)</li><li>✅ Application du locale via <code>Context.setLocale</code></li><li>✅ Rechargement de l'activité via <code>recreate()</code></li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Settings → Language</li><li>✅ Dialog s'ouvre avec les langues disponibles</li><li>Sélectionner Arabe</li><li>✅ L'app passe en arabe + RTL</li><li>Sélectionner Anglais → ✅ Retour en anglais</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Changement langue OK ✅ / RTL correct ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- SET-002 -->
+    <div class="ticket" data-status="pending" data-prio="critical" id="SET-002">
+      <div class="ticket-header" onclick="toggleTicket('SET-002')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">SET-002</span>
+        <div class="ticket-title">
+          Crash navigation vers profil d'un créateur
+          <span class="priority-tag prio-critical">CRITICAL</span>
+          <small>NullPointerException lors du clic sur avatar d'un autre utilisateur</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 7)</strong>"الخروج الكراش" — Crash en naviguant vers le profil d'un créateur depuis le feed</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Cliquer sur l'avatar d'un utilisateur dans le feed provoque un crash (NullPointerException — UID manquant lors du fetch profil ViewModel).</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ Null-check sur <code>userId</code> avant navigation</li><li>⏳ Guard <code>if (userId.isNullOrBlank()) return</code></li><li>⏳ Toast si profil non trouvable</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Dans le feed, appuyer sur l'avatar d'un créateur</li><li>✅ Profil s'ouvre sans crash</li><li>✅ Stats (Followers, Following, Likes) affichées</li><li>✅ Bouton Follow visible</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Crash toujours présent / Profil créateur accessible ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- SET-003 -->
+    <div class="ticket" data-status="done" data-prio="high" id="SET-003">
+      <div class="ticket-header" onclick="toggleTicket('SET-003')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">SET-003</span>
+        <div class="ticket-title">
+          Follow button — Disparaît après suivi (GONE)
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"زر المتابعة يختفي تماما بدلا من رمادي" — Le bouton Follow doit disparaître</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 4)</strong>"زر المتابعة يختفي تماما بدلا من رمادي" — Le bouton Follow doit disparaître (GONE), pas devenir gris (disabled)</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Après un follow, le bouton restait visible en état "disabled" (grisé) au lieu de disparaître.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ <code>View.GONE</code> sur le bouton Follow après API success</li><li>✅ Plus de bouton grisé</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir le profil d'un utilisateur non suivi</li><li>Bouton "Follow" visible ✅</li><li>Appuyer sur Follow</li><li>✅ Le bouton disparaît complètement</li><li>✅ Compteur Followers s'incrémente</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Bouton Follow disparaît après clic ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- SET-004 -->
+    <div class="ticket" data-status="done" data-prio="high" id="SET-004">
+      <div class="ticket-header" onclick="toggleTicket('SET-004')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">SET-004</span>
+        <div class="ticket-title">
+          Save = Cart — Un seul bouton
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"زر الحفظ هو السلة" — Le bouton Save doit être le Cart</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 4)</strong>"زر الحفظ هو السلة" — L'icône de sauvegarde doit être fusionnée avec le panier</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Deux boutons séparés : Save (bookmark) et Cart. Le client veut un seul bouton Cart qui fait les deux actions.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Suppression du bouton Save dédié</li><li>✅ Bouton Cart unique : <code>addToCart() + bookmarkPost()</code></li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Dans le feed sur une vidéo produit</li><li>✅ Pas de bouton Save/Bookmark séparé</li><li>Appuyer sur l'icône Panier</li><li>✅ Produit ajouté au panier</li><li>✅ Post sauvegardé dans les favoris</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Un seul bouton cart ✅ / Double action produit + favori ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== MODULE: PRODUCTS & MARKETPLACE ===== -->
+<div class="module" id="mod-product">
+  <div class="module-header" onclick="toggleModule('mod-product')">
+    <span class="module-icon">🛍️</span>
+    <h2>Produits & Marketplace</h2>
+    <span class="module-badge badge-medium">5 tickets</span>
+    <span class="collapse-arrow">▼</span>
+  </div>
+  <div class="module-body">
+
+    <!-- PROD-001 -->
+    <div class="ticket" data-status="pending" data-prio="medium" id="PROD-001">
+      <div class="ticket-header" onclick="toggleTicket('PROD-001')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">PROD-001</span>
+        <div class="ticket-title">
+          Carte produit overlay — Taille réduite
+          <span class="priority-tag prio-medium">MEDIUM</span>
+          <small>"مستطيل عرض تفاصيل المنتج بجانب زر buy يكون صغير"</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 17)</strong>"مستطيل عرض تفاصيل المنتج بجانب زر buy يكون صغير" — La carte produit en superposition est trop grande</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>La carte produit en bas du lecteur vidéo prend trop de place et masque le contenu.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ Hauteur CardView réduite de ~30%</li><li>⏳ Thumbnail 40dp, titre 1 ligne ellipsis, prix compact</li><li>⏳ Max width 160dp</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir une vidéo avec produit associé</li><li>✅ Carte produit compacte en bas gauche</li><li>✅ La vidéo n'est pas masquée à plus de 15% de hauteur</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Carte toujours grande / Réduite ✅..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- PROD-003 -->
+    <div class="ticket" data-status="pending" data-prio="medium" id="PROD-003">
+      <div class="ticket-header" onclick="toggleTicket('PROD-003')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">PROD-003</span>
+        <div class="ticket-title">
+          Image produit non chargée — Placeholder incorrect
+          <span class="priority-tag prio-medium">MEDIUM</span>
+          <small>Placeholder panier 🛒 au lieu d'une image produit générique</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Observé (Photo 24)</strong>Zone image du détail produit vide avec icône panier gris comme placeholder</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Échec de chargement des images produit CJ, et le placeholder affiché est une icône panier (hors-sujet).</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ Retry logic Coil sur les URLs CJ</li><li>⏳ Placeholder : image générique produit ou shimmer</li><li>⏳ Remplacer <code>ic_cart</code> par <code>ic_image_placeholder</code></li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir un produit CJ</li><li>✅ Image se charge correctement</li><li>✅ Si échec → skeleton loader ou image générique (pas panier)</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Images CJ se chargent ✅ / Placeholder toujours panier..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- PROD-005 -->
+    <div class="ticket" data-status="done" data-prio="medium" id="PROD-005">
+      <div class="ticket-header" onclick="toggleTicket('PROD-005')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">PROD-005</span>
+        <div class="ticket-title">
+          Bannière promotionnelle dynamique (Admin)
+          <span class="priority-tag prio-medium">MEDIUM</span>
+          <small>"تغيير أيقونة العروض والتخفيضات" — Bannière configurable par l'admin</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 10)</strong>"تغيير أيقونة العروض والتخفيضات والنصوص عليها" — La bannière "Sales get 25% discount" doit être modifiable par l'admin</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Bannière promotionnelle hardcodée dans l'app, impossible à modifier sans recompiler.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Modèle <code>PromotionalBanner</code> en base de données</li><li>✅ Table <code>promotional_banners</code> créée (local + Railway)</li><li>✅ Vue admin <code>PromotionalBannerAdminView</code> dans le panel</li><li>✅ Champs : titre, sous-titre, image, lien, date de début/fin, ordre</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Panel admin → Marketplace → Banners</li><li>✅ Interface CRUD disponible</li><li>Créer une bannière avec titre "30% OFF"</li><li>✅ Bannière sauvegardée en DB</li><li>Vérifier qu'elle s'affiche dans l'app</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Admin panel Banners ✅ / Bannière s'affiche dans l'app..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== MODULE: CATEGORIES & CJ ===== -->
+<div class="module" id="mod-cat">
+  <div class="module-header" onclick="toggleModule('mod-cat')">
+    <span class="module-icon">🏷️</span>
+    <h2>Catégories & CJ Import</h2>
+    <span class="module-badge badge-high">5 tickets</span>
+    <span class="collapse-arrow">▼</span>
+  </div>
+  <div class="module-body">
+
+    <!-- CAT-001 -->
+    <div class="ticket" data-status="pending" data-prio="high" id="CAT-001">
+      <div class="ticket-header" onclick="toggleTicket('CAT-001')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">CAT-001</span>
+        <div class="ticket-title">
+          Catégories actives sur la page Products
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"التصنيفات لازم تكون شغالة بصفحة البروداكتس ومتوافقة مع ما يحدده الادمن"</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photos 28, 29)</strong>"التصنيفات لازم تكون شغالة بصفحة البروداكتس ومتوافقة مع ما يحدده الادمن"</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Les catégories définies dans l'admin ne sont pas reflétées sur la page Products de l'app. Filtrage par catégorie non fonctionnel.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ <code>GET /api/categories</code> → chips/tabs en haut de Products</li><li>⏳ Filtrage produits au clic sur catégorie</li><li>⏳ Respect du <code>display_order</code></li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Admin crée/active une catégorie "Electronics"</li><li>Ouvrir la page Products dans l'app</li><li>✅ La catégorie "Electronics" apparaît dans les chips</li><li>Appuyer sur Electronics → ✅ Produits filtrés</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Chips catégories affichées ✅ / Filtrage fonctionne ✅..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- CAT-005 -->
+    <div class="ticket" data-status="pending" data-prio="high" id="CAT-005">
+      <div class="ticket-header" onclick="toggleTicket('CAT-005')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">CAT-005</span>
+        <div class="ticket-title">
+          Icônes catégories — Placeholder panier incorrect
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>Toutes les catégories affichent l'icône 🛒 au lieu de leur icône dédiée</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Observé (Photo 30)</strong>La row des catégories dans Products affiche des icônes panier pour toutes les catégories (Fashion, Electronics, Beauty…)</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Le champ "Icon URL" est vide dans la DB. Le code utilise <code>ic_cart</code> comme fallback au lieu d'une icône par catégorie.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ Fallback par slug dans le code Android/iOS</li><li>⏳ Icônes vectorielles par catégorie (<code>R.drawable.ic_electronics</code>, etc.)</li><li>⏳ Admin : renseigner les Icon URLs</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Ouvrir la page Products</li><li>✅ Chaque catégorie a son icône distincte</li><li>Electronics → icône ordinateur, Fashion → cintre, etc.</li><li>✅ Plus d'icône panier sur les catégories</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Icônes toujours panier / Icônes par catégorie ✅..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- CAT-002 -->
+    <div class="ticket" data-status="pending" data-prio="high" id="CAT-002">
+      <div class="ticket-header" onclick="toggleTicket('CAT-002')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">CAT-002</span>
+        <div class="ticket-title">
+          Auto-catégorisation des produits CJ à l'import
+          <span class="priority-tag prio-high">HIGH</span>
+          <small>"من الاحسن... يتم تلقائيا تصنيف المنتجات" — Catégorisation automatique CJ</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 29)</strong>"من الاحسن لما يتم مناداة كامل المنتوجات عبر صفحة الامبورت... يتم تلقائيا تصنيف المنتجات"</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Les produits importés depuis CJ n'ont pas de catégorie assignée automatiquement.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ Mapping CJ categories → BuyV categories</li><li>⏳ Ex: "3C Products" → Electronics, "Clothing" → Fashion</li><li>⏳ Assignation automatique lors de l'import</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Importer un produit CJ de catégorie "Clothing"</li><li>✅ Dans BuyV → catégorie "Fashion" assignée automatiquement</li><li>Importer un produit "3C Products" → ✅ "Electronics"</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Catégorisation auto ok ✅ / Toujours sans catégorie..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== MODULE: UI/UX GLOBAL ===== -->
+<div class="module" id="mod-ui">
+  <div class="module-header" onclick="toggleModule('mod-ui')">
+    <span class="module-icon">🎨</span>
+    <h2>UI/UX Global</h2>
+    <span class="module-badge badge-medium">5 tickets</span>
+    <span class="collapse-arrow">▼</span>
+  </div>
+  <div class="module-body">
+
+    <!-- UI-001 -->
+    <div class="ticket" data-status="pending" data-prio="medium" id="UI-001">
+      <div class="ticket-header" onclick="toggleTicket('UI-001')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">UI-001</span>
+        <div class="ticket-title">
+          Bouton Buy — Bordures inconfortables
+          <span class="priority-tag prio-medium">MEDIUM</span>
+          <small>"زر buy تكون عليه حدود غير مريحة اثناء التنقل بين الصفحات"</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 2)</strong>"وشكل زر buy تكون عليه حدود غير مريحة اثناء التنقل بين الصفحات" — Contour dur du bouton Buy pendant les transitions</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Le bouton Buy central de la Bottom Nav a un contour rigide qui crée un effet visuel désagréable pendant les transitions de page.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ Retirer <code>borderWidth</code> ou réduire à 0dp</li><li>⏳ Normaliser l'ombre portée</li><li>⏳ Transition fluide pendant navigation</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Naviguer rapidement entre les onglets</li><li>✅ Le bouton Buy s'affiche sans contour dur visible</li><li>✅ Ombre portée naturelle</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Bordure toujours visible / Style amélioré ✅..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- UI-003 -->
+    <div class="ticket" data-status="done" data-prio="medium" id="UI-003">
+      <div class="ticket-header" onclick="toggleTicket('UI-003')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">UI-003</span>
+        <div class="ticket-title">
+          Caractères [OBJ] — Emojis corrompus
+          <span class="priority-tag prio-medium">MEDIUM</span>
+          <small>Rectangles "OBJ" visibles à la place des emojis</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Observé (Photos 20, 22)</strong>Caractères "[OBJ][OBJ][OBJ]" visibles dans les descriptions et noms d'utilisateurs à la place des emojis</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>La police système ne supporte pas tous les emojis Unicode. Les caractères hors-BMP s'affichent en "[OBJ]".</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Dépendance <code>emoji2</code> ajoutée</li><li>✅ <code>EmojiCompat</code> initialisé au démarrage</li><li>✅ Support des emojis récents</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Afficher un profil avec emojis dans le nom/bio</li><li>✅ Emojis s'affichent correctement</li><li>✅ Plus de rectangles "[OBJ]"</li><li>Tester sur Android 8+ et Android 12+</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Emojis s'affichent bien ✅ / OBJ non vu ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- UI-004 -->
+    <div class="ticket" data-status="done" data-prio="medium" id="UI-004">
+      <div class="ticket-header" onclick="toggleTicket('UI-004')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">UI-004</span>
+        <div class="ticket-title">
+          Vignettes profil rectangulaires (9:16)
+          <span class="priority-tag prio-medium">MEDIUM</span>
+          <small>"نخلي الشكل مستطيل بدلا من مربع لإبعاد الفيديو"</small>
+        </div>
+        <span class="status-badge status-done">Implémenté</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 13)</strong>"نشيلو هنا هذا المثلث الي بالاحمر ولو نخلي الشكل مستطيل بدلا من مربع لإبعاد الفيديو"</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Les vignettes vidéo dans la grille du profil étaient carrées (1:1). Le client veut des rectangles portrait (9:16).</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>✅ Ratio modifié de 1:1 → 9:16</li><li>✅ Badge triangulaire supprimé</li><li>✅ Grid items en portrait dans le profil</li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Aller sur le profil utilisateur</li><li>✅ Les vignettes vidéo sont rectangulaires (portrait)</li><li>✅ Pas de badge/triangle rouge visible</li><li>✅ Icône play centrale + compteur vues</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Vignettes en 9:16 ✅ / Triangle supprimé ✅"></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+    <!-- UI-002 -->
+    <div class="ticket" data-status="pending" data-prio="low" id="UI-002">
+      <div class="ticket-header" onclick="toggleTicket('UI-002')">
+        <input type="checkbox" class="ticket-checkbox" onchange="onCheck(this)" onclick="event.stopPropagation()">
+        <span class="ticket-id">UI-002</span>
+        <div class="ticket-title">
+          Spinner de chargement — Un seul, couleur unifiée
+          <span class="priority-tag prio-low">LOW</span>
+          <small>"نتمنى نصحوو أمر دوائر... نخليها وحدة" — Un seul spinner</small>
+        </div>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="ticket-detail">
+        <div class="client-feedback"><strong>Feedback client (Photo 18)</strong>"نتمنى نصحوو أمر دوائر أثناء ضعف الشبكة نخليها وحدة" — Un seul spinner de chargement, couleur cohérente</div>
+        <div class="detail-grid">
+          <div class="detail-box box-problem"><h4>🐛 Problème</h4><p>Plusieurs spinners simultanés de couleurs différentes (vert, violet). Incohérence visuelle.</p></div>
+          <div class="detail-box box-fix"><h4>🔧 Modifications</h4><ul><li>⏳ Centraliser le loading state dans un ViewModel partagé</li><li>⏳ Un seul <code>CircularProgressIndicator</code> Material</li><li>⏳ Couleur : orange BuyV <code>#FF6D00</code></li></ul></div>
+          <div class="detail-box box-test"><h4>🧪 Scénario de test</h4><ol style="padding-left:16px"><li>Simuler connexion lente (mode avion partiel)</li><li>Charger le feed</li><li>✅ Un seul spinner visible, couleur orange BuyV</li><li>✅ Plus de spinners multiples/colorés</li></ol></div>
+        </div>
+        <div class="obs-section"><h4>📝 Observations testeur (NOUS)</h4><textarea class="obs-textarea" placeholder="Ex: Toujours plusieurs spinners / Un seul spinner orange ✅..."></textarea></div>
+        <div class="client-obs"><label>📝 Observations client</label><textarea class="obs-textarea" placeholder="Le client note ses observations ici..."></textarea></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- end container -->
+
+<div class="fab-group">
+  <div class="save-indicator" id="save-indicator">non lié à un fichier</div>
+  <button class="save-btn" id="save-btn" onclick="connectSaveFile()">💾 Lier un fichier .json</button>
+  <button class="export-btn" onclick="exportChecklist()">📄 Exporter rapport .txt</button>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'buyv_qa_checklist_v4';
+let fileHandle = null;   // File System Access API handle
+let saveTimer  = null;
+
+function getState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+}
+function saveState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleFileSave();
+}
+
+// ── File System Access API ─────────────────────────────────────────────────
+async function connectSaveFile() {
+  if (!window.showSaveFilePicker) {
+    alert('Votre navigateur ne supporte pas l\'écriture directe (utilisez Chrome/Edge).\nUtilisez le bouton Exporter à la place.');
+    return;
+  }
+  try {
+    fileHandle = await window.showSaveFilePicker({
+      suggestedName: 'QA_CHECKLIST_BUYV_state.json',
+      startIn: 'desktop',
+      types: [{ description: 'Fichier JSON', accept: { 'application/json': ['.json'] } }]
+    });
+    document.getElementById('save-btn').textContent = '✅ Fichier lié — auto-save ON';
+    document.getElementById('save-btn').classList.add('connected');
+    setIndicator('Fichier lié — sauvegarde automatique activée', true);
+    await writeToFile(); // save immediately
+  } catch(e) {
+    if (e.name !== 'AbortError') console.error(e);
+  }
+}
+
+function scheduleFileSave() {
+  if (!fileHandle) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(writeToFile, 800); // debounce 800ms
+}
+
+async function writeToFile() {
+  if (!fileHandle) return;
+  try {
+    const json = buildJsonSnapshot();
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(json, null, 2));
+    await writable.close();
+    const now = new Date().toLocaleTimeString('fr-FR');
+    setIndicator(`Sauvegardé à ${now}`, true);
+  } catch(e) {
+    setIndicator('Erreur sauvegarde !', false);
+    console.error(e);
+  }
+}
+
+function setIndicator(msg, ok) {
+  const el = document.getElementById('save-indicator');
+  el.textContent = msg;
+  el.className = 'save-indicator' + (ok ? ' ok' : '');
+}
+
+// ── Build JSON snapshot ────────────────────────────────────────────────────
+function buildJsonSnapshot() {
+  const state = getState();
+  const snapshot = {
+    version: '0.4',
+    exported_at: new Date().toISOString(),
+    summary: { total: 0, checked: 0, pct: 0 },
+    tickets: {}
+  };
+
+  document.querySelectorAll('.ticket[id]').forEach(t => {
+    const id     = t.id;
+    const status = t.getAttribute('data-status');
+    const prio   = t.getAttribute('data-prio');
+    const title  = t.querySelector('.ticket-title')?.childNodes[0]?.textContent?.trim() || '';
+    const cb     = t.querySelector('.ticket-checkbox');
+    const tas    = t.querySelectorAll('.obs-textarea');
+
+    snapshot.tickets[id] = {
+      title,
+      priority: prio,
+      implementation_status: status,
+      tested: cb?.checked || false,
+      obs_testeur: tas[0]?.value || '',
+      obs_client:  tas[1]?.value || ''
+    };
+
+    snapshot.summary.total++;
+    if (cb?.checked) snapshot.summary.checked++;
+  });
+
+  snapshot.summary.pct = snapshot.summary.total
+    ? Math.round((snapshot.summary.checked / snapshot.summary.total) * 100)
+    : 0;
+
+  return snapshot;
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const state = getState();
+  document.querySelectorAll('.ticket').forEach(ticket => {
+    const id = ticket.id;
+    if (!id) return;
+
+    const cb = ticket.querySelector('.ticket-checkbox');
+    if (cb && state[id]?.checked) cb.checked = true;
+
+    const tas = ticket.querySelectorAll('.obs-textarea');
+    tas.forEach((ta, i) => {
+      const key = `${id}_ta${i}`;
+      if (state[key]) ta.value = state[key];
+    });
+
+    tas.forEach((ta, i) => {
+      ta.addEventListener('input', () => {
+        const s = getState();
+        s[`${id}_ta${i}`] = ta.value;
+        saveState(s);
+      });
+    });
+  });
+
+  updateStats();
+});
+
+// ── Toggle ticket detail ───────────────────────────────────────────────────
+function toggleTicket(id) {
+  const t = document.getElementById(id);
+  if (t) t.classList.toggle('open');
+}
+
+// ── Toggle module collapse ─────────────────────────────────────────────────
+function toggleModule(id) {
+  const m = document.getElementById(id);
+  if (m) m.classList.toggle('collapsed');
+}
+
+// ── Checkbox ───────────────────────────────────────────────────────────────
+function onCheck(cb) {
+  const ticket = cb.closest('.ticket');
+  const id = ticket?.id;
+  if (!id) return;
+  const s = getState();
+  s[id] = { checked: cb.checked };
+  saveState(s);
+  updateStats();
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+function updateStats() {
+  const all = document.querySelectorAll('.ticket[data-status]');
+  let done = 0, partial = 0, pending = 0;
+  let checkedDone = 0;
+
+  all.forEach(t => {
+    const status = t.getAttribute('data-status');
+    if (status === 'done') done++;
+    else if (status === 'partial') partial++;
+    else pending++;
+
+    const cb = t.querySelector('.ticket-checkbox');
+    if (cb?.checked) checkedDone++;
+  });
+
+  const total = all.length;
+  const pct = total ? Math.round((checkedDone / total) * 100) : 0;
+
+  document.getElementById('cnt-done').textContent = done;
+  document.getElementById('cnt-partial').textContent = partial;
+  document.getElementById('cnt-pending').textContent = pending;
+  document.getElementById('cnt-total').textContent = total;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = `${checkedDone}/${total} testés (${pct}%)`;
+}
+
+// ── Filter ─────────────────────────────────────────────────────────────────
+function filterStatus(filter) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  document.querySelectorAll('.ticket').forEach(t => {
+    const status = t.getAttribute('data-status');
+    const prio   = t.getAttribute('data-prio');
+    if (filter === 'all' || filter === status || filter === prio) {
+      t.style.display = '';
+    } else {
+      t.style.display = 'none';
+    }
+  });
+
+  document.querySelectorAll('.module').forEach(mod => {
+    const visible = [...mod.querySelectorAll('.ticket')].some(t => t.style.display !== 'none');
+    mod.style.display = visible ? '' : 'none';
+  });
+}
+
+function expandAll() {
+  document.querySelectorAll('.ticket').forEach(t => t.classList.add('open'));
+  document.querySelectorAll('.module').forEach(m => m.classList.remove('collapsed'));
+}
+function collapseAll() {
+  document.querySelectorAll('.ticket').forEach(t => t.classList.remove('open'));
+  document.querySelectorAll('.module').forEach(m => m.classList.add('collapsed'));
+}
+
+// ── Export .txt ────────────────────────────────────────────────────────────
+function exportChecklist() {
+  const json = buildJsonSnapshot();
+  const date = new Date().toLocaleDateString('fr-FR');
+  let out = `BUYV — RAPPORT QA CHECKLIST v${json.version}\nDate : ${date}\nProgression : ${json.summary.checked}/${json.summary.total} (${json.summary.pct}%)\n${'='.repeat(60)}\n\n`;
+
+  document.querySelectorAll('.module').forEach(mod => {
+    const modTitle = mod.querySelector('h2')?.textContent || '';
+    out += `\n### ${modTitle.toUpperCase()} ###\n${'─'.repeat(50)}\n`;
+
+    mod.querySelectorAll('.ticket').forEach(t => {
+      const id     = t.id;
+      const data   = json.tickets[id];
+      if (!data) return;
+      const tested = data.tested ? '☑ TESTÉ' : '☐ À TESTER';
+      out += `\n[${tested}] ${id} — ${data.title}\n`;
+      out += `  Priorité : ${data.priority?.toUpperCase()}\n`;
+      out += `  Statut   : ${data.implementation_status}\n`;
+      if (data.obs_testeur) out += `  Obs. testeur : ${data.obs_testeur}\n`;
+      if (data.obs_client)  out += `  Obs. client  : ${data.obs_client}\n`;
+    });
+  });
+
+  const blob = new Blob([out], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `BuyV_QA_Checklist_${date.replace(/\//g, '-')}.txt`;
+  a.click();
+}
+</script>
+</body>
+</html>

@@ -471,7 +471,7 @@ fun AddNewContentScreen(
         }
 
         // Upload Reel
-        Text("Upload Product Reel", fontWeight = FontWeight.SemiBold, color = Color(0xFF0066CC))
+        Text("🎬 Upload Product Reel", fontWeight = FontWeight.SemiBold, color = Color(0xFFFF6F00))
         Spacer(Modifier.height(8.dp))
         if (reelVideoUri.value != null) {
             Row(
@@ -573,7 +573,7 @@ fun AddNewContentScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Upload Product Images
-        Text("Upload Product Images", fontWeight = FontWeight.SemiBold, color = Color(0xFF0066CC))
+        Text("🖼️ Upload Product Images", fontWeight = FontWeight.SemiBold, color = Color(0xFFFF6F00))
         Spacer(Modifier.height(8.dp))
         if (productImageUris.isNotEmpty()) {
             LazyRow(
@@ -586,7 +586,7 @@ fun AddNewContentScreen(
                 item {
                     Button(
                         onClick = { imageLauncher.launch("image/*") },
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1B7ACE)),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFFF6F00)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.padding(vertical = 25.dp)
                     ) {

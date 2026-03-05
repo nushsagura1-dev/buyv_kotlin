@@ -150,6 +150,8 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging-ktx:24.1.2")
     // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:21.3.0")
+    // Facebook Login SDK (AUTH-002)
+    implementation("com.facebook.android:facebook-login:18.0.0")
     // implementation("com.google.firebase:firebase-storage-ktx:21.0.2") // Commented out - using Cloudinary instead
 
     // Cloudinary

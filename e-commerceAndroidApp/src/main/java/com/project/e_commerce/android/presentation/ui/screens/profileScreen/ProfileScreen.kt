@@ -26,6 +26,7 @@ import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -50,6 +51,8 @@ import androidx.navigation.NavHostController
 import android.util.Log
 import androidx.compose.runtime.LaunchedEffect
 import coil3.compose.AsyncImage
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import com.project.e_commerce.android.presentation.viewModel.editProfileViewModel.EditProfileViewModel
 import com.project.e_commerce.android.presentation.viewModel.followingViewModel.FollowingViewModel
 import com.project.e_commerce.android.presentation.utils.UserFollowStats
@@ -179,6 +182,7 @@ fun ProfileScreen(navController: NavHostController) {
             )
         }
     } else {
+        Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -1169,6 +1173,21 @@ fun UserLikedGrid(likedContent: List<com.project.e_commerce.android.domain.model
                 }
             }
         }
+        // UPLOAD-001: FAB to open upload screen
+        FloatingActionButton(
+            onClick = { navController.navigate(Screens.ProfileScreen.AddNewContentScreen.route) },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 80.dp),
+            containerColor = Color(0xFFFF6F00)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Upload content",
+                tint = Color.White
+            )
+        }
+        } // closes Box
     }
 }
 

@@ -17,7 +17,7 @@ fun LoadingView(
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(
-            color = Color(0xFF0066CC)
+            color = Color(0xFFFF6D00)
         )
     }
 }

@@ -42,6 +42,7 @@ import com.project.e_commerce.domain.usecase.auth.LogoutUseCase
 import com.project.e_commerce.domain.usecase.auth.RegisterUseCase
 import com.project.e_commerce.domain.usecase.auth.SendPasswordResetUseCase
 import com.project.e_commerce.domain.usecase.auth.ConfirmPasswordResetUseCase
+import com.project.e_commerce.domain.usecase.auth.FacebookSignInUseCase
 import com.project.e_commerce.domain.usecase.blockeduser.GetBlockedUsersUseCase
 import com.project.e_commerce.domain.usecase.blockeduser.BlockUserUseCase
 import com.project.e_commerce.domain.usecase.blockeduser.UnblockUserUseCase
@@ -260,6 +261,7 @@ val useCaseModule = module {
     single { GetCurrentUserUseCase(get()) }
     single { SendPasswordResetUseCase(get()) }
     single { GoogleSignInUseCase(get()) }
+    single { FacebookSignInUseCase(get()) }
     single { ConfirmPasswordResetUseCase(get()) }
     
     // Product Use Cases

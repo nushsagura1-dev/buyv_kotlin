@@ -72,6 +72,7 @@ import com.project.e_commerce.android.domain.usecase.UpdateOrderStatusUseCase
 import com.project.e_commerce.android.domain.usecase.CancelOrderUseCase
 import com.project.e_commerce.android.domain.usecase.GoogleSignInUseCase
 import com.project.e_commerce.android.data.helper.GoogleSignInHelper
+import com.project.e_commerce.android.data.helper.FacebookSignInHelper
 
 import com.project.e_commerce.android.presentation.viewModel.SocialViewModel
 import com.project.e_commerce.android.presentation.viewModel.FavouritesViewModel
@@ -320,6 +321,12 @@ val viewModelModule = module {
             helper
         }
 
+        single {
+            val helper = FacebookSignInHelper(androidContext())
+            android.util.Log.d("CrashDebug", "AppModule: FacebookSignInHelper created")
+            helper
+        }
+
         // ViewModels
         viewModel {
             android.util.Log.d("CrashDebug", "AppModule: AuthViewModel created")
@@ -330,6 +337,8 @@ val viewModelModule = module {
                 checkMatchedPassword = get(),
                 googleSignInUseCase = get(), // Backend Google Sign-In via shared KMP
                 googleSignInHelper = get(),
+                facebookSignInUseCase = get(), // AUTH-002
+                facebookSignInHelper = get(), // AUTH-002
                 loginUseCase = get(),
                 registerUseCase = get(),
                 logoutUseCase = get(),

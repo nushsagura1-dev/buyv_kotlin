@@ -259,7 +259,27 @@ class AuthNetworkRepository(
             Result.Error(ApiError.Unknown(e.message ?: "Failed to delete account"))
         }
     }
-    
+
+    override suspend fun signInWithFacebook(accessToken: String): Result<UserProfile> {
+        if (accessToken.isBlank()) {
+            return Result.Error(ApiError.ValidationError("Facebook access token is required"))
+        }
+        return try {
+            val response = authApi.facebookSignIn(accessToken)
+            tokenManager.saveAccessToken(response.accessToken)
+            response.refreshToken?.let { tokenManager.saveRefreshToken(it) }
+            val expirationTime = (Clock.System.now().toEpochMilliseconds() / 1000) + response.expiresIn
+            tokenManager.saveTokenExpiration(expirationTime)
+            Result.Success(response.user.toDomain())
+        } catch (e: ClientRequestException) {
+            Result.Error(ApiError.fromException(e))
+        } catch (e: IOException) {
+            Result.Error(ApiError.NetworkError)
+        } catch (e: Exception) {
+            Result.Error(ApiError.Unknown(e.message ?: "Facebook Sign-In failed"))
+        }
+    }
+
     /**
      * Refresh access token using refresh token
      */
